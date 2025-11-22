@@ -103,11 +103,14 @@ quit
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
-            cwd=str(install_path.parent)
+            cwd=str(install_path.parent),
+            bufsize=0  # Unbuffered output
         )
         
         # Script küldése
-        stdout, _ = await process.communicate(input=steamcmd_script.encode())
+        process.stdin.write(steamcmd_script.encode())
+        await process.stdin.drain()
+        process.stdin.close()
         
         # Kimenet feldolgozása (real-time)
         # Valós idejű kimenet olvasása
