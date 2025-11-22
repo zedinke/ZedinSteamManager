@@ -72,10 +72,8 @@ def require_role(required_role: UserRole):
 
 def require_manager_admin(request: Request, db: Session = Depends(get_db)) -> User:
     """Manager Admin jogosultság ellenőrzése session alapján"""
-    from fastapi import Request
     user_id = request.session.get("user_id")
     if not user_id:
-        from fastapi.responses import RedirectResponse
         raise HTTPException(
             status_code=status.HTTP_302_FOUND,
             detail="Nincs bejelentkezve",
