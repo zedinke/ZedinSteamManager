@@ -256,7 +256,7 @@ async def delete_server(
     server_id: int,
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Szerver törlése - token felszabadítása"""
+    """Server Admin: Szerver törlése - token felszabadítása és szerver törlése"""
     current_user = require_server_admin(request, db)
     
     server = db.query(ServerInstance).filter(
@@ -269,18 +269,20 @@ async def delete_server(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
-    # Token felszabadítása (token_used_id = NULL)
+    # Token felszabadítása (ha van token társítva)
     # A token marad aktív, hogy újra használható legyen
-    server.token_used_id = None
-    server.token_expires_at = None
-    server.scheduled_deletion_date = None
-    server.status = ServerStatus.STOPPED
-    server.stopped_at = datetime.now()
+    # De csak akkor, ha a szerver nem ütemezett törlésre (grace period alatt)
+    if server.token_used_id and server.scheduled_deletion_date is None:
+        # Token felszabadítása - de csak ha még nem ütemezett törlésre
+        # (Ha grace period alatt van, akkor a token már inaktív, nem kell felszabadítani)
+        pass  # A token automatikusan felszabadul, amikor töröljük a szervert
     
+    # Szerver törlése az adatbázisból
+    db.delete(server)
     db.commit()
     
     return JSONResponse({
         "success": True,
-        "message": "Szerver törölve, token felszabadítva"
+        "message": "Szerver törölve"
     })
 
