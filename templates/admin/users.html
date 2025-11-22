@@ -22,7 +22,6 @@
                             <th>Regisztrálva</th>
                             <th>Aktív tokenek</th>
                             <th>Legkésőbbi token lejárat</th>
-                            <th>Műveletek</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -32,7 +31,7 @@
                             {% set latest_token_expiry = user_data.latest_token_expiry %}
                             {% set server_admin_ids = user_data.server_admin_ids %}
                             <tr>
-                                <td>{{ user.username }}</td>
+                                <td><strong>{{ user.username }}</strong></td>
                                 <td>{{ user.email }}</td>
                                 <td>
                                     <span class="badge role-{{ user.role.value }}">
@@ -46,14 +45,14 @@
                                 <td>
                                     {% if user.role.value in ["admin", "user"] %}
                                         <div class="server-admin-selector" data-user-id="{{ user.id }}">
-                                            <select multiple class="server-admin-multiselect" id="server_admins_{{ user.id }}" style="min-width: 200px; padding: 5px;">
+                                            <select multiple class="server-admin-multiselect" id="server_admins_{{ user.id }}">
                                                 {% for server_admin in server_admins %}
                                                     <option value="{{ server_admin.id }}" {% if server_admin.id in server_admin_ids %}selected{% endif %}>
                                                         {{ server_admin.username }}
                                                     </option>
                                                 {% endfor %}
                                             </select>
-                                            <button type="button" class="btn btn-sm btn-primary save-server-admins" data-user-id="{{ user.id }}" style="margin-top: 5px;">
+                                            <button type="button" class="btn btn-sm btn-primary save-server-admins" data-user-id="{{ user.id }}">
                                                 <i class="fas fa-save"></i> Mentés
                                             </button>
                                         </div>
@@ -69,11 +68,6 @@
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <button type="button" class="btn btn-sm btn-secondary edit-user" data-user-id="{{ user.id }}" title="Szerkesztés">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -145,6 +139,9 @@ document.querySelectorAll('.save-server-admins').forEach(btn => {
     border-radius: 5px;
     font-size: 0.875rem;
     min-height: 80px;
+    min-width: 200px;
+    padding: 5px;
+    background: white;
 }
 
 .server-admin-multiselect:focus {
