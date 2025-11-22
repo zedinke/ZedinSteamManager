@@ -202,11 +202,21 @@ async def list_all_users(
     
     from sqlalchemy import func, case
     # MySQL kompatibilis query - FILTER helyett CASE WHEN használata
-    users = db.query(
+    results = db.query(
         User,
         func.sum(case((Token.is_active == True, 1), else_=0)).label("active_token_count"),
         func.max(case((Token.is_active == True, Token.expires_at), else_=None)).label("latest_token_expiry")
     ).outerjoin(Token, User.id == Token.user_id).group_by(User.id).order_by(User.created_at.desc()).all()
+    
+    # Adatok formázása template-hez
+    users = []
+    for result in results:
+        user = result[0]
+        users.append({
+            "user": user,
+            "active_token_count": result.active_token_count or 0,
+            "latest_token_expiry": result.latest_token_expiry
+        })
     
     from app.main import get_templates
     templates = get_templates()
