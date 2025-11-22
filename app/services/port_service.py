@@ -6,7 +6,9 @@ import socket
 import subprocess
 import psutil
 from typing import Optional, List
+from sqlalchemy.orm import Session
 from app.config import settings
+from app.database import ServerInstance
 
 def check_port_available(port: int) -> bool:
     """Ellenőrzi, hogy egy port elérhető-e"""
@@ -51,28 +53,64 @@ def get_used_ports() -> List[int]:
     
     return sorted(used_ports)
 
-def find_available_port(start_port: int = None, max_attempts: int = 100) -> Optional[int]:
+def get_ark_server_ports(db: Session) -> List[int]:
     """
-    Talál egy elérhető portot
+    Visszaadja az összes Ark szerver portját az adatbázisból
+    Csak a 7777-es port környékén lévő portokat (Ark szerver portok)
+    """
+    ark_ports = []
+    
+    try:
+        # Összes Ark szerver port lekérése
+        servers = db.query(ServerInstance.port).filter(
+            ServerInstance.port.isnot(None)
+        ).all()
+        
+        for server in servers:
+            if server.port and server.port >= settings.ark_default_port:
+                # Csak az Ark alap port (7777) vagy annál nagyobb portokat vesszük figyelembe
+                ark_ports.append(server.port)
+    except Exception:
+        # Ha hiba van, üres listát adunk vissza
+        pass
+    
+    return sorted(ark_ports)
+
+def find_available_port(start_port: int = None, max_attempts: int = 100, db: Session = None) -> Optional[int]:
+    """
+    Talál egy elérhető Ark szerver portot (7777-től kezdve)
     
     Args:
-        start_port: Kezdő port (ha None, akkor a legmagasabb használt port + 2)
+        start_port: Kezdő port (ha None, akkor a legmagasabb használt Ark port + 2)
         max_attempts: Maximum próbálkozások száma
+        db: Adatbázis session (opcionális, ha nincs megadva, akkor csak a rendszer portokat nézi)
     
     Returns:
         Elérhető port szám vagy None
     """
     if start_port is None:
-        # Alapértelmezett porttól kezdünk
+        # Alapértelmezett Ark porttól kezdünk (7777)
         start_port = settings.ark_default_port
     
-    # Először ellenőrizzük a használt portokat
-    used_ports = get_used_ports()
-    
-    # Ha van használt port, akkor a legmagasabb + 2-től kezdünk
-    if used_ports:
-        highest_port = max(used_ports)
-        start_port = max(start_port, highest_port + 2)
+    # Először ellenőrizzük az Ark szerverek portjait az adatbázisból
+    if db:
+        ark_ports = get_ark_server_ports(db)
+        if ark_ports:
+            # A legmagasabb Ark port + 2-től kezdünk
+            highest_ark_port = max(ark_ports)
+            start_port = max(start_port, highest_ark_port + 2)
+        else:
+            # Ha nincs Ark szerver, akkor az alap porttól kezdünk
+            start_port = settings.ark_default_port
+    else:
+        # Ha nincs db session, akkor a rendszer portokat nézzük
+        # De csak azokat, amelyek az Ark alap port környékén vannak
+        used_ports = get_used_ports()
+        ark_related_ports = [p for p in used_ports if p >= settings.ark_default_port]
+        
+        if ark_related_ports:
+            highest_port = max(ark_related_ports)
+            start_port = max(start_port, highest_port + 2)
     
     # Keressük az első elérhető portot
     for i in range(max_attempts):

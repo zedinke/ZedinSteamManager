@@ -251,8 +251,8 @@ async def create_server(
             detail="Nincs elérhető aktív token!"
         )
     
-    # Port hozzárendelés
-    game_port = find_available_port()
+    # Port hozzárendelés - csak Ark szerver portokat nézünk (7777-től)
+    game_port = find_available_port(db=db)
     if not game_port:
         raise HTTPException(
             status_code=500,
