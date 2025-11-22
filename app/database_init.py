@@ -42,6 +42,49 @@ def init_db():
                         conn.commit()
                 print("✓ created_by_id oszlop hozzáadva")
         
+        # Tokens tábla ellenőrzése
+        if 'tokens' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('tokens')]
+            indexes = [idx['name'] for idx in inspector.get_indexes('tokens')]
+            
+            # generated_by_id oszlop hozzáadása ha hiányzik
+            if 'generated_by_id' not in columns:
+                print("generated_by_id oszlop hozzáadása a tokens táblához...")
+                with engine.connect() as conn:
+                    # Először az oszlop
+                    conn.execute(text("""
+                        ALTER TABLE tokens 
+                        ADD COLUMN generated_by_id INT(11) UNSIGNED NOT NULL
+                    """))
+                    conn.commit()
+                    
+                    # Foreign key hozzáadása
+                    try:
+                        conn.execute(text("""
+                            ALTER TABLE tokens 
+                            ADD CONSTRAINT fk_tokens_generated_by 
+                            FOREIGN KEY (generated_by_id) REFERENCES users(id) ON DELETE CASCADE
+                        """))
+                        conn.commit()
+                    except Exception as e:
+                        # Ha már létezik a foreign key, akkor nem baj
+                        if "Duplicate foreign key" not in str(e) and "already exists" not in str(e).lower():
+                            print(f"  Figyelmeztetés: Foreign key hozzáadása: {e}")
+                    
+                    # Index hozzáadása, ha még nincs
+                    token_indexes = [idx['name'] for idx in inspector.get_indexes('tokens')]
+                    if 'ix_tokens_generated_by_id' not in token_indexes:
+                        try:
+                            conn.execute(text("""
+                                ALTER TABLE tokens 
+                                ADD INDEX ix_tokens_generated_by_id (generated_by_id)
+                            """))
+                            conn.commit()
+                        except Exception as e:
+                            if "Duplicate key name" not in str(e):
+                                print(f"  Figyelmeztetés: Index hozzáadása: {e}")
+                print("✓ generated_by_id oszlop hozzáadva")
+        
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
         raise
