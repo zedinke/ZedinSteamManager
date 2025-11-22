@@ -76,15 +76,16 @@ async def send_token_to_user(db: Session, token: Token, user_id: int) -> bool:
         token.expires_at.strftime("%Y-%m-%d %H:%M:%S")
     )
     
-    # Értesítés létrehozása
+    # Értesítés létrehozása a tokennel
     from app.services.notification_service import create_notification
     type_text = "Szerver Admin" if token.token_type == TokenType.SERVER_ADMIN else "Felhasználó"
+    activation_link = f"{settings.base_url}/tokens/activate?token={token.token}"
     create_notification(
         db,
         user_id,
         "token_generated",
         "Új token generálva",
-        f"Ön számára egy új {type_text} token lett generálva. Lejárat: {token.expires_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        f"Ön számára egy új {type_text} token lett generálva.\n\nToken: {token.token}\nLejárat: {token.expires_at.strftime('%Y-%m-%d %H:%M:%S')}\n\nAktiválás: {activation_link}"
     )
     
     return True
