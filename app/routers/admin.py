@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import (
     get_db, User, ServerAdminAdmin, Server, AdminServer,
-    UserRole
+    UserRole, Token
 )
 from app.services.auth_service import create_user
 from app.services.email_service import send_verification_email
@@ -216,20 +216,92 @@ async def list_all_users(
         func.max(case((Token.is_active == True, Token.expires_at), else_=None)).label("latest_token_expiry")
     ).outerjoin(Token, User.id == Token.user_id).group_by(User.id).order_by(User.created_at.desc()).all()
     
+    # Összes Server Admin lekérése (legördülő menühöz)
+    server_admins = db.query(User).filter(User.role == UserRole.SERVER_ADMIN).order_by(User.username).all()
+    
     # Adatok formázása template-hez
     users = []
     for result in results:
         user = result[0]
+        
+        # Server Admin kapcsolatok lekérése (ha admin vagy user)
+        server_admin_relations = []
+        if user.role.value in ["admin", "user"]:
+            relations = db.query(ServerAdminAdmin).filter(
+                ServerAdminAdmin.admin_id == user.id
+            ).all()
+            server_admin_relations = [rel.server_admin_id for rel in relations]
+        
         users.append({
             "user": user,
             "active_token_count": result.active_token_count or 0,
-            "latest_token_expiry": result.latest_token_expiry
+            "latest_token_expiry": result.latest_token_expiry,
+            "server_admin_ids": server_admin_relations
         })
     
     from app.main import get_templates
     templates = get_templates()
     return templates.TemplateResponse(
         "admin/users.html",
-        {"request": request, "users": users}
+        {
+            "request": request,
+            "users": users,
+            "server_admins": server_admins
+        }
     )
+
+@router.post("/admin/users/{user_id}/server-admins")
+async def update_user_server_admins(
+    request: Request,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """Felhasználó Server Admin kapcsolatainak frissítése"""
+    current_user = require_manager_admin(request, db)
+    
+    # Form adatok lekérése
+    form = await request.form()
+    server_admin_ids = []
+    for key, value in form.items():
+        if key == "server_admin_ids":
+            try:
+                server_admin_ids.append(int(value))
+            except ValueError:
+                pass
+    
+    # Felhasználó lekérése
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Felhasználó nem található")
+    
+    # Csak admin és user esetén lehet beállítani
+    if user.role.value not in ["admin", "user"]:
+        raise HTTPException(status_code=400, detail="Csak admin és user felhasználókhoz lehet server admin-okat rendelni")
+    
+    # Server Admin ID-k ellenőrzése
+    if server_admin_ids:
+        server_admins = db.query(User).filter(
+            User.id.in_(server_admin_ids),
+            User.role == UserRole.SERVER_ADMIN
+        ).all()
+        if len(server_admins) != len(server_admin_ids):
+            raise HTTPException(status_code=400, detail="Érvénytelen server admin ID-k")
+    
+    # Régi kapcsolatok törlése
+    db.query(ServerAdminAdmin).filter(
+        ServerAdminAdmin.admin_id == user_id
+    ).delete()
+    
+    # Új kapcsolatok létrehozása
+    for server_admin_id in server_admin_ids:
+        relation = ServerAdminAdmin(
+            server_admin_id=server_admin_id,
+            admin_id=user_id
+        )
+        db.add(relation)
+    
+    db.commit()
+    
+    request.session["success"] = f"{user.username} server admin kapcsolatai sikeresen frissítve!"
+    return RedirectResponse(url="/admin/users", status_code=302)
 
