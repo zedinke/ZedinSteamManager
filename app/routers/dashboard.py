@@ -27,6 +27,17 @@ async def dashboard(
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/login", status_code=302)
     """Dashboard oldal"""
+    # Session ellenőrzés
+    user_id = request.session.get("user_id")
+    if not user_id:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/login", status_code=302)
+    
+    current_user = db.query(User).filter(User.id == user_id).first()
+    if not current_user:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/login", status_code=302)
+    
     stats = {}
     
     if current_user.role.value == "manager_admin":
