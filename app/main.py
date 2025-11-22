@@ -76,6 +76,7 @@ app.include_router(server_management.router, tags=["Server Management"])
 app.include_router(games_admin.router, tags=["Games Admin"])
 app.include_router(servers.router, tags=["Servers"])
 app.include_router(ai_chat.router, tags=["AI Chat"])
+app.include_router(api.router, prefix="/api", tags=["API"])
 
 # Token lejárat kezelés - háttérben futó task
 @app.on_event("startup")
@@ -84,7 +85,6 @@ async def startup_event():
     from app.tasks.token_expiry_task import token_expiry_worker
     asyncio.create_task(token_expiry_worker())
     logging.info("Token lejárat ellenőrzés elindítva")
-app.include_router(api.router, prefix="/api", tags=["API"])
 
 # Updating oldal router
 from fastapi.responses import HTMLResponse
