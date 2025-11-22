@@ -119,6 +119,46 @@ async def create_cluster(
         status_code=302
     )
 
+@router.post("/clusters/{cluster_id}/delete")
+async def delete_cluster(
+    request: Request,
+    cluster_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Cluster törlése"""
+    current_user = require_server_admin(request, db)
+    
+    # Cluster lekérése
+    cluster = db.query(Cluster).filter(
+        and_(
+            Cluster.id == cluster_id,
+            Cluster.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Cluster nem található")
+    
+    # Ellenőrizzük, hogy van-e hozzárendelt szerver
+    servers_count = db.query(ServerInstance).filter(
+        ServerInstance.cluster_id == cluster.id
+    ).count()
+    
+    if servers_count > 0:
+        return RedirectResponse(
+            url=f"/ark/clusters?error=A+cluster+törlése+előtt+először+törölni+kell+a+hozzárendelt+szerevereket+({servers_count}+szerver)",
+            status_code=302
+        )
+    
+    # Cluster törlése
+    db.delete(cluster)
+    db.commit()
+    
+    return RedirectResponse(
+        url="/ark/clusters?success=Cluster+törölve",
+        status_code=302
+    )
+
 @router.get("/servers/create", response_class=HTMLResponse)
 async def show_create_server(
     request: Request,
@@ -389,6 +429,51 @@ async def show_edit_server(
         "server": server,
         "clusters": clusters
     })
+
+@router.post("/servers/{server_id}/delete")
+async def delete_server(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Ark szerver törlése"""
+    current_user = require_server_admin(request, db)
+    
+    # Szerver lekérése
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    # Ha fut a szerver, akkor először le kell állítani
+    if server.status == ServerStatus.RUNNING:
+        return RedirectResponse(
+            url=f"/ark/servers?error=A+szerver+törlése+előtt+először+le+kell+állítani",
+            status_code=302
+        )
+    
+    # Symlink eltávolítása (ha létezik)
+    try:
+        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first() if server.cluster_id else None
+        cluster_id_str = cluster.cluster_id if cluster else None
+        remove_server_symlink(server.id, cluster_id_str)
+    except Exception as e:
+        # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
+        print(f"Figyelmeztetés: Symlink eltávolítása sikertelen: {e}")
+    
+    # Szerver törlése
+    db.delete(server)
+    db.commit()
+    
+    return RedirectResponse(
+        url="/ark/servers?success=Szerver+törölve",
+        status_code=302
+    )
 
 @router.post("/servers/{server_id}/edit")
 async def edit_server(
