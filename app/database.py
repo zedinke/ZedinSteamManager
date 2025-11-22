@@ -249,6 +249,43 @@ class ChatMessage(Base):
     room = relationship("ChatRoom", back_populates="messages")
     user = relationship("User", back_populates="chat_messages")
 
+class Game(Base):
+    """Steam játékok, amiket a Manager Admin engedélyez"""
+    __tablename__ = "games"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)  # Játék neve
+    steam_app_id = Column(String(50), nullable=True, index=True)  # Steam App ID
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    server_instances = relationship("ServerInstance", back_populates="game")
+
+class ServerInstance(Base):
+    """Indított szerver példányok"""
+    __tablename__ = "server_instances"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True)
+    server_admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)  # Szerver neve
+    port = Column(Integer, nullable=True)  # Port szám
+    status = Column(EnumType(ServerStatus), default=ServerStatus.STOPPED, nullable=False, index=True)
+    config = Column(JSON, nullable=True)  # Szerver konfiguráció
+    token_used_id = Column(Integer, ForeignKey("tokens.id", ondelete="SET NULL"), nullable=True, index=True)  # Használt token
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    stopped_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    game = relationship("Game", back_populates="server_instances")
+    server_admin = relationship("User", foreign_keys=[server_admin_id])
+    token_used = relationship("Token", foreign_keys=[token_used_id])
+
 # Dependency
 def get_db():
     """Database session dependency"""

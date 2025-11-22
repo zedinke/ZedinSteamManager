@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Szervereim{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-server"></i> Szervereim</h1>
+        <a href="/servers/start" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Új Szerver Indítása
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if servers %}
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Név</th>
+                            <th>Játék</th>
+                            <th>Port</th>
+                            <th>Státusz</th>
+                            <th>Indítva</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for server in servers %}
+                        <tr>
+                            <td><strong>{{ server.name }}</strong></td>
+                            <td>{{ server.game.name }}</td>
+                            <td>{{ server.port or '-' }}</td>
+                            <td>
+                                {% if server.status.value == 'running' %}
+                                    <span class="badge bg-success">Fut</span>
+                                {% elif server.status.value == 'stopped' %}
+                                    <span class="badge bg-secondary">Leállítva</span>
+                                {% elif server.status.value == 'restarting' %}
+                                    <span class="badge bg-warning">Újraindítás</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ server.started_at.strftime('%Y-%m-%d %H:%M') if server.started_at else '-' }}</td>
+                            <td>
+                                {% if server.status.value == 'running' %}
+                                    <button class="btn btn-sm btn-warning" onclick="stopServer({{ server.id }})">
+                                        <i class="fas fa-stop"></i> Leállítás
+                                    </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-danger" onclick="deleteServer({{ server.id }})">
+                                    <i class="fas fa-trash"></i> Törlés
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Még nincs indított szerver.
+                    <a href="/servers/start">Indíts egyet!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function stopServer(serverId) {
+    if (!confirm('Biztosan le szeretnéd állítani ezt a szervert?')) {
+        return;
+    }
+    
+    fetch(`/servers/${serverId}/stop`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Hiba történt');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hiba történt');
+    });
+}
+
+function deleteServer(serverId) {
+    if (!confirm('Biztosan törölni szeretnéd ezt a szervert?')) {
+        return;
+    }
+    
+    fetch(`/servers/${serverId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Hiba történt');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hiba történt');
+    });
+}
+</script>
+{% endblock %}
+

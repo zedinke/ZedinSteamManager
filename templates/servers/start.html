@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Szerver Indítása{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1><i class="fas fa-play"></i> Szerver Indítása</h1>
+    
+    {% if active_tokens == 0 %}
+    <div class="alert alert-warning mt-4">
+        <i class="fas fa-exclamation-triangle"></i> 
+        <strong>Nincs aktív token!</strong> Szükséges 1 aktív token a szerver indításához.
+        <a href="/tokens/activate" class="alert-link">Token aktiválása</a>
+    </div>
+    {% else %}
+    <div class="alert alert-info mt-4">
+        <i class="fas fa-info-circle"></i> 
+        Aktív tokenek száma: <strong>{{ active_tokens }}</strong>
+        <br><small>1 szerver indítása = 1 token</small>
+    </div>
+    {% endif %}
+    
+    <div class="card mt-4">
+        <div class="card-body">
+            <form method="POST" action="/servers/start">
+                <div class="mb-3">
+                    <label for="game_id" class="form-label">Játék *</label>
+                    <select class="form-control" id="game_id" name="game_id" required {% if active_tokens == 0 %}disabled{% endif %}>
+                        <option value="">-- Válassz játékot --</option>
+                        {% for game in games %}
+                        <option value="{{ game.id }}">{{ game.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">Válassz ki egy játékot a Manager Admin által engedélyezettek közül</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="name" class="form-label">Szerver neve *</label>
+                    <input type="text" class="form-control" id="name" name="name" required {% if active_tokens == 0 %}disabled{% endif %}>
+                    <small class="form-text text-muted">Pl: My ARK Server #1</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="port" class="form-label">Port</label>
+                    <input type="number" class="form-control" id="port" name="port" min="1024" max="65535" {% if active_tokens == 0 %}disabled{% endif %}>
+                    <small class="form-text text-muted">Opcionális: A szerver port száma</small>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" {% if active_tokens == 0 %}disabled{% endif %}>
+                        <i class="fas fa-play"></i> Szerver Indítása (1 token)
+                    </button>
+                    <a href="/servers" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

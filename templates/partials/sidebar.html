@@ -58,6 +58,26 @@
                     <a href="/admin/server/steamcmd" class="nav-item nav-sub-item">
                         <i class="fas fa-download"></i> SteamCMD
                     </a>
+                    <a href="/admin/games" class="nav-item nav-sub-item">
+                        <i class="fas fa-gamepad"></i> Steam Szerverek
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+        
+        {% if user_role == "server_admin" %}
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-server"></i> Szerverkezelő
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/servers" class="nav-item nav-sub-item">
+                        <i class="fas fa-list"></i> Szervereim
+                    </a>
+                    <a href="/servers/start" class="nav-item nav-sub-item">
+                        <i class="fas fa-play"></i> Szerver indítása
+                    </a>
                 </div>
             </div>
         {% endif %}

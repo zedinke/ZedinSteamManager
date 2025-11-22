@@ -12,7 +12,7 @@ sys.path.insert(0, str(BASE_DIR))
 from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
-    ChatRoom, ChatMessage
+    ChatRoom, ChatMessage, Game, ServerInstance
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings

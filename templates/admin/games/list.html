@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Steam Játékok Kezelése{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-gamepad"></i> Steam Játékok Kezelése</h1>
+        <a href="/admin/games/add" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Új Játék Hozzáadása
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if games %}
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Név</th>
+                            <th>Steam App ID</th>
+                            <th>Leírás</th>
+                            <th>Státusz</th>
+                            <th>Létrehozva</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for game in games %}
+                        <tr>
+                            <td><strong>{{ game.name }}</strong></td>
+                            <td>{{ game.steam_app_id or '-' }}</td>
+                            <td>{{ game.description or '-' }}</td>
+                            <td>
+                                {% if game.is_active %}
+                                    <span class="badge bg-success">Aktív</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inaktív</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ game.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-warning" onclick="toggleGame({{ game.id }}, {{ 'false' if game.is_active else 'true' }})">
+                                    <i class="fas fa-toggle-{{ 'on' if game.is_active else 'off' }}"></i>
+                                    {{ 'Deaktiválás' if game.is_active else 'Aktiválás' }}
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteGame({{ game.id }})">
+                                    <i class="fas fa-trash"></i> Törlés
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Még nincs játék hozzáadva.
+                    <a href="/admin/games/add">Adj hozzá egyet!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleGame(gameId, newStatus) {
+    if (!confirm('Biztosan megváltoztatod a játék státuszát?')) {
+        return;
+    }
+    
+    fetch(`/admin/games/${gameId}/toggle`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Hiba történt');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hiba történt');
+    });
+}
+
+function deleteGame(gameId) {
+    if (!confirm('Biztosan törölni szeretnéd ezt a játékot? Ez törli az összes hozzá tartozó szerver példányt is!')) {
+        return;
+    }
+    
+    fetch(`/admin/games/${gameId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Hiba történt');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hiba történt');
+    });
+}
+</script>
+{% endblock %}
+
