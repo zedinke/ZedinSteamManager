@@ -280,6 +280,13 @@ class ServerInstance(Base):
     scheduled_deletion_date = Column(DateTime, nullable=True, index=True)  # Ütemezett törlési dátum (30 nap a token lejárata után)
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    stopped_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    game = relationship("Game", back_populates="server_instances")
+    server_admin = relationship("User", foreign_keys=[server_admin_id])
+    token_used = relationship("Token", foreign_keys=[token_used_id])
 
 class TokenExtensionRequest(Base):
     __tablename__ = "token_extension_requests"
