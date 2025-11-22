@@ -77,3 +77,29 @@ def mark_all_as_read(db: Session, user_id: int) -> int:
     db.commit()
     return count
 
+def create_notification_for_users(
+    db: Session,
+    user_ids: list[int],
+    notification_type: str,
+    title: str,
+    message: str
+) -> list[Notification]:
+    """Értesítés létrehozása több felhasználónak"""
+    notifications = []
+    for user_id in user_ids:
+        notification = create_notification(db, user_id, notification_type, title, message)
+        notifications.append(notification)
+    return notifications
+
+def create_notification_for_all_users(
+    db: Session,
+    notification_type: str,
+    title: str,
+    message: str
+) -> list[Notification]:
+    """Értesítés létrehozása minden felhasználónak"""
+    from app.database import User
+    all_users = db.query(User).all()
+    user_ids = [user.id for user in all_users]
+    return create_notification_for_users(db, user_ids, notification_type, title, message)
+

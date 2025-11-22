@@ -127,3 +127,20 @@ async def send_token_expiry_warning(email: str, username: str, token: str, days_
     
     return await send_email(email, "Token lejárat figyelmeztetés - ZedinArkManager", body)
 
+async def send_notification_email(email: str, username: str, title: str, message: str) -> bool:
+    """Értesítés email küldése"""
+    body = f"""
+    <html>
+    <body>
+        <h2>{title}</h2>
+        <p>Kedves {username}!</p>
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            {message.replace(chr(10), '<br>')}
+        </div>
+        <p>Üdvözlettel,<br>ZedinArkManager csapat</p>
+    </body>
+    </html>
+    """
+    
+    return await send_email(email, f"{title} - ZedinArkManager", body)
+

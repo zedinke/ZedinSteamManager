@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Értesítés írása - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-bell"></i> Értesítés írása</h2>
+        <p>Manager Admin - értesítés küldése felhasználóknak</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">{{ request.query_params.get("success") }}</div>
+    {% endif %}
+    
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>Új értesítés létrehozása</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/admin/notifications/create">
+                <div class="form-group">
+                    <label for="title">
+                        <i class="fas fa-heading"></i> Cím
+                    </label>
+                    <input type="text" id="title" name="title" required placeholder="Értesítés címe">
+                </div>
+                
+                <div class="form-group">
+                    <label for="message">
+                        <i class="fas fa-comment"></i> Üzenet
+                    </label>
+                    <textarea id="message" name="message" rows="5" required placeholder="Értesítés üzenete"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="send_type">
+                        <i class="fas fa-users"></i> Küldés típusa
+                    </label>
+                    <select id="send_type" name="send_type" required onchange="toggleUserSelection()">
+                        <option value="specific">Külön felhasználóknak</option>
+                        <option value="all">Minden felhasználónak (globális)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="user_selection">
+                    <label>
+                        <i class="fas fa-user-check"></i> Felhasználók kiválasztása
+                    </label>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                        {% for user in users %}
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="user_ids" value="{{ user.id }}">
+                                {{ user.username }} ({{ user.email }}) - 
+                                {% if user.role.value == "manager_admin" %}Manager Admin
+                                {% elif user.role.value == "server_admin" %}Szerver Admin
+                                {% elif user.role.value == "admin" %}Admin
+                                {% else %}Felhasználó
+                                {% endif %}
+                            </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" name="send_email" value="true" style="margin-right: 10px;">
+                        <i class="fas fa-envelope"></i> Küldés email-ben is
+                    </label>
+                </div>
+                
+                <input type="hidden" name="notification_type" value="admin_notification">
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Értesítés küldése
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleUserSelection() {
+    const sendType = document.getElementById('send_type').value;
+    const userSelection = document.getElementById('user_selection');
+    
+    if (sendType === 'all') {
+        userSelection.style.display = 'none';
+        // Töröljük a checkbox-ok checked állapotát
+        document.querySelectorAll('input[name="user_ids"]').forEach(cb => cb.checked = false);
+    } else {
+        userSelection.style.display = 'block';
+    }
+}
+
+// Alapértelmezett állapot
+toggleUserSelection();
+</script>
+{% endblock %}
+

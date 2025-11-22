@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Tokenek kezelése - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-key"></i> Tokenek kezelése</h2>
+        <p>Manager Admin - összes token listázása és törlése</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">{{ request.query_params.get("success") }}</div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-body">
+            {% if tokens %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>Felhasználó</th>
+                            <th>Típus</th>
+                            <th>Generálva</th>
+                            <th>Lejárat</th>
+                            <th>Státusz</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for token in tokens %}
+                            <tr>
+                                <td><code>{{ token.token[:30] }}...</code></td>
+                                <td>
+                                    {% if token.user %}
+                                        {{ token.user.username }} ({{ token.user.email }})
+                                    {% else %}
+                                        <span class="text-muted">Nincs hozzárendelve</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if token.token_type.value == "server_admin" %}
+                                        <span class="badge badge-info">Szerver Admin</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Felhasználó</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ token.created_at.strftime("%Y-%m-%d %H:%M") if token.created_at else "-" }}</td>
+                                <td>{{ token.expires_at.strftime("%Y-%m-%d %H:%M") if token.expires_at else "-" }}</td>
+                                <td>
+                                    {% if token.is_active %}
+                                        <span class="badge badge-success">Aktív</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">Inaktív</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" action="/tokens/delete" style="display: inline;" onsubmit="return confirm('Biztosan törölni szeretnéd ezt a tokent?');">
+                                        <input type="hidden" name="token_id" value="{{ token.id }}">
+                                        <button type="submit" class="btn btn-danger btn-sm">
+                                            <i class="fas fa-trash"></i> Törlés
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nincsenek tokenek.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
