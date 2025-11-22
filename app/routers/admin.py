@@ -200,11 +200,12 @@ async def list_all_users(
     """Manager Admin: összes felhasználó listája"""
     current_user = require_manager_admin(request, db)
     
-    from sqlalchemy import func
+    from sqlalchemy import func, case
+    # MySQL kompatibilis query - FILTER helyett CASE WHEN használata
     users = db.query(
         User,
-        func.count(Token.id).filter(Token.is_active == True).label("active_token_count"),
-        func.max(Token.expires_at).filter(Token.is_active == True).label("latest_token_expiry")
+        func.sum(case((Token.is_active == True, 1), else_=0)).label("active_token_count"),
+        func.max(case((Token.is_active == True, Token.expires_at), else_=None)).label("latest_token_expiry")
     ).outerjoin(Token, User.id == Token.user_id).group_by(User.id).order_by(User.created_at.desc()).all()
     
     from app.main import get_templates
