@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Frissítés - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>🔄 Manager Frissítés</h1>
+        <p>Git-ről automatikus frissítés</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Jelenlegi Verzió</h2>
+        </div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="label">Branch:</span>
+                    <span class="value">{{ git_info.branch }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Commit:</span>
+                    <span class="value code">{{ git_info.commit }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Utolsó frissítés:</span>
+                    <span class="value">{{ git_info.last_commit_date }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Frissítés Ellenőrzése</h2>
+        </div>
+        <div class="card-body">
+            <button id="checkUpdateBtn" class="btn btn-primary">
+                <span class="btn-icon">🔍</span>
+                Frissítések Ellenőrzése
+            </button>
+            <div id="updateInfo" class="update-info" style="display: none;">
+                <div id="updateStatus" class="alert"></div>
+                <div id="commitsList" class="commits-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Frissítés Végrehajtása</h2>
+        </div>
+        <div class="card-body">
+            <div class="warning-box">
+                <strong>⚠️ Figyelem!</strong> A frissítés során a manager átmenetileg nem lesz elérhető.
+                A felhasználókat egy "Frissítés folyamatban" oldalra irányítjuk.
+            </div>
+            <button id="executeUpdateBtn" class="btn btn-danger" {% if is_updating %}disabled{% endif %}>
+                <span class="btn-icon">🚀</span>
+                Frissítés Végrehajtása
+            </button>
+            {% if is_updating %}
+            <div class="alert alert-warning">
+                ⏳ Frissítés folyamatban...
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+let updateCheckInterval = null;
+
+document.getElementById('checkUpdateBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('checkUpdateBtn');
+    const infoDiv = document.getElementById('updateInfo');
+    const statusDiv = document.getElementById('updateStatus');
+    const commitsDiv = document.getElementById('commitsList');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-icon">⏳</span> Ellenőrzés...';
+    
+    try {
+        const response = await fetch('/admin/update/check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        infoDiv.style.display = 'block';
+        
+        if (data.has_update) {
+            statusDiv.className = 'alert alert-success';
+            statusDiv.innerHTML = `✅ <strong>Frissítés elérhető!</strong> ${data.commit_count} új commit.`;
+            
+            if (data.commits && data.commits.length > 0) {
+                commitsDiv.innerHTML = '<h4>Új commitok:</h4><ul>' + 
+                    data.commits.map(c => `<li>${c}</li>`).join('') + 
+                    '</ul>';
+            }
+            
+            document.getElementById('executeUpdateBtn').disabled = false;
+        } else {
+            statusDiv.className = 'alert alert-info';
+            statusDiv.innerHTML = '✅ A manager naprakész. Nincs új frissítés.';
+            commitsDiv.innerHTML = '';
+        }
+    } catch (error) {
+        statusDiv.className = 'alert alert-danger';
+        statusDiv.innerHTML = `❌ Hiba: ${error.message}`;
+        commitsDiv.innerHTML = '';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="btn-icon">🔍</span> Frissítések Ellenőrzése';
+    }
+});
+
+document.getElementById('executeUpdateBtn').addEventListener('click', async () => {
+    if (!confirm('Biztosan végrehajtod a frissítést? A manager átmenetileg nem lesz elérhető.')) {
+        return;
+    }
+    
+    const btn = document.getElementById('executeUpdateBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-icon">⏳</span> Frissítés folyamatban...';
+    
+    try {
+        const response = await fetch('/admin/update/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Átirányítás az updating oldalra
+            window.location.href = '/updating';
+        } else {
+            alert('Hiba: ' + (data.error || 'Ismeretlen hiba'));
+            btn.disabled = false;
+            btn.innerHTML = '<span class="btn-icon">🚀</span> Frissítés Végrehajtása';
+        }
+    } catch (error) {
+        alert('Hiba: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = '<span class="btn-icon">🚀</span> Frissítés Végrehajtása';
+    }
+});
+</script>
+
+<style>
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.info-item .label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.info-item .value {
+    font-size: 16px;
+    color: #667eea;
+    font-weight: bold;
+}
+
+.info-item .value.code {
+    font-family: 'Courier New', monospace;
+    background: #1a1a2e;
+    padding: 5px 10px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.update-info {
+    margin-top: 20px;
+}
+
+.commits-list {
+    margin-top: 15px;
+    padding: 15px;
+    background: #1a1a2e;
+    border-radius: 8px;
+    border: 1px solid #3a3a5a;
+}
+
+.commits-list ul {
+    margin: 10px 0 0 0;
+    padding-left: 20px;
+    color: #d0d0d0;
+}
+
+.commits-list li {
+    margin: 5px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.warning-box {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 4px solid #f59e0b;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    color: #f59e0b;
+}
+
+.btn-icon {
+    margin-right: 8px;
+}
+</style>
+{% endblock %}
+
