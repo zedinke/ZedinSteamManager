@@ -13,12 +13,12 @@ from app.config import settings
 
 router = APIRouter()
 
-async def require_manager_admin(request: Request, db: Session) -> User:
+def require_manager_admin(request: Request, db: Session) -> User:
     """Manager Admin jogosultság ellenőrzése"""
     user_id = request.session.get("user_id")
     if not user_id:
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url="/login", status_code=302)
+        raise HTTPException(status_code=302, detail="Nincs bejelentkezve")
     
     current_user = db.query(User).filter(User.id == user_id).first()
     if not current_user or current_user.role.value != "manager_admin":
@@ -31,7 +31,7 @@ async def show_generate(
     db: Session = Depends(get_db)
 ):
     """Token generálás oldal"""
-    current_user = await require_manager_admin(request, db)
+    current_user = require_manager_admin(request, db)
     
     # Összes user és server admin
     users = db.query(User).filter(
