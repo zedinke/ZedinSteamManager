@@ -130,13 +130,9 @@
                                 </td>
                                 <td>
                                     {% if token.is_active %}
-                                        <form method="POST" action="/cart/add-extension-request" style="display: inline;">
-                                            <input type="hidden" name="token_id" value="{{ token.id }}">
-                                            <input type="hidden" name="requested_days" value="30">
-                                            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Biztosan hozzáadod a kosárhoz?');">
-                                                <i class="fas fa-shopping-cart"></i> Kosárba
-                                            </button>
-                                        </form>
+                                        <button class="btn btn-primary btn-sm" onclick="showExtensionRequestModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else '' }}')">
+                                            <i class="fas fa-shopping-cart"></i> Kosárba
+                                        </button>
                                     {% endif %}
                                 </td>
                             </tr>
