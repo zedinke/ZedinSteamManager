@@ -130,7 +130,10 @@
                                 </td>
                                 <td>
                                     {% if token.is_active %}
-                                        <button class="btn btn-primary btn-sm" onclick="showExtensionRequestModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else '' }}')">
+                                        <button class="btn btn-primary btn-sm add-to-cart-btn" 
+                                                data-token-id="{{ token.id }}" 
+                                                data-expires-at="{{ token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else '' }}"
+                                                onclick="showExtensionRequestModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else '' }}')">
                                             <i class="fas fa-shopping-cart"></i> Kosárba
                                         </button>
                                     {% endif %}
@@ -518,23 +521,47 @@ function addMessage(text, type) {
 
 // Token Hosszabbítási Kérés Modal
 function showExtensionRequestModal(tokenId, currentExpiry) {
-    document.getElementById('extensionRequestTokenId').value = tokenId;
-    document.getElementById('currentExpiryRequest').textContent = currentExpiry || 'Nincs lejárat';
-    
-    // Új lejárat számítása
-    const daysInput = document.getElementById('extensionRequestDays');
-    if (daysInput) {
-        daysInput.removeEventListener('input', updateNewExpiryRequest);
-        daysInput.addEventListener('input', updateNewExpiryRequest);
-        updateNewExpiryRequest();
+    try {
+        const tokenIdInput = document.getElementById('extensionRequestTokenId');
+        const currentExpirySpan = document.getElementById('currentExpiryRequest');
+        const modal = document.getElementById('extensionRequestModal');
+        
+        if (!tokenIdInput || !currentExpirySpan || !modal) {
+            console.error('Modal elements not found');
+            alert('Hiba: A modal elemek nem találhatók. Kérlek frissítsd az oldalt.');
+            return;
+        }
+        
+        tokenIdInput.value = tokenId;
+        currentExpirySpan.textContent = currentExpiry || 'Nincs lejárat';
+        
+        // Új lejárat számítása
+        const daysInput = document.getElementById('extensionRequestDays');
+        if (daysInput) {
+            daysInput.value = 30; // Reset to default
+            daysInput.removeEventListener('input', updateNewExpiryRequest);
+            daysInput.addEventListener('input', updateNewExpiryRequest);
+            updateNewExpiryRequest();
+        }
+        
+        // Modal megjelenítése
+        modal.style.display = 'block';
+    } catch (error) {
+        console.error('Error showing extension request modal:', error);
+        alert('Hiba történt a modal megnyitásakor. Kérlek próbáld újra.');
     }
-    
-    // Modal megjelenítése
-    document.getElementById('extensionRequestModal').style.display = 'block';
 }
 
 function closeExtensionRequestModal() {
-    document.getElementById('extensionRequestModal').style.display = 'none';
+    const modal = document.getElementById('extensionRequestModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Token Igénylés Modal (átirányítás a token generálás oldalra)
+function showTokenRequestModal() {
+    window.location.href = '/tokens/generate';
 }
 
 function updateNewExpiryRequest() {
