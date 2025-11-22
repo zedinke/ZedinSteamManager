@@ -264,6 +264,22 @@ class Game(Base):
     # Relationships
     server_instances = relationship("ServerInstance", back_populates="game")
 
+class Cluster(Base):
+    """Ark Survival Ascended Cluster-ek"""
+    __tablename__ = "clusters"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    server_admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    cluster_id = Column(String(50), nullable=False, unique=True, index=True)  # Cluster ID (pl. "MyCluster")
+    name = Column(String(100), nullable=False)  # Cluster neve
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    server_admin = relationship("User", foreign_keys=[server_admin_id])
+    servers = relationship("ServerInstance", back_populates="cluster")
+
 class ServerInstance(Base):
     """Indított szerver példányok"""
     __tablename__ = "server_instances"
@@ -271,10 +287,16 @@ class ServerInstance(Base):
     id = Column(Integer, primary_key=True, index=True)
     game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False, index=True)
     server_admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    cluster_id = Column(Integer, ForeignKey("clusters.id", ondelete="SET NULL"), nullable=True, index=True)  # Ark cluster (opcionális)
     name = Column(String(100), nullable=False)  # Szerver neve
     port = Column(Integer, nullable=True)  # Port szám
+    query_port = Column(Integer, nullable=True)  # Query port (Ark esetén port + 1)
+    max_players = Column(Integer, default=40, nullable=False)  # Max játékosok száma
     status = Column(EnumType(ServerStatus), default=ServerStatus.STOPPED, nullable=False, index=True)
     config = Column(JSON, nullable=True)  # Szerver konfiguráció
+    active_mods = Column(JSON, nullable=True)  # Aktív mod ID-k listája (pl. [123456, 789012])
+    passive_mods = Column(JSON, nullable=True)  # Passzív mod ID-k listája
+    server_path = Column(String(500), nullable=True)  # Symlink útvonal
     token_used_id = Column(Integer, ForeignKey("tokens.id", ondelete="SET NULL"), nullable=True, index=True)  # Használt token
     token_expires_at = Column(DateTime, nullable=True, index=True)  # Token lejárat dátuma
     scheduled_deletion_date = Column(DateTime, nullable=True, index=True)  # Ütemezett törlési dátum (30 nap a token lejárata után)
@@ -287,6 +309,22 @@ class ServerInstance(Base):
     game = relationship("Game", back_populates="server_instances")
     server_admin = relationship("User", foreign_keys=[server_admin_id])
     token_used = relationship("Token", foreign_keys=[token_used_id])
+    cluster = relationship("Cluster", back_populates="servers")
+
+class ArkServerFiles(Base):
+    """Ark Survival Ascended szerverfájlok (Manager Admin telepíti)"""
+    __tablename__ = "ark_server_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    version = Column(String(50), nullable=False)  # Verzió (pl. "1.0.0")
+    install_path = Column(String(500), nullable=False)  # Telepítési útvonal
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # Aktuálisan használt verzió
+    installed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    installed_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    notes = Column(Text, nullable=True)
+    
+    # Relationships
+    installed_by = relationship("User", foreign_keys=[installed_by_id])
 
 class TokenExtensionRequest(Base):
     __tablename__ = "token_extension_requests"

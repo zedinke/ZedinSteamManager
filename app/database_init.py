@@ -13,7 +13,7 @@ from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
     ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest,
-    TokenPricingRule, TokenBasePrice
+    TokenPricingRule, TokenBasePrice, Cluster, ArkServerFiles
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -770,6 +770,149 @@ def init_db():
                 print("✓ token_pricing_rules tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: token_pricing_rules tábla: {e}")
+        
+        # Clusters tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'clusters' not in existing_tables:
+            print("clusters tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE clusters (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            server_admin_id {users_id_type} NOT NULL,
+                            cluster_id VARCHAR(50) NOT NULL UNIQUE,
+                            name VARCHAR(100) NOT NULL,
+                            description TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_clusters_server_admin_id (server_admin_id),
+                            INDEX ix_clusters_cluster_id (cluster_id),
+                            CONSTRAINT fk_clusters_server_admin_id
+                                FOREIGN KEY (server_admin_id) REFERENCES users(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ clusters tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: clusters tábla: {e}")
+        
+        # Ark server files tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'ark_server_files' not in existing_tables:
+            print("ark_server_files tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE ark_server_files (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            version VARCHAR(50) NOT NULL,
+                            install_path VARCHAR(500) NOT NULL,
+                            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                            installed_by_id {users_id_type} NULL,
+                            installed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            notes TEXT NULL,
+                            PRIMARY KEY (id),
+                            INDEX ix_ark_server_files_is_active (is_active),
+                            INDEX ix_ark_server_files_installed_at (installed_at),
+                            CONSTRAINT fk_ark_server_files_installed_by_id
+                                FOREIGN KEY (installed_by_id) REFERENCES users(id) ON DELETE SET NULL
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ ark_server_files tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: ark_server_files tábla: {e}")
+        
+        # Server instances tábla bővítése (cluster_id, max_players, active_mods, passive_mods, query_port, server_path)
+        if 'server_instances' in inspector.get_table_names():
+            existing_columns = [col['name'] for col in inspector.get_columns('server_instances')]
+            
+            # cluster_id oszlop hozzáadása
+            if 'cluster_id' not in existing_columns:
+                print("cluster_id oszlop hozzáadása a server_instances táblához...")
+                try:
+                    with engine.connect() as conn:
+                        # Először ellenőrizzük, hogy létezik-e a clusters tábla
+                        if 'clusters' in inspector.get_table_names():
+                            clusters_id_type = id_type
+                            result = conn.execute(text("""
+                                SELECT COLUMN_TYPE 
+                                FROM INFORMATION_SCHEMA.COLUMNS 
+                                WHERE TABLE_SCHEMA = DATABASE() 
+                                AND TABLE_NAME = 'clusters' 
+                                AND COLUMN_NAME = 'id'
+                            """))
+                            row = result.fetchone()
+                            if row:
+                                clusters_id_type = row[0]
+                            
+                            conn.execute(text(f"""
+                                ALTER TABLE server_instances 
+                                ADD COLUMN cluster_id {clusters_id_type} NULL,
+                                ADD INDEX ix_server_instances_cluster_id (cluster_id)
+                            """))
+                            conn.commit()
+                            
+                            # Foreign key hozzáadása
+                            try:
+                                conn.execute(text("""
+                                    ALTER TABLE server_instances 
+                                    ADD CONSTRAINT fk_server_instances_cluster_id
+                                    FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE SET NULL
+                                """))
+                                conn.commit()
+                            except Exception as e:
+                                if "Duplicate foreign key" not in str(e) and "already exists" not in str(e).lower():
+                                    print(f"    Figyelmeztetés: cluster_id foreign key: {e}")
+                            
+                            print("✓ cluster_id oszlop hozzáadva")
+                except Exception as e:
+                    print(f"  Figyelmeztetés: cluster_id oszlop: {e}")
+            
+            # Egyéb új oszlopok hozzáadása
+            new_columns = {
+                'max_players': 'INT NOT NULL DEFAULT 40',
+                'query_port': 'INT NULL',
+                'active_mods': 'JSON NULL',
+                'passive_mods': 'JSON NULL',
+                'server_path': 'VARCHAR(500) NULL'
+            }
+            
+            for col_name, col_def in new_columns.items():
+                if col_name not in existing_columns:
+                    print(f"{col_name} oszlop hozzáadása a server_instances táblához...")
+                    try:
+                        with engine.connect() as conn:
+                            conn.execute(text(f"""
+                                ALTER TABLE server_instances 
+                                ADD COLUMN {col_name} {col_def}
+                            """))
+                            conn.commit()
+                        print(f"✓ {col_name} oszlop hozzáadva")
+                    except Exception as e:
+                        print(f"  Figyelmeztetés: {col_name} oszlop: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

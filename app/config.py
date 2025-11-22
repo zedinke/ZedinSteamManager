@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     # Session
     session_secret_key: str = ""
     
+    # Ark Server
+    ark_base_path: str = "/opt/ark_servers"  # Alap útvonal az Ark szerverekhez
+    ark_install_path: str = "/opt/ark_server_files"  # Telepített szerverfájlok útvonala
+    ark_default_port: int = 7777  # Alapértelmezett port
+    ark_default_query_port: int = 27015  # Alapértelmezett query port
+    
     class Config:
         env_file = BASE_DIR / ".env"
         env_file_encoding = "utf-8"
