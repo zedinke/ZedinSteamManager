@@ -2,7 +2,7 @@
 FastAPI dependencies
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -69,6 +69,26 @@ def require_role(required_role: UserRole):
         return current_user
     
     return role_checker
+
+def require_manager_admin(request: Request, db: Session = Depends(get_db)) -> User:
+    """Manager Admin jogosultság ellenőrzése session alapján"""
+    from fastapi import Request
+    user_id = request.session.get("user_id")
+    if not user_id:
+        from fastapi.responses import RedirectResponse
+        raise HTTPException(
+            status_code=status.HTTP_302_FOUND,
+            detail="Nincs bejelentkezve",
+            headers={"Location": "/login"}
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or user.role != UserRole.MANAGER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Nincs jogosultságod - Manager Admin szükséges"
+        )
+    return user
 
 # Session alapú dependency (cookie-khoz) - nincs használva, a require_login közvetlenül session-t használ
 
