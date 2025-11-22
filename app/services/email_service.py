@@ -33,17 +33,11 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True, dom
         use_tls = smtp_config.get('use_tls', False)
         
         # TLS beállítások
-        if smtp_port == 465:
-            # Port 465 = SSL/TLS
-            use_tls = True
-            start_tls = False
-        elif smtp_port == 587:
-            # Port 587 = STARTTLS
-            use_tls = False
-            start_tls = True
-        else:
-            # Port 25 = általában nincs TLS
-            start_tls = False
+        # Port 465 = SSL/TLS (use_tls=True)
+        # Port 587 = STARTTLS (start_tls=True)
+        # Port 25 = általában nincs TLS
+        use_tls_param = (smtp_port == 465)
+        start_tls_param = (smtp_port == 587)
         
         await aiosmtplib.send(
             message,
@@ -51,8 +45,8 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True, dom
             port=smtp_port,
             username=smtp_user if smtp_user else None,
             password=smtp_pass if smtp_pass else None,
-            use_tls=use_tls,
-            start_tls=start_tls if 'start_tls' in locals() else False
+            use_tls=use_tls_param,
+            start_tls=start_tls_param
         )
         
         return True
