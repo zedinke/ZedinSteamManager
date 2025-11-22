@@ -94,47 +94,93 @@ async def install_steamcmd(
         """SteamCMD telepítő folyamat"""
         try:
             # Mappa létrehozása
+            output_queue.put("[INFO] SteamCMD mappa létrehozása...\n")
             STEAMCMD_DIR.mkdir(parents=True, exist_ok=True)
+            output_queue.put(f"[INFO] Mappa: {STEAMCMD_DIR}\n")
             
             # Linux/Unix rendszerek
             if os.name != 'nt':
-                # SteamCMD letöltése és telepítése
-                commands = [
-                    f"cd {STEAMCMD_DIR}",
-                    "curl -sqL 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz' | tar zxvf -",
-                    "chmod +x steamcmd.sh"
-                ]
+                output_queue.put("[INFO] Linux/Unix rendszer észlelve\n")
                 
-                for cmd in commands:
-                    output_queue.put(f"[INFO] Futtatás: {cmd}\n")
-                    result = subprocess.run(
-                        cmd,
-                        shell=True,
-                        cwd=str(STEAMCMD_DIR),
-                        capture_output=True,
-                        text=True,
-                        timeout=300
-                    )
-                    if result.stdout:
-                        output_queue.put(result.stdout)
-                    if result.stderr:
-                        output_queue.put(f"[ERROR] {result.stderr}\n")
-                    if result.returncode != 0:
-                        output_queue.put(f"[ERROR] Parancs sikertelen: {cmd}\n")
-                        break
+                # SteamCMD letöltése
+                output_queue.put("[INFO] SteamCMD letöltése...\n")
+                download_cmd = "curl -sqL 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz' -o steamcmd.tar.gz"
+                download_process = subprocess.Popen(
+                    download_cmd,
+                    shell=True,
+                    cwd=str(STEAMCMD_DIR),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
+                
+                # Live output olvasása
+                for line in download_process.stdout:
+                    output_queue.put(f"[DOWNLOAD] {line}")
+                download_process.wait()
+                
+                if download_process.returncode != 0:
+                    output_queue.put("[ERROR] Letöltés sikertelen!\n")
+                    return
+                
+                output_queue.put("[INFO] Letöltés befejezve\n")
+                output_queue.put("[INFO] Fájlok kicsomagolása...\n")
+                
+                # Kicsomagolás
+                extract_process = subprocess.Popen(
+                    "tar zxvf steamcmd.tar.gz",
+                    shell=True,
+                    cwd=str(STEAMCMD_DIR),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
+                
+                for line in extract_process.stdout:
+                    output_queue.put(f"[EXTRACT] {line}")
+                extract_process.wait()
+                
+                if extract_process.returncode != 0:
+                    output_queue.put("[ERROR] Kicsomagolás sikertelen!\n")
+                    return
+                
+                output_queue.put("[INFO] Jogosultságok beállítása...\n")
+                
+                # Jogosultságok beállítása
+                chmod_process = subprocess.run(
+                    "chmod +x steamcmd.sh",
+                    shell=True,
+                    cwd=str(STEAMCMD_DIR),
+                    capture_output=True,
+                    text=True
+                )
+                
+                if chmod_process.returncode != 0:
+                    output_queue.put(f"[WARNING] Jogosultság beállítás: {chmod_process.stderr}\n")
+                else:
+                    output_queue.put("[INFO] Jogosultságok beállítva\n")
             else:
                 # Windows rendszerek
                 steamcmd_url = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"
                 output_queue.put(f"[INFO] SteamCMD letöltése Windows rendszerre...\n")
-                # Itt implementálhatnánk a Windows letöltést is
                 output_queue.put("[ERROR] Windows telepítés még nincs implementálva\n")
+                return
             
+            # Ellenőrzés
+            output_queue.put("[INFO] Telepítés ellenőrzése...\n")
             if STEAMCMD_BIN.exists():
-                output_queue.put("[SUCCESS] SteamCMD telepítése sikeres!\n")
+                output_queue.put("[SUCCESS] ✓ SteamCMD telepítése sikeres!\n")
+                output_queue.put(f"[INFO] Telepítési útvonal: {STEAMCMD_BIN}\n")
             else:
-                output_queue.put("[ERROR] SteamCMD telepítése sikertelen!\n")
+                output_queue.put("[ERROR] ✗ SteamCMD telepítése sikertelen! A fájl nem található.\n")
         except Exception as e:
             output_queue.put(f"[ERROR] Hiba: {str(e)}\n")
+            import traceback
+            output_queue.put(f"[ERROR] Traceback: {traceback.format_exc()}\n")
         finally:
             output_queue.put("[DONE]\n")
             if process_id in active_processes:
@@ -180,7 +226,8 @@ async def update_steamcmd(
     def update_process():
         """SteamCMD frissítő folyamat"""
         try:
-            output_queue.put("[INFO] SteamCMD frissítése...\n")
+            output_queue.put("[INFO] SteamCMD frissítése elindítva...\n")
+            output_queue.put(f"[INFO] Futtatás: {STEAMCMD_BIN} +quit\n")
             
             # SteamCMD frissítése
             process = subprocess.Popen(
@@ -193,18 +240,26 @@ async def update_steamcmd(
                 cwd=str(STEAMCMD_DIR)
             )
             
-            # Live output olvasása
-            for line in process.stdout:
+            # Live output olvasása soronként
+            while True:
+                line = process.stdout.readline()
+                if not line:
+                    break
                 output_queue.put(line)
+                # Flush a buffer miatt
+                import sys
+                sys.stdout.flush()
             
             process.wait()
             
             if process.returncode == 0:
-                output_queue.put("[SUCCESS] SteamCMD frissítése sikeres!\n")
+                output_queue.put("[SUCCESS] ✓ SteamCMD frissítése sikeres!\n")
             else:
-                output_queue.put(f"[ERROR] SteamCMD frissítése sikertelen (exit code: {process.returncode})\n")
+                output_queue.put(f"[ERROR] ✗ SteamCMD frissítése sikertelen (exit code: {process.returncode})\n")
         except Exception as e:
             output_queue.put(f"[ERROR] Hiba: {str(e)}\n")
+            import traceback
+            output_queue.put(f"[ERROR] Traceback: {traceback.format_exc()}\n")
         finally:
             output_queue.put("[DONE]\n")
             if process_id in active_processes:
