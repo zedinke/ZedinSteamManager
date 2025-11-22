@@ -12,6 +12,47 @@ from typing import Optional
 
 router = APIRouter()
 
+@router.get("/api/pricing/debug-rules")
+async def debug_pricing_rules(
+    token_type: str = "server_admin",
+    item_type: str = "token_request",
+    quantity: int = 1,
+    days: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint az árazási szabályok ellenőrzéséhez"""
+    from app.services.pricing_service import get_active_pricing_rules, calculate_price
+    from app.database import TokenType
+    
+    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    
+    rules = get_active_pricing_rules(db, token_type_enum, item_type, quantity, days)
+    pricing = calculate_price(db, token_type_enum, item_type, quantity, days)
+    
+    rules_data = []
+    for rule in rules:
+        rules_data.append({
+            "id": rule.id,
+            "name": rule.name,
+            "type": rule.rule_type,
+            "is_active": rule.is_active,
+            "applies_to_token_type": rule.applies_to_token_type.value if rule.applies_to_token_type else None,
+            "applies_to_item_type": rule.applies_to_item_type,
+            "discount_percent": rule.discount_percent,
+            "quantity_discount_percent": rule.quantity_discount_percent,
+            "duration_discount_percent": rule.duration_discount_percent,
+            "min_quantity": rule.min_quantity,
+            "min_duration_days": rule.min_duration_days,
+            "valid_from": rule.valid_from.isoformat() if rule.valid_from else None,
+            "valid_until": rule.valid_until.isoformat() if rule.valid_until else None,
+            "priority": rule.priority
+        })
+    
+    return JSONResponse(content={
+        "rules": rules_data,
+        "pricing": pricing
+    })
+
 @router.get("/api/pricing/active-promotions")
 async def get_active_promotions(
     db: Session = Depends(get_db)

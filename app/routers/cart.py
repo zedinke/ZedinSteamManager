@@ -42,35 +42,41 @@ async def show_cart(
     total_final_price = 0
     
     for item in cart_items:
-        if item.item_type == "token_request":
-            # Token igénylés ár számítása
-            pricing = calculate_price(
-                db,
-                item.token_type,
-                "token_request",
-                quantity=item.quantity,
-                days=None
-            )
-            item.pricing = pricing
-            total_base_price += pricing["total_base_price"]
-            total_discount += pricing["discount_amount"]
-            total_final_price += pricing["final_price"]
-        elif item.item_type == "token_extension":
-            # Token hosszabbítás ár számítása
-            if item.token:
+        try:
+            if item.item_type == "token_request":
+                # Token igénylés ár számítása
                 pricing = calculate_price(
                     db,
-                    item.token.token_type,
-                    "token_extension",
-                    quantity=1,
-                    days=item.requested_days
+                    item.token_type,
+                    "token_request",
+                    quantity=item.quantity,
+                    days=None
                 )
                 item.pricing = pricing
                 total_base_price += pricing["total_base_price"]
                 total_discount += pricing["discount_amount"]
                 total_final_price += pricing["final_price"]
-            else:
-                item.pricing = None
+            elif item.item_type == "token_extension":
+                # Token hosszabbítás ár számítása
+                if item.token:
+                    pricing = calculate_price(
+                        db,
+                        item.token.token_type,
+                        "token_extension",
+                        quantity=1,
+                        days=item.requested_days
+                    )
+                    item.pricing = pricing
+                    total_base_price += pricing["total_base_price"]
+                    total_discount += pricing["discount_amount"]
+                    total_final_price += pricing["final_price"]
+                else:
+                    item.pricing = None
+        except Exception as e:
+            # Hiba esetén logoljuk, de ne akadjon el
+            import logging
+            logging.error(f"Error calculating price for cart item {item.id}: {e}")
+            item.pricing = None
         
         cart_items_with_pricing.append(item)
     
