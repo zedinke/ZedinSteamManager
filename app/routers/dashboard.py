@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.database import get_db, User, Token, Server, ServerAdminAdmin
+from app.database import get_db, User, Token, Server, ServerAdminAdmin, CartItem
 
 router = APIRouter()
 
@@ -46,6 +46,10 @@ async def dashboard(
         stats["my_tokens"] = db.query(func.count(Token.id)).filter(
             Token.user_id == current_user.id,
             Token.is_active == True
+        ).scalar()
+        
+        stats["cart_count"] = db.query(func.count(CartItem.id)).filter(
+            CartItem.user_id == current_user.id
         ).scalar()
         
         # Tokenek lekérése

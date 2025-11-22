@@ -57,7 +57,7 @@ if not templates_dir.exists():
 templates = Jinja2Templates(directory=str(templates_dir))
 
 # Routers importálása
-from app.routers import auth, dashboard, tokens, admin, notifications, api, notifications_admin, update, system, settings, tickets, tickets_admin, chat, server_management, games_admin, servers, ai_chat
+from app.routers import auth, dashboard, tokens, admin, notifications, api, notifications_admin, update, system, settings, tickets, tickets_admin, chat, server_management, games_admin, servers, ai_chat, cart, cart_admin
 
 # Routers regisztrálása
 app.include_router(auth.router, tags=["Auth"])

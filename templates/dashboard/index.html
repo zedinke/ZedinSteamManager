@@ -82,6 +82,16 @@
                     <p>Aktív tokenjeim</p>
                 </div>
             </div>
+            
+            <div class="stat-card" style="cursor: pointer;" onclick="showTokenRequestModal()">
+                <div class="stat-icon" style="background: #f093fb;">
+                    <i class="fas fa-shopping-cart"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="cartCount">{{ stats.cart_count or 0 }}</h3>
+                    <p>Kosár</p>
+                </div>
+            </div>
         {% endif %}
     </div>
     

@@ -66,6 +66,18 @@
                     </a>
                 </div>
             </div>
+            
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-shopping-cart"></i> Kosarak
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/admin/carts" class="nav-item nav-sub-item">
+                        <i class="fas fa-list"></i> Összes kosár
+                    </a>
+                </div>
+            </div>
         {% endif %}
         
         {% if user_role == "server_admin" %}
@@ -83,6 +95,10 @@
                     </a>
                 </div>
             </div>
+            
+            <a href="/cart" class="nav-item">
+                <i class="fas fa-shopping-cart"></i> Kosaram
+            </a>
         {% endif %}
         
         {% if user_role in ["manager_admin", "server_admin"] %}

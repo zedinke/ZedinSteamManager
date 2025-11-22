@@ -293,45 +293,33 @@ async def request_token_extension(
     if not token:
         raise HTTPException(status_code=404, detail="Token nem található vagy nincs hozzáférésed hozzá")
     
-    # Ellenőrizzük, hogy van-e már pending kérés erre a tokenre
-    existing_request = db.query(TokenExtensionRequest).filter(
-        TokenExtensionRequest.token_id == token_id,
-        TokenExtensionRequest.status == "pending"
+    # Ellenőrizzük, hogy van-e már ilyen elem a kosárban
+    existing_cart_item = db.query(CartItem).filter(
+        CartItem.user_id == current_user.id,
+        CartItem.item_type == "token_extension",
+        CartItem.token_id == token_id
     ).first()
     
-    if existing_request:
+    if existing_cart_item:
         return RedirectResponse(
-            url="/dashboard?error=Már+van+folyamatban+lévő+hosszabbítási+kérésed+erre+a+tokenre",
+            url="/dashboard?error=Már+van+ilyen+elem+a+kosárban",
             status_code=302
         )
     
-    # Kérés létrehozása
-    extension_request = TokenExtensionRequest(
-        token_id=token_id,
+    # Kosár elem létrehozása (a régi TokenExtensionRequest helyett)
+    cart_item = CartItem(
         user_id=current_user.id,
+        item_type="token_extension",
+        token_id=token_id,
         requested_days=requested_days,
-        notes=notes,
-        status="pending"
+        notes=notes
     )
     
-    db.add(extension_request)
+    db.add(cart_item)
     db.commit()
     
-    # Értesítés küldése a Manager Admin-oknak
-    from app.services.notification_service import create_notification
-    manager_admins = db.query(User).filter(User.role == UserRole.MANAGER_ADMIN).all()
-    
-    for admin in manager_admins:
-        create_notification(
-            db,
-            admin.id,
-            "token_extension_request",
-            f"Token hosszabbítási kérés - {current_user.username}",
-            f"{current_user.username} hosszabbítási kérelmet küldött egy tokenre.\n\nKért napok: {requested_days}\nToken: {token.token[:20]}...\nLejárat: {token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else 'Nincs'}"
-        )
-    
     return RedirectResponse(
-        url="/dashboard?success=Hosszabbítási+kérés+sikeresen+elküldve.+A+Manager+Admin+hamarosan+feldolgozza",
+        url="/dashboard?success=Hosszabbítási+kérés+hozzáadva+a+kosárhoz",
         status_code=302
     )
 

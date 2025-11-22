@@ -12,7 +12,7 @@ sys.path.insert(0, str(BASE_DIR))
 from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
-    ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest
+    ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -579,6 +579,52 @@ def init_db():
                 print("✓ token_extension_requests tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: token_extension_requests tábla: {e}")
+        
+        # Cart items tábla
+        if 'cart_items' not in existing_tables:
+            print("cart_items tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    # Ellenőrizzük a tokens.id típusát
+                    tokens_id_type = id_type
+                    if 'tokens' in inspector.get_table_names():
+                        result = conn.execute(text("""
+                            SELECT COLUMN_TYPE 
+                            FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                            AND TABLE_NAME = 'tokens' 
+                            AND COLUMN_NAME = 'id'
+                        """))
+                        row = result.fetchone()
+                        if row:
+                            tokens_id_type = row[0]
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE cart_items (
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            user_id {id_type} NOT NULL,
+                            item_type VARCHAR(20) NOT NULL,
+                            token_type VARCHAR(20) NULL,
+                            quantity INT NOT NULL DEFAULT 1,
+                            requested_days INT NULL,
+                            token_id {tokens_id_type} NULL,
+                            notes TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_cart_items_user_id (user_id),
+                            INDEX ix_cart_items_item_type (item_type),
+                            INDEX ix_cart_items_token_id (token_id),
+                            INDEX ix_cart_items_created_at (created_at),
+                            CONSTRAINT fk_cart_items_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_cart_items_token_id
+                                FOREIGN KEY (token_id) REFERENCES tokens(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ cart_items tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: cart_items tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

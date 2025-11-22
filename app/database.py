@@ -306,6 +306,24 @@ class TokenExtensionRequest(Base):
     user = relationship("User", foreign_keys=[user_id])
     processed_by = relationship("User", foreign_keys=[processed_by_id])
 
+class CartItem(Base):
+    """Kosár elemek - token igénylés vagy hosszabbítási kérés"""
+    __tablename__ = "cart_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_type = Column(String(20), nullable=False, index=True)  # "token_request" vagy "token_extension"
+    token_type = Column(EnumType(TokenType), nullable=True)  # Csak token_request esetén
+    quantity = Column(Integer, nullable=False, default=1)  # Token igénylés esetén hány darab
+    requested_days = Column(Integer, nullable=True)  # Token hosszabbítás esetén hány nap
+    token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=True, index=True)  # Csak token_extension esetén
+    notes = Column(Text, nullable=True)  # Opcionális megjegyzés
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+    token = relationship("Token", foreign_keys=[token_id])
+
 # Dependency
 def get_db():
     """Database session dependency"""

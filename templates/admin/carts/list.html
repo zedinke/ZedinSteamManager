@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Kosarak kezelése - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-shopping-cart"></i> Kosarak kezelése</h2>
+        <p>Manager Admin - összes kosár felhasználóra lebontva</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">{{ request.query_params.get("success") }}</div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-body">
+            {% if carts_by_user %}
+                {% for user_id, cart_data in carts_by_user.items() %}
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div class="card-header">
+                            <h3>
+                                <i class="fas fa-user"></i> {{ cart_data.user.username }}
+                                <small class="text-muted">({{ cart_data.user.email }})</small>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Típus</th>
+                                        <th>Leírás</th>
+                                        <th>Mennyiség/Napok</th>
+                                        <th>Megjegyzés</th>
+                                        <th>Dátum</th>
+                                        <th>Műveletek</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in cart_data.items %}
+                                        <tr>
+                                            <td>
+                                                {% if item.item_type == "token_request" %}
+                                                    <span class="badge badge-info">Token igénylés</span>
+                                                {% else %}
+                                                    <span class="badge badge-primary">Hosszabbítási kérés</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if item.item_type == "token_request" %}
+                                                    <strong>{{ "Szerver Admin" if item.token_type.value == "server_admin" else "Felhasználó" }} token</strong>
+                                                {% else %}
+                                                    {% if item.token %}
+                                                        <strong>Token:</strong> <code>{{ item.token.token[:20] }}...</code><br>
+                                                        <small>Lejárat: {{ item.token.expires_at.strftime("%Y-%m-%d %H:%M") if item.token.expires_at else "-" }}</small>
+                                                    {% else %}
+                                                        <span class="text-muted">Token nem található</span>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if item.item_type == "token_request" %}
+                                                    <strong>{{ item.quantity }} db</strong>
+                                                {% else %}
+                                                    <strong>{{ item.requested_days }} nap</strong>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if item.notes %}
+                                                    <small>{{ item.notes[:50] }}{% if item.notes|length > 50 %}...{% endif %}</small>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "-" }}</td>
+                                            <td>
+                                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                                    <form method="POST" action="/admin/carts/process/{{ item.id }}" style="display: inline;">
+                                                        <input type="hidden" name="action" value="approve">
+                                                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Biztosan jóváhagyod ezt a kérelmet?');">
+                                                            <i class="fas fa-check"></i> Jóváhagyás
+                                                        </button>
+                                                    </form>
+                                                    <button class="btn btn-danger btn-sm" onclick="showRejectModal({{ item.id }})">
+                                                        <i class="fas fa-times"></i> Elutasítás
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>Nincsenek kosár elemek.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Elutasítás Modal -->
+<div id="rejectModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content" style="background-color: white; margin: 15% auto; padding: 20px; border-radius: 10px; width: 500px; max-width: 90%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3><i class="fas fa-times"></i> Kérelem Elutasítása</h3>
+            <button onclick="closeRejectModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <form method="POST" action="" id="rejectForm">
+            <div style="margin-bottom: 15px;">
+                <label for="rejectNotes" style="display: block; margin-bottom: 5px; font-weight: bold;">Megjegyzés (opcionális):</label>
+                <textarea id="rejectNotes" name="notes" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; resize: vertical;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeRejectModal()" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Mégse</button>
+                <button type="submit" class="btn btn-danger" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    <i class="fas fa-times"></i> Elutasítás
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showRejectModal(itemId) {
+    document.getElementById('rejectForm').action = `/admin/carts/process/${itemId}`;
+    document.getElementById('rejectForm').innerHTML += '<input type="hidden" name="action" value="reject">';
+    document.getElementById('rejectModal').style.display = 'block';
+}
+
+function closeRejectModal() {
+    document.getElementById('rejectModal').style.display = 'none';
+}
+
+// Modal bezárása kattintásra a háttérre
+window.onclick = function(event) {
+    const modal = document.getElementById('rejectModal');
+    if (event.target == modal) {
+        closeRejectModal();
+    }
+}
+</script>
+{% endblock %}
+
