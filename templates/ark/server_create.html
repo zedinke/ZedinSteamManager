@@ -136,6 +136,174 @@
                         </small>
                     </div>
                     
+                    <!-- Szerver Beállítások -->
+                    <div class="form-group" style="margin-top: 30px; border-top: 2px solid #ddd; padding-top: 20px;">
+                        <h3 style="margin-bottom: 20px;"><i class="fas fa-cog"></i> Szerver Beállítások</h3>
+                        
+                        <!-- Alapbeállítások -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                            <div class="form-group">
+                                <label for="timezone">
+                                    <i class="fas fa-clock"></i> Időzóna
+                                </label>
+                                <select id="timezone" name="timezone" 
+                                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                    <option value="Europe/Budapest" selected>Europe/Budapest</option>
+                                    <option value="UTC">UTC</option>
+                                    <option value="Europe/London">Europe/London</option>
+                                    <option value="America/New_York">America/New_York</option>
+                                    <option value="America/Los_Angeles">America/Los_Angeles</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="map_name">
+                                    <i class="fas fa-map"></i> Térkép
+                                </label>
+                                <select id="map_name" name="map_name" 
+                                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                    <option value="TheIsland" selected>The Island</option>
+                                    <option value="TheCenter">The Center</option>
+                                    <option value="ScorchedEarth">Scorched Earth</option>
+                                    <option value="Ragnarok">Ragnarok</option>
+                                    <option value="Aberration">Aberration</option>
+                                    <option value="Extinction">Extinction</option>
+                                    <option value="Valguero">Valguero</option>
+                                    <option value="Genesis">Genesis</option>
+                                    <option value="CrystalIsles">Crystal Isles</option>
+                                    <option value="Fjordur">Fjordur</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="session_name">
+                                <i class="fas fa-tag"></i> Szerver Munkamenet Neve
+                            </label>
+                            <input type="text" id="session_name" name="session_name" 
+                                   placeholder="pl. Rexodon - The Island" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                            <div class="form-group">
+                                <label for="server_admin_password">
+                                    <i class="fas fa-key"></i> Szerver Admin Jelszó
+                                </label>
+                                <input type="password" id="server_admin_password" name="server_admin_password" 
+                                       placeholder="Admin jelszó" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="server_password">
+                                    <i class="fas fa-lock"></i> Szerver Jelszó (opcionális)
+                                </label>
+                                <input type="password" id="server_password" name="server_password" 
+                                       placeholder="Játékos jelszó (üres = nyilvános)" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                        </div>
+                        
+                        <!-- Boolean beállítások -->
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 10px;">Beállítások</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="battleeye" value="true" style="width: auto;">
+                                    <span>BattleEye</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="api" value="true" style="width: auto;">
+                                    <span>API</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="rcon_enabled" value="true" checked style="width: auto;">
+                                    <span>RCON Engedélyezve</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="display_pok_monitor_message" value="true" style="width: auto;">
+                                    <span>POK Monitor Üzenet</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="random_startup_delay" value="true" checked style="width: auto;">
+                                    <span>Véletlenszerű Indítási Késleltetés</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="cpu_optimization" value="true" checked style="width: auto;">
+                                    <span>CPU Optimalizálás</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="update_server" value="true" checked style="width: auto;">
+                                    <span>Szerver Frissítés</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="enable_motd" value="true" checked style="width: auto;">
+                                    <span>MOTD Engedélyezve</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="show_admin_commands_in_chat" value="true" style="width: auto;">
+                                    <span>Admin Parancsok Chat-ben</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- MOTD beállítások -->
+                        <div class="form-group" id="motd_settings" style="display: block;">
+                            <label for="motd">
+                                <i class="fas fa-comment"></i> MOTD Üzenet
+                            </label>
+                            <input type="text" id="motd" name="motd" 
+                                   placeholder="pl. Welcome To Rexodon Cluster!" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                                <div>
+                                    <label for="motd_duration">MOTD Időtartam (másodperc)</label>
+                                    <input type="number" id="motd_duration" name="motd_duration" value="30" min="1" 
+                                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Frissítés beállítások -->
+                        <div class="form-group" id="update_settings" style="display: block; margin-top: 20px;">
+                            <h4 style="margin-bottom: 10px;">Frissítés Beállítások</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <label for="check_for_update_interval">Frissítés Ellenőrzés Intervallum (óra)</label>
+                                    <input type="number" id="check_for_update_interval" name="check_for_update_interval" value="24" min="1" 
+                                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                </div>
+                                <div>
+                                    <label for="update_window_minimum_time">Frissítés Ablak Kezdete</label>
+                                    <input type="time" id="update_window_minimum_time" name="update_window_minimum_time" value="03:00" 
+                                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                </div>
+                                <div>
+                                    <label for="update_window_maximum_time">Frissítés Ablak Vége</label>
+                                    <input type="time" id="update_window_maximum_time" name="update_window_maximum_time" value="05:00" 
+                                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                </div>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <label for="restart_notice_minutes">Újraindítás Értesítés (perc)</label>
+                                <input type="number" id="restart_notice_minutes" name="restart_notice_minutes" value="30" min="0" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                        </div>
+                        
+                        <!-- Egyedi Szerver Argumentumok -->
+                        <div class="form-group" style="margin-top: 20px;">
+                            <label for="custom_server_args">
+                                <i class="fas fa-code"></i> Egyedi Szerver Argumentumok
+                            </label>
+                            <textarea id="custom_server_args" name="custom_server_args" rows="3" 
+                                      placeholder="Egyedi argumentumok (opcionális)" 
+                                      style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;"></textarea>
+                        </div>
+                    </div>
+                    
                     <div style="display: flex; gap: 10px; margin-top: 20px;">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i> Szerver Létrehozása
@@ -276,6 +444,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const passiveModIds = Array.from(passiveSelect.options).map(opt => opt.value);
             document.getElementById('passive_mods').value = passiveModIds.join(',');
         });
+    }
+});
+
+// Dinamikus beállítások megjelenítése/elrejtése
+document.addEventListener('DOMContentLoaded', function() {
+    const enableMotdCheckbox = document.querySelector('input[name="enable_motd"]');
+    const motdSettings = document.getElementById('motd_settings');
+    const updateServerCheckbox = document.querySelector('input[name="update_server"]');
+    const updateSettings = document.getElementById('update_settings');
+    
+    if (enableMotdCheckbox && motdSettings) {
+        function toggleMotdSettings() {
+            motdSettings.style.display = enableMotdCheckbox.checked ? 'block' : 'none';
+        }
+        enableMotdCheckbox.addEventListener('change', toggleMotdSettings);
+        toggleMotdSettings(); // Kezdeti állapot
+    }
+    
+    if (updateServerCheckbox && updateSettings) {
+        function toggleUpdateSettings() {
+            updateSettings.style.display = updateServerCheckbox.checked ? 'block' : 'none';
+        }
+        updateServerCheckbox.addEventListener('change', toggleUpdateSettings);
+        toggleUpdateSettings(); // Kezdeti állapot
     }
 });
 </script>

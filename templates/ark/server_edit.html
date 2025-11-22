@@ -112,6 +112,182 @@
                     </small>
                 </div>
                 
+                <!-- Szerver Beállítások -->
+                <div class="form-group" style="margin-top: 30px; border-top: 2px solid #ddd; padding-top: 20px;">
+                    <h3 style="margin-bottom: 20px;"><i class="fas fa-cog"></i> Szerver Beállítások</h3>
+                    
+                    {% set config = server.config or {} %}
+                    
+                    <!-- Alapbeállítások -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label for="timezone">
+                                <i class="fas fa-clock"></i> Időzóna
+                            </label>
+                            <select id="timezone" name="timezone" 
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="Europe/Budapest" {% if config.get('TZ', 'Europe/Budapest') == 'Europe/Budapest' %}selected{% endif %}>Europe/Budapest</option>
+                                <option value="UTC" {% if config.get('TZ') == 'UTC' %}selected{% endif %}>UTC</option>
+                                <option value="Europe/London" {% if config.get('TZ') == 'Europe/London' %}selected{% endif %}>Europe/London</option>
+                                <option value="America/New_York" {% if config.get('TZ') == 'America/New_York' %}selected{% endif %}>America/New_York</option>
+                                <option value="America/Los_Angeles" {% if config.get('TZ') == 'America/Los_Angeles' %}selected{% endif %}>America/Los_Angeles</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="map_name">
+                                <i class="fas fa-map"></i> Térkép
+                            </label>
+                            <select id="map_name" name="map_name" 
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="TheIsland" {% if config.get('MAP_NAME', 'TheIsland') == 'TheIsland' %}selected{% endif %}>The Island</option>
+                                <option value="TheCenter" {% if config.get('MAP_NAME') == 'TheCenter' %}selected{% endif %}>The Center</option>
+                                <option value="ScorchedEarth" {% if config.get('MAP_NAME') == 'ScorchedEarth' %}selected{% endif %}>Scorched Earth</option>
+                                <option value="Ragnarok" {% if config.get('MAP_NAME') == 'Ragnarok' %}selected{% endif %}>Ragnarok</option>
+                                <option value="Aberration" {% if config.get('MAP_NAME') == 'Aberration' %}selected{% endif %}>Aberration</option>
+                                <option value="Extinction" {% if config.get('MAP_NAME') == 'Extinction' %}selected{% endif %}>Extinction</option>
+                                <option value="Valguero" {% if config.get('MAP_NAME') == 'Valguero' %}selected{% endif %}>Valguero</option>
+                                <option value="Genesis" {% if config.get('MAP_NAME') == 'Genesis' %}selected{% endif %}>Genesis</option>
+                                <option value="CrystalIsles" {% if config.get('MAP_NAME') == 'CrystalIsles' %}selected{% endif %}>Crystal Isles</option>
+                                <option value="Fjordur" {% if config.get('MAP_NAME') == 'Fjordur' %}selected{% endif %}>Fjordur</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="session_name">
+                            <i class="fas fa-tag"></i> Szerver Munkamenet Neve
+                        </label>
+                        <input type="text" id="session_name" name="session_name" 
+                               value="{{ config.get('SESSION_NAME', '') }}" 
+                               placeholder="pl. Rexodon - The Island" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label for="server_admin_password">
+                                <i class="fas fa-key"></i> Szerver Admin Jelszó
+                            </label>
+                            <input type="password" id="server_admin_password" name="server_admin_password" 
+                                   placeholder="Admin jelszó (üres = nem változik)" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="server_password">
+                                <i class="fas fa-lock"></i> Szerver Jelszó (opcionális)
+                            </label>
+                            <input type="password" id="server_password" name="server_password" 
+                                   placeholder="Játékos jelszó (üres = nyilvános)" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        </div>
+                    </div>
+                    
+                    <!-- Boolean beállítások -->
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 10px;">Beállítások</h4>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="battleeye" value="true" {% if config.get('BATTLEEYE', False) %}checked{% endif %} style="width: auto;">
+                                <span>BattleEye</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="api" value="true" {% if config.get('API', False) %}checked{% endif %} style="width: auto;">
+                                <span>API</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="rcon_enabled" value="true" {% if config.get('RCON_ENABLED', True) %}checked{% endif %} style="width: auto;">
+                                <span>RCON Engedélyezve</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="display_pok_monitor_message" value="true" {% if config.get('DISPLAY_POK_MONITOR_MESSAGE', False) %}checked{% endif %} style="width: auto;">
+                                <span>POK Monitor Üzenet</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="random_startup_delay" value="true" {% if config.get('RANDOM_STARTUP_DELAY', True) %}checked{% endif %} style="width: auto;">
+                                <span>Véletlenszerű Indítási Késleltetés</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="cpu_optimization" value="true" {% if config.get('CPU_OPTIMIZATION', True) %}checked{% endif %} style="width: auto;">
+                                <span>CPU Optimalizálás</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="update_server" value="true" {% if config.get('UPDATE_SERVER', True) %}checked{% endif %} style="width: auto;">
+                                <span>Szerver Frissítés</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="enable_motd" value="true" {% if config.get('ENABLE_MOTD', True) %}checked{% endif %} style="width: auto;">
+                                <span>MOTD Engedélyezve</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="show_admin_commands_in_chat" value="true" {% if config.get('SHOW_ADMIN_COMMANDS_IN_CHAT', False) %}checked{% endif %} style="width: auto;">
+                                <span>Admin Parancsok Chat-ben</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- MOTD beállítások -->
+                    <div class="form-group" id="motd_settings" style="display: {% if config.get('ENABLE_MOTD', True) %}block{% else %}none{% endif %};">
+                        <label for="motd">
+                            <i class="fas fa-comment"></i> MOTD Üzenet
+                        </label>
+                        <input type="text" id="motd" name="motd" 
+                               value="{{ config.get('MOTD', '') }}" 
+                               placeholder="pl. Welcome To Rexodon Cluster!" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                            <div>
+                                <label for="motd_duration">MOTD Időtartam (másodperc)</label>
+                                <input type="number" id="motd_duration" name="motd_duration" value="{{ config.get('MOTD_DURATION', 30) }}" min="1" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Frissítés beállítások -->
+                    <div class="form-group" id="update_settings" style="display: {% if config.get('UPDATE_SERVER', True) %}block{% else %}none{% endif %}; margin-top: 20px;">
+                        <h4 style="margin-bottom: 10px;">Frissítés Beállítások</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label for="check_for_update_interval">Frissítés Ellenőrzés Intervallum (óra)</label>
+                                <input type="number" id="check_for_update_interval" name="check_for_update_interval" value="{{ config.get('CHECK_FOR_UPDATE_INTERVAL', 24) }}" min="1" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                            <div>
+                                <label for="update_window_minimum_time">Frissítés Ablak Kezdete</label>
+                                {% set min_time = config.get('UPDATE_WINDOW_MINIMUM_TIME', '03:00 AM') %}
+                                {% set min_time_24 = min_time.split(' ')[0] if ' ' in min_time else min_time %}
+                                <input type="time" id="update_window_minimum_time" name="update_window_minimum_time" value="{{ min_time_24 }}" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                            <div>
+                                <label for="update_window_maximum_time">Frissítés Ablak Vége</label>
+                                {% set max_time = config.get('UPDATE_WINDOW_MAXIMUM_TIME', '05:00 AM') %}
+                                {% set max_time_24 = max_time.split(' ')[0] if ' ' in max_time else max_time %}
+                                <input type="time" id="update_window_maximum_time" name="update_window_maximum_time" value="{{ max_time_24 }}" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label for="restart_notice_minutes">Újraindítás Értesítés (perc)</label>
+                            <input type="number" id="restart_notice_minutes" name="restart_notice_minutes" value="{{ config.get('RESTART_NOTICE_MINUTES', 30) }}" min="0" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        </div>
+                    </div>
+                    
+                    <!-- Egyedi Szerver Argumentumok -->
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="custom_server_args">
+                            <i class="fas fa-code"></i> Egyedi Szerver Argumentumok
+                        </label>
+                        <textarea id="custom_server_args" name="custom_server_args" rows="3" 
+                                  placeholder="Egyedi argumentumok (opcionális)" 
+                                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">{{ config.get('CUSTOM_SERVER_ARGS', '') }}</textarea>
+                    </div>
+                </div>
+                
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px;">
                     <h4 style="margin-top: 0;">Szerver Információ</h4>
                     <table style="width: 100%;">
@@ -314,6 +490,28 @@ document.addEventListener('DOMContentLoaded', function() {
             const passiveModIds = Array.from(passiveSelect.options).map(opt => opt.value);
             document.getElementById('passive_mods').value = passiveModIds.join(',');
         });
+    }
+});
+
+// Dinamikus beállítások megjelenítése/elrejtése
+document.addEventListener('DOMContentLoaded', function() {
+    const enableMotdCheckbox = document.querySelector('input[name="enable_motd"]');
+    const motdSettings = document.getElementById('motd_settings');
+    const updateServerCheckbox = document.querySelector('input[name="update_server"]');
+    const updateSettings = document.getElementById('update_settings');
+    
+    if (enableMotdCheckbox && motdSettings) {
+        function toggleMotdSettings() {
+            motdSettings.style.display = enableMotdCheckbox.checked ? 'block' : 'none';
+        }
+        enableMotdCheckbox.addEventListener('change', toggleMotdSettings);
+    }
+    
+    if (updateServerCheckbox && updateSettings) {
+        function toggleUpdateSettings() {
+            updateSettings.style.display = updateServerCheckbox.checked ? 'block' : 'none';
+        }
+        updateServerCheckbox.addEventListener('change', toggleUpdateSettings);
     }
 });
 </script>

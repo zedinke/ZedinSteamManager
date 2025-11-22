@@ -221,6 +221,28 @@ async def create_server(
     max_players: int = Form(40),
     active_mods: str = Form(None),  # JSON string vagy comma-separated
     passive_mods: str = Form(None),
+    # Szerver beállítások
+    timezone: str = Form("Europe/Budapest"),
+    map_name: str = Form("TheIsland"),
+    session_name: str = Form(None),
+    server_admin_password: str = Form(None),
+    server_password: str = Form(None),
+    battleeye: str = Form(None),
+    api: str = Form(None),
+    rcon_enabled: str = Form(None),
+    display_pok_monitor_message: str = Form(None),
+    random_startup_delay: str = Form(None),
+    cpu_optimization: str = Form(None),
+    update_server: str = Form(None),
+    enable_motd: str = Form(None),
+    show_admin_commands_in_chat: str = Form(None),
+    motd: str = Form(None),
+    motd_duration: int = Form(30),
+    check_for_update_interval: int = Form(24),
+    update_window_minimum_time: str = Form("03:00"),
+    update_window_maximum_time: str = Form("05:00"),
+    restart_notice_minutes: int = Form(30),
+    custom_server_args: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Server Admin: Ark szerver létrehozása"""
@@ -325,6 +347,64 @@ async def create_server(
         except (json.JSONDecodeError, ValueError):
             passive_mods_list = None
     
+    # Szerver konfiguráció összeállítása
+    server_config = {
+        "TZ": timezone,
+        "MAP_NAME": map_name,
+        "BATTLEEYE": battleeye == "true",
+        "API": api == "true",
+        "RCON_ENABLED": rcon_enabled == "true" if rcon_enabled else True,
+        "DISPLAY_POK_MONITOR_MESSAGE": display_pok_monitor_message == "true",
+        "RANDOM_STARTUP_DELAY": random_startup_delay == "true" if random_startup_delay else True,
+        "CPU_OPTIMIZATION": cpu_optimization == "true" if cpu_optimization else True,
+        "UPDATE_SERVER": update_server == "true" if update_server else True,
+        "ENABLE_MOTD": enable_motd == "true" if enable_motd else True,
+        "SHOW_ADMIN_COMMANDS_IN_CHAT": show_admin_commands_in_chat == "true",
+        "CHECK_FOR_UPDATE_INTERVAL": check_for_update_interval,
+        "RESTART_NOTICE_MINUTES": restart_notice_minutes,
+    }
+    
+    if session_name:
+        server_config["SESSION_NAME"] = session_name
+    if server_admin_password:
+        server_config["SERVER_ADMIN_PASSWORD"] = server_admin_password
+    if server_password:
+        server_config["SERVER_PASSWORD"] = server_password
+    if motd:
+        server_config["MOTD"] = motd
+        server_config["MOTD_DURATION"] = motd_duration
+    
+    # Frissítés ablak időpontok formázása
+    if update_window_minimum_time:
+        # Konvertáljuk HH:MM formátumból "HH:MM AM/PM" formátumba
+        try:
+            hour, minute = update_window_minimum_time.split(":")
+            hour_int = int(hour)
+            am_pm = "AM" if hour_int < 12 else "PM"
+            if hour_int == 0:
+                hour_int = 12
+            elif hour_int > 12:
+                hour_int -= 12
+            server_config["UPDATE_WINDOW_MINIMUM_TIME"] = f"{hour_int:02d}:{minute} {am_pm}"
+        except:
+            server_config["UPDATE_WINDOW_MINIMUM_TIME"] = update_window_minimum_time
+    
+    if update_window_maximum_time:
+        try:
+            hour, minute = update_window_maximum_time.split(":")
+            hour_int = int(hour)
+            am_pm = "AM" if hour_int < 12 else "PM"
+            if hour_int == 0:
+                hour_int = 12
+            elif hour_int > 12:
+                hour_int -= 12
+            server_config["UPDATE_WINDOW_MAXIMUM_TIME"] = f"{hour_int:02d}:{minute} {am_pm}"
+        except:
+            server_config["UPDATE_WINDOW_MAXIMUM_TIME"] = update_window_maximum_time
+    
+    if custom_server_args:
+        server_config["CUSTOM_SERVER_ARGS"] = custom_server_args.strip()
+    
     # Symlink-et később hozzuk létre, amikor már van server_id
     
     # Szerver létrehozása
@@ -338,6 +418,7 @@ async def create_server(
         rcon_port=rcon_port,
         max_players=max_players,
         status=ServerStatus.STOPPED,
+        config=server_config,
         active_mods=active_mods_list,
         passive_mods=passive_mods_list,
         token_used_id=active_token.id,
@@ -484,6 +565,28 @@ async def edit_server(
     cluster_id: int = Form(...),
     active_mods: str = Form(None),
     passive_mods: str = Form(None),
+    # Szerver beállítások
+    timezone: str = Form(None),
+    map_name: str = Form(None),
+    session_name: str = Form(None),
+    server_admin_password: str = Form(None),
+    server_password: str = Form(None),
+    battleeye: str = Form(None),
+    api: str = Form(None),
+    rcon_enabled: str = Form(None),
+    display_pok_monitor_message: str = Form(None),
+    random_startup_delay: str = Form(None),
+    cpu_optimization: str = Form(None),
+    update_server: str = Form(None),
+    enable_motd: str = Form(None),
+    show_admin_commands_in_chat: str = Form(None),
+    motd: str = Form(None),
+    motd_duration: int = Form(None),
+    check_for_update_interval: int = Form(None),
+    update_window_minimum_time: str = Form(None),
+    update_window_maximum_time: str = Form(None),
+    restart_notice_minutes: int = Form(None),
+    custom_server_args: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Server Admin: Ark szerver módosítása"""
