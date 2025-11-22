@@ -102,7 +102,8 @@ class Token(Base):
     token = Column(String(100), unique=True, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     token_type = Column(EnumType(TokenType), nullable=False)
-    generated_by_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Explicit oszlopnév megadása - ha az adatbázisban generated_by van, akkor azt használja
+    generated_by_id = Column("generated_by_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
     activated_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=False, index=True)

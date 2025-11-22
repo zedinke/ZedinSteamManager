@@ -24,6 +24,18 @@ def fix_tokens_table():
             # Átnevezzük generated_by_id-re
             print("generated_by oszlop átnevezése generated_by_id-re...")
             try:
+                # Először ellenőrizzük, hogy van-e foreign key constraint
+                fks = inspector.get_foreign_keys('tokens')
+                for fk in fks:
+                    if 'generated_by' in fk.get('constrained_columns', []):
+                        print(f"  Foreign key törlése: {fk.get('name', 'unknown')}")
+                        try:
+                            conn.execute(text(f"ALTER TABLE tokens DROP FOREIGN KEY {fk['name']}"))
+                            conn.commit()
+                        except Exception as e:
+                            print(f"  Figyelmeztetés FK törlés: {e}")
+                
+                # Most átnevezzük
                 conn.execute(text("""
                     ALTER TABLE tokens 
                     CHANGE COLUMN generated_by generated_by_id INT(11) UNSIGNED NOT NULL
@@ -34,6 +46,17 @@ def fix_tokens_table():
                 print(f"✗ Hiba az átnevezéskor: {e}")
                 # Próbáljuk meg úgy, hogy először NULL-ra állítjuk
                 try:
+                    print("  Próbálkozás NULL-ra állítással...")
+                    # Először töröljük a foreign key-t ha van
+                    fks = inspector.get_foreign_keys('tokens')
+                    for fk in fks:
+                        if 'generated_by' in fk.get('constrained_columns', []):
+                            try:
+                                conn.execute(text(f"ALTER TABLE tokens DROP FOREIGN KEY {fk['name']}"))
+                                conn.commit()
+                            except:
+                                pass
+                    
                     conn.execute(text("""
                         ALTER TABLE tokens 
                         MODIFY COLUMN generated_by INT(11) UNSIGNED NULL
@@ -41,12 +64,17 @@ def fix_tokens_table():
                     conn.commit()
                     
                     # Kitöltjük a meglévő rekordokat
-                    conn.execute(text("""
-                        UPDATE tokens 
-                        SET generated_by = (SELECT id FROM users WHERE role = 'manager_admin' LIMIT 1)
-                        WHERE generated_by IS NULL
-                    """))
-                    conn.commit()
+                    result = conn.execute(text("SELECT id FROM users WHERE role = 'manager_admin' LIMIT 1"))
+                    admin_id = result.fetchone()
+                    if admin_id:
+                        admin_id = admin_id[0]
+                        print(f"  Meglévő rekordok kitöltése admin ID-val: {admin_id}")
+                        conn.execute(text(f"""
+                            UPDATE tokens 
+                            SET generated_by = {admin_id}
+                            WHERE generated_by IS NULL
+                        """))
+                        conn.commit()
                     
                     # Most átnevezzük
                     conn.execute(text("""
@@ -57,6 +85,8 @@ def fix_tokens_table():
                     print("✓ Átnevezve generated_by_id-re (NULL értékek kitöltve)")
                 except Exception as e2:
                     print(f"✗ Hiba: {e2}")
+                    import traceback
+                    traceback.print_exc()
                     return
         
         elif not has_generated_by_id:
