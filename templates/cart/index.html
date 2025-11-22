@@ -58,6 +58,11 @@
                                 <td>
                                     {% if item.item_type == "token_request" %}
                                         <strong>{{ item.quantity }} db</strong>
+                                        {% if item.expires_in_days %}
+                                            <br><small style="color: #666;">{{ item.expires_in_days }} napos lejárat</small>
+                                        {% else %}
+                                            <br><small style="color: #666;">Alapértelmezett lejárat</small>
+                                        {% endif %}
                                     {% else %}
                                         <strong>{{ item.requested_days }} nap</strong>
                                     {% endif %}

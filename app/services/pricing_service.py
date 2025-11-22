@@ -21,12 +21,26 @@ def get_base_price(db: Session, token_type: TokenType, item_type: str, days: Opt
                 TokenType.SERVER_ADMIN: 10000,  # 10,000 Ft
                 TokenType.USER: 5000  # 5,000 Ft
             }
-            return default_prices.get(token_type, 5000)
+            base = default_prices.get(token_type, 5000)
+            # Ha van napok száma megadva és van price_per_day, akkor számoljuk
+            if days:
+                # Alapértelmezett: 30 nap = base_price, tehát naponta base_price/30
+                return int(base * days / 30)
+            return base
         else:  # token_extension
+            if days:
+                return 1000 * days  # 1,000 Ft/nap alapértelmezett
             return 1000  # 1,000 Ft/nap alapértelmezett
     
-    if item_type == "token_extension" and days and base_price.price_per_day:
+    # Ha van price_per_day és van napok száma, akkor használjuk azt
+    if days and base_price.price_per_day:
         return base_price.price_per_day * days
+    
+    # Egyébként az alapár (token igénylésnél ez lehet fix ár vagy 30 napos ár)
+    if item_type == "token_request" and days and not base_price.price_per_day:
+        # Ha nincs price_per_day beállítva, de van napok száma, akkor arányosan számoljuk
+        # Feltételezzük, hogy a base_price 30 napos ár
+        return int(base_price.base_price * days / 30)
     
     return base_price.base_price
 

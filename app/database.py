@@ -335,6 +335,7 @@ class CartItem(Base):
     token_type = Column(EnumType(TokenType), nullable=True)  # Csak token_request esetén
     quantity = Column(Integer, nullable=False, default=1)  # Token igénylés esetén hány darab
     requested_days = Column(Integer, nullable=True)  # Token hosszabbítás esetén hány nap
+    expires_in_days = Column(Integer, nullable=True)  # Token igénylés esetén hány napos lejárat
     token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=True, index=True)  # Csak token_extension esetén
     notes = Column(Text, nullable=True)  # Opcionális megjegyzés
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)

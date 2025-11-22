@@ -45,12 +45,13 @@ async def show_cart(
         try:
             if item.item_type == "token_request":
                 # Token igénylés ár számítása
+                # Ha expires_in_days nincs megadva, akkor None (alapértelmezett lejárat)
                 pricing = calculate_price(
                     db,
                     item.token_type,
                     "token_request",
                     quantity=item.quantity,
-                    days=None
+                    days=item.expires_in_days
                 )
                 item.pricing = pricing
                 total_base_price += pricing["total_base_price"]

@@ -608,6 +608,7 @@ def init_db():
                             token_type VARCHAR(20) NULL,
                             quantity INT NOT NULL DEFAULT 1,
                             requested_days INT NULL,
+                            expires_in_days INT NULL,
                             token_id {tokens_id_type} NULL,
                             notes TEXT NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -626,6 +627,24 @@ def init_db():
                 print("✓ cart_items tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: cart_items tábla: {e}")
+        
+        # Ha a cart_items tábla már létezik, ellenőrizzük az új oszlopokat
+        if 'cart_items' in inspector.get_table_names():
+            existing_columns = [col['name'] for col in inspector.get_columns('cart_items')]
+            
+            # expires_in_days oszlop hozzáadása, ha nincs
+            if 'expires_in_days' not in existing_columns:
+                print("expires_in_days oszlop hozzáadása a cart_items táblához...")
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("""
+                            ALTER TABLE cart_items 
+                            ADD COLUMN expires_in_days INT NULL
+                        """))
+                        conn.commit()
+                    print("✓ expires_in_days oszlop hozzáadva")
+                except Exception as e:
+                    print(f"  Figyelmeztetés: expires_in_days oszlop: {e}")
         
         # Token requests tábla létrehozása
         existing_tables = inspector.get_table_names()

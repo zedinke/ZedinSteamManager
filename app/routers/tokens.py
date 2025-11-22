@@ -585,6 +585,7 @@ async def request_token(
             item_type="token_request",
             token_type=token_type_enum,
             quantity=quantity,
+            expires_in_days=expires_in_days,
             notes=notes
         )
         db.add(cart_item)
