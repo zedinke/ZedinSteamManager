@@ -854,28 +854,28 @@ def init_db():
                 print("cluster_id oszlop hozzáadása a server_instances táblához...")
                 try:
                     with engine.connect() as conn:
-                        # Először ellenőrizzük, hogy létezik-e a clusters tábla
-                        if 'clusters' in inspector.get_table_names():
-                            clusters_id_type = id_type
-                            result = conn.execute(text("""
-                                SELECT COLUMN_TYPE 
-                                FROM INFORMATION_SCHEMA.COLUMNS 
-                                WHERE TABLE_SCHEMA = DATABASE() 
-                                AND TABLE_NAME = 'clusters' 
-                                AND COLUMN_NAME = 'id'
-                            """))
-                            row = result.fetchone()
-                            if row:
-                                clusters_id_type = row[0]
-                            
-                            conn.execute(text(f"""
+                        # Használjuk az id_type-ot, mert a clusters tábla ID típusa ugyanaz lesz
+                        conn.execute(text(f"""
+                            ALTER TABLE server_instances 
+                            ADD COLUMN cluster_id {id_type} NULL
+                        """))
+                        conn.commit()
+                        
+                        # Index hozzáadása
+                        try:
+                            conn.execute(text("""
                                 ALTER TABLE server_instances 
-                                ADD COLUMN cluster_id {clusters_id_type} NULL,
                                 ADD INDEX ix_server_instances_cluster_id (cluster_id)
                             """))
                             conn.commit()
-                            
-                            # Foreign key hozzáadása
+                        except Exception as e:
+                            error_str = str(e).lower()
+                            if "duplicate key name" not in error_str:
+                                print(f"    Figyelmeztetés: cluster_id index: {e}")
+                        
+                        # Foreign key hozzáadása (csak ha létezik a clusters tábla)
+                        existing_tables = inspector.get_table_names()
+                        if 'clusters' in existing_tables:
                             try:
                                 conn.execute(text("""
                                     ALTER TABLE server_instances 
@@ -884,12 +884,15 @@ def init_db():
                                 """))
                                 conn.commit()
                             except Exception as e:
-                                if "Duplicate foreign key" not in str(e) and "already exists" not in str(e).lower():
+                                error_str = str(e).lower()
+                                if "duplicate foreign key" not in error_str and "already exists" not in error_str:
                                     print(f"    Figyelmeztetés: cluster_id foreign key: {e}")
-                            
-                            print("✓ cluster_id oszlop hozzáadva")
+                        
+                        print("✓ cluster_id oszlop hozzáadva")
                 except Exception as e:
-                    print(f"  Figyelmeztetés: cluster_id oszlop: {e}")
+                    error_str = str(e).lower()
+                    if "duplicate column name" not in error_str:
+                        print(f"  Figyelmeztetés: cluster_id oszlop: {e}")
             
             # Egyéb új oszlopok hozzáadása
             new_columns = {
