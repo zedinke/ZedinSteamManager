@@ -81,17 +81,16 @@
 <script>
 function toggleCategory(header) {
     const category = header.parentElement;
-    const content = category.querySelector('.nav-category-content');
-    const icon = header.querySelector('.nav-category-icon');
+    const isActive = category.classList.contains('active');
     
-    if (content.style.display === 'none' || !content.style.display) {
-        content.style.display = 'block';
-        icon.style.transform = 'rotate(180deg)';
+    // Bezárjuk az összes kategóriát
+    document.querySelectorAll('.nav-category').forEach(cat => {
+        cat.classList.remove('active');
+    });
+    
+    // Ha nem volt aktív, akkor nyitjuk
+    if (!isActive) {
         category.classList.add('active');
-    } else {
-        content.style.display = 'none';
-        icon.style.transform = 'rotate(0deg)';
-        category.classList.remove('active');
     }
 }
 
@@ -99,14 +98,21 @@ function toggleCategory(header) {
 document.addEventListener('DOMContentLoaded', function() {
     const firstCategory = document.querySelector('.nav-category');
     if (firstCategory) {
-        const content = firstCategory.querySelector('.nav-category-content');
-        const icon = firstCategory.querySelector('.nav-category-icon');
-        if (content) {
-            content.style.display = 'block';
-            icon.style.transform = 'rotate(180deg)';
-            firstCategory.classList.add('active');
-        }
+        firstCategory.classList.add('active');
     }
+    
+    // Aktív oldal kiemelése
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.nav-item, .nav-sub-item').forEach(item => {
+        if (item.getAttribute('href') === currentPath) {
+            item.classList.add('active');
+            // Szülő kategória is nyitva legyen
+            const category = item.closest('.nav-category');
+            if (category) {
+                category.classList.add('active');
+            }
+        }
+    });
 });
 </script>
 
