@@ -64,6 +64,15 @@
                                     <a href="/ark/servers?cluster_id={{ cluster.id }}" class="btn btn-sm btn-primary">
                                         <i class="fas fa-server"></i> Szerverek
                                     </a>
+                                    {% if cluster.server_count == 0 %}
+                                        <form method="POST" action="/ark/clusters/{{ cluster.id }}/delete" 
+                                              style="display: inline; margin-left: 5px;"
+                                              onsubmit="return confirm('Biztosan törlöd ezt a cluster-t?');">
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="fas fa-trash"></i> Törlés
+                                            </button>
+                                        </form>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}

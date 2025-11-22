@@ -96,6 +96,13 @@
                                     <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary">
                                         <i class="fas fa-edit"></i> Szerkesztés
                                     </a>
+                                    <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
+                                          style="display: inline; margin-left: 5px;"
+                                          onsubmit="return confirm('Biztosan törlöd ezt a szervert? Ez a művelet nem visszavonható!');">
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            <i class="fas fa-trash"></i> Törlés
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                         {% endfor %}
