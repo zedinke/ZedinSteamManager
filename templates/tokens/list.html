@@ -56,12 +56,17 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <form method="POST" action="/tokens/delete" style="display: inline;" onsubmit="return confirm('Biztosan törölni szeretnéd ezt a tokent?');">
-                                        <input type="hidden" name="token_id" value="{{ token.id }}">
-                                        <button type="submit" class="btn btn-danger btn-sm">
-                                            <i class="fas fa-trash"></i> Törlés
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-primary btn-sm" onclick="showExtendModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d') if token.expires_at else '' }}')">
+                                            <i class="fas fa-clock"></i> Hosszabbítás
                                         </button>
-                                    </form>
+                                        <form method="POST" action="/tokens/delete" style="display: inline;" onsubmit="return confirm('Biztosan törölni szeretnéd ezt a tokent?');">
+                                            <input type="hidden" name="token_id" value="{{ token.id }}">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i> Törlés
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -73,5 +78,97 @@
         </div>
     </div>
 </div>
+
+<!-- Token Hosszabbítás Modal -->
+<div id="extendTokenModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content" style="background-color: white; margin: 15% auto; padding: 20px; border-radius: 10px; width: 500px; max-width: 90%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3><i class="fas fa-clock"></i> Token Hosszabbítása</h3>
+            <button onclick="closeExtendModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <form method="POST" action="/tokens/extend" id="extendTokenForm">
+            <input type="hidden" name="token_id" id="extendTokenId">
+            <div style="margin-bottom: 15px;">
+                <label for="additionalDays" style="display: block; margin-bottom: 5px; font-weight: bold;">Hány napra szeretnéd meghosszabbítani?</label>
+                <input type="number" class="form-control" id="additionalDays" name="additional_days" min="1" max="365" value="30" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                <small style="color: #666;">1-365 nap között lehet megadni</small>
+            </div>
+            <div class="alert alert-info" style="background: #e7f3ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <strong>Jelenlegi lejárat:</strong> <span id="currentExpiry"></span><br>
+                <strong>Új lejárat:</strong> <span id="newExpiry" style="color: #667eea; font-weight: bold;"></span>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeExtendModal()" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Mégse</button>
+                <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    <i class="fas fa-check"></i> Hosszabbítás
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showExtendModal(tokenId, currentExpiry) {
+    document.getElementById('extendTokenId').value = tokenId;
+    document.getElementById('currentExpiry').textContent = currentExpiry || 'Nincs lejárat';
+    
+    // Új lejárat számítása
+    const daysInput = document.getElementById('additionalDays');
+    daysInput.removeEventListener('input', updateNewExpiry);
+    daysInput.addEventListener('input', updateNewExpiry);
+    updateNewExpiry();
+    
+    // Modal megjelenítése
+    document.getElementById('extendTokenModal').style.display = 'block';
+}
+
+function closeExtendModal() {
+    document.getElementById('extendTokenModal').style.display = 'none';
+}
+
+function updateNewExpiry() {
+    const days = parseInt(document.getElementById('additionalDays').value) || 0;
+    const currentExpiryText = document.getElementById('currentExpiry').textContent;
+    
+    if (currentExpiryText && currentExpiryText !== 'Nincs lejárat') {
+        // Parse magyar dátum formátum: YYYY-MM-DD HH:MM
+        const parts = currentExpiryText.split(' ');
+        const dateParts = parts[0].split('-');
+        const timeParts = parts[1] ? parts[1].split(':') : [0, 0];
+        
+        const currentDate = new Date(
+            parseInt(dateParts[0]),
+            parseInt(dateParts[1]) - 1,
+            parseInt(dateParts[2]),
+            parseInt(timeParts[0]),
+            parseInt(timeParts[1])
+        );
+        
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + days);
+        
+        const formattedDate = newDate.toLocaleDateString('hu-HU') + ' ' + 
+                             newDate.toLocaleTimeString('hu-HU', {hour: '2-digit', minute: '2-digit'});
+        document.getElementById('newExpiry').textContent = formattedDate;
+    } else {
+        const today = new Date();
+        const newDate = new Date(today);
+        newDate.setDate(newDate.getDate() + days);
+        
+        const formattedDate = newDate.toLocaleDateString('hu-HU') + ' ' + 
+                             newDate.toLocaleTimeString('hu-HU', {hour: '2-digit', minute: '2-digit'});
+        document.getElementById('newExpiry').textContent = formattedDate;
+    }
+}
+
+// Modal bezárása kattintásra a háttérre
+window.onclick = function(event) {
+    const modal = document.getElementById('extendTokenModal');
+    if (event.target == modal) {
+        closeExtendModal();
+    }
+}
+</script>
+
 {% endblock %}
 

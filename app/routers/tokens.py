@@ -216,3 +216,50 @@ async def delete_token(
     
     return RedirectResponse(url="/tokens/list?success=Token+sikeresen+törölve", status_code=302)
 
+@router.post("/tokens/extend")
+async def extend_token(
+    request: Request,
+    token_id: int = Form(...),
+    additional_days: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Token hosszabbítása (Manager Admin)"""
+    current_user = require_manager_admin(request, db)
+    
+    if additional_days < 1 or additional_days > 365:
+        raise HTTPException(status_code=400, detail="A hosszabbítás 1 és 365 nap között lehet")
+    
+    token = db.query(Token).filter(Token.id == token_id).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Token nem található")
+    
+    from datetime import datetime, timedelta
+    
+    # Ha a token már lejárt, akkor a mai dátumtól számolunk
+    # Ha még nem járt le, akkor a jelenlegi lejárati dátumtól
+    if token.expires_at and token.expires_at > datetime.now():
+        new_expires_at = token.expires_at + timedelta(days=additional_days)
+    else:
+        new_expires_at = datetime.now() + timedelta(days=additional_days)
+    
+    token.expires_at = new_expires_at
+    db.commit()
+    
+    # Ha a token használatban van szerverrel, akkor frissítsük a szerver token_expires_at mezőjét is
+    from app.database import ServerInstance
+    servers = db.query(ServerInstance).filter(
+        ServerInstance.token_used_id == token.id
+    ).all()
+    
+    for server in servers:
+        server.token_expires_at = new_expires_at
+        # Frissítsük a scheduled_deletion_date-et is (30 nap a token lejárata után)
+        server.scheduled_deletion_date = new_expires_at + timedelta(days=30)
+    
+    db.commit()
+    
+    return RedirectResponse(
+        url=f"/tokens/list?success=Token+hosszabbítva+{additional_days}+napra.+Új+lejárat:+{new_expires_at.strftime('%Y-%m-%d %H:%M')}",
+        status_code=302
+    )
+
