@@ -183,10 +183,12 @@ async def install_steamcmd(
             output_queue.put(f"[ERROR] Traceback: {traceback.format_exc()}\n")
         finally:
             output_queue.put("[DONE]\n")
+            # Várunk egy kicsit, hogy a WebSocket végig tudja olvasni az üzeneteket
+            time.sleep(2)
             if process_id in active_processes:
                 del active_processes[process_id]
-            if process_id in process_outputs:
-                del process_outputs[process_id]
+            # Ne töröljük azonnal a process_outputs-ot, hogy a WebSocket végig tudja olvasni
+            # A WebSocket törli, amikor befejeződik
     
     # Folyamat indítása háttérben
     thread = threading.Thread(target=install_process)
@@ -262,10 +264,12 @@ async def update_steamcmd(
             output_queue.put(f"[ERROR] Traceback: {traceback.format_exc()}\n")
         finally:
             output_queue.put("[DONE]\n")
+            # Várunk egy kicsit, hogy a WebSocket végig tudja olvasni az üzeneteket
+            time.sleep(2)
             if process_id in active_processes:
                 del active_processes[process_id]
-            if process_id in process_outputs:
-                del process_outputs[process_id]
+            # Ne töröljük azonnal a process_outputs-ot, hogy a WebSocket végig tudja olvasni
+            # A WebSocket törli, amikor befejeződik
     
     # Folyamat indítása háttérben
     thread = threading.Thread(target=update_process)
