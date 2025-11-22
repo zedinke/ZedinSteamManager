@@ -7,9 +7,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.database import get_db, User
 from app.services.auth_service import verify_password, get_password_hash
-from app.main import get_templates
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
 
 router = APIRouter()
+
+# Template-ek inicializálása
+BASE_DIR = Path(__file__).parent.parent.parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 @router.get("/settings/profile", response_class=HTMLResponse)
 async def show_profile(request: Request, db: Session = Depends(get_db)):
@@ -22,7 +27,6 @@ async def show_profile(request: Request, db: Session = Depends(get_db)):
     if not current_user:
         return RedirectResponse(url="/login", status_code=302)
     
-    templates = get_templates()
     return templates.TemplateResponse(
         "settings/profile.html",
         {
@@ -77,7 +81,6 @@ async def show_password_change(request: Request, db: Session = Depends(get_db)):
     if not current_user:
         return RedirectResponse(url="/login", status_code=302)
     
-    templates = get_templates()
     return templates.TemplateResponse(
         "settings/password.html",
         {

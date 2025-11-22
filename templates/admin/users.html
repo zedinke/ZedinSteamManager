@@ -46,11 +46,15 @@
                                     {% if user.role.value in ["admin", "user"] %}
                                         <div class="server-admin-selector" data-user-id="{{ user.id }}">
                                             <select multiple class="server-admin-multiselect" id="server_admins_{{ user.id }}">
-                                                {% for server_admin in server_admins %}
-                                                    <option value="{{ server_admin.id }}" {% if server_admin.id in server_admin_ids %}selected{% endif %}>
-                                                        {{ server_admin.username }}
-                                                    </option>
-                                                {% endfor %}
+                                                {% if server_admins %}
+                                                    {% for server_admin in server_admins %}
+                                                        <option value="{{ server_admin.id }}" {% if server_admin_ids and server_admin.id in server_admin_ids %}selected{% endif %}>
+                                                            {{ server_admin.username }}
+                                                        </option>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <option disabled>Nincs elérhető Server Admin</option>
+                                                {% endif %}
                                             </select>
                                             <button type="button" class="btn btn-sm btn-primary save-server-admins" data-user-id="{{ user.id }}">
                                                 <i class="fas fa-save"></i> Mentés
