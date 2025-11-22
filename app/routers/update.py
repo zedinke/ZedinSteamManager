@@ -110,12 +110,32 @@ async def execute_update(request: Request, db: Session = Depends(get_db)):
             raise HTTPException(status_code=401, detail="Nincs bejelentkezve")
         raise HTTPException(status_code=403, detail="Nincs jogosultság")
     
-    # Update már folyamatban van?
-    if is_update_in_progress():
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Update már folyamatban van"}
-        )
+    # Ellenőrizzük, hogy valóban folyamatban van-e az update
+    updating = is_update_in_progress()
+    if updating:
+        # Ellenőrizzük, hogy az update script még fut-e
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "update.sh"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            script_running = result.returncode == 0
+            if script_running:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Update már folyamatban van"}
+                )
+            else:
+                # Ha a flag ott van, de a script nem fut, töröljük a flagot
+                set_update_in_progress(False)
+        except:
+            # Ha pgrep nem elérhető, csak a flag alapján döntünk
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Update már folyamatban van. Ha biztos vagy benne, hogy nincs, töröld a .updating fájlt."}
+            )
     
     # Update flag beállítása
     set_update_in_progress(True)
@@ -132,7 +152,8 @@ async def execute_update(request: Request, db: Session = Depends(get_db)):
     
     try:
         # Update script futtatása háttérben
-        subprocess.Popen(
+        # A script végén automatikusan törli a flagot
+        process = subprocess.Popen(
             ["bash", str(update_script)],
             cwd=project_dir,
             stdout=subprocess.PIPE,
@@ -171,8 +192,26 @@ async def update_status(request: Request):
     updating = is_update_in_progress()
     
     # Ha a service aktív és nincs update folyamatban, akkor kész
-    if service_active and not updating:
-        set_update_in_progress(False)
+    if service_active and updating:
+        # Ellenőrizzük, hogy az update script még fut-e
+        try:
+            # Nézzük meg, hogy van-e update.sh folyamat
+            result = subprocess.run(
+                ["pgrep", "-f", "update.sh"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            script_running = result.returncode == 0
+            if not script_running:
+                # Ha a script nem fut, de a flag még ott van, töröljük
+                set_update_in_progress(False)
+                updating = False
+        except:
+            # Ha pgrep nem elérhető, csak a service státusz alapján döntünk
+            if service_active:
+                set_update_in_progress(False)
+                updating = False
     
     return JSONResponse(content={
         "service_active": service_active,
@@ -240,4 +279,27 @@ def set_update_in_progress(value: bool):
     else:
         if flag_file.exists():
             flag_file.unlink()
+
+@router.post("/clear-flag")
+async def clear_update_flag(request: Request, db: Session = Depends(get_db)):
+    """Update flag manuális törlése"""
+    # Manager Admin ellenőrzés
+    try:
+        require_manager_admin(request, db)
+    except HTTPException as e:
+        if e.status_code == 302:
+            raise HTTPException(status_code=401, detail="Nincs bejelentkezve")
+        raise HTTPException(status_code=403, detail="Nincs jogosultság")
+    
+    try:
+        set_update_in_progress(False)
+        return JSONResponse(content={
+            "success": True,
+            "message": "Update flag törölve"
+        })
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
