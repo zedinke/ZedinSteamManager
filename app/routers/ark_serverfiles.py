@@ -216,12 +216,15 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
         # Progress callback
         log_lines = []
         
-        def progress_callback(message: str):
+        async def progress_callback(message: str):
             log_lines.append(message)
-            asyncio.create_task(websocket.send_json({
-                "type": "progress",
-                "message": message
-            }))
+            try:
+                await websocket.send_json({
+                    "type": "progress",
+                    "message": message
+                })
+            except:
+                pass  # Ha a WebSocket már bezárult, ne dobjunk hibát
         
         # Telepítés indítása
         await websocket.send_json({
