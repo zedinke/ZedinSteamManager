@@ -149,6 +149,19 @@ def init_db():
         # Helper függvény a users.id típusának lekéréséhez
         def get_users_id_type():
             """Lekéri a users.id oszlop típusát"""
+            # Közvetlenül az adatbázisból kérdezzük le, hogy biztosan jó legyen
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT COLUMN_TYPE 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = 'users' 
+                    AND COLUMN_NAME = 'id'
+                """))
+                row = result.fetchone()
+                if row:
+                    return row[0]
+            # Ha nem találjuk, próbáljuk meg az inspector-ral
             users_columns = inspector.get_columns('users')
             for col in users_columns:
                 if col['name'] == 'id':
@@ -159,20 +172,7 @@ def init_db():
                         return "INT(11) UNSIGNED"
                     elif 'INT' in type_str or 'INTEGER' in type_str:
                         return "INT(11)"
-                    else:
-                        # Próbáljuk meg közvetlenül lekérdezni az adatbázisból
-                        with engine.connect() as conn:
-                            result = conn.execute(text("""
-                                SELECT COLUMN_TYPE 
-                                FROM INFORMATION_SCHEMA.COLUMNS 
-                                WHERE TABLE_SCHEMA = DATABASE() 
-                                AND TABLE_NAME = 'users' 
-                                AND COLUMN_NAME = 'id'
-                            """))
-                            row = result.fetchone()
-                            if row:
-                                return row[0]
-            return "INT(11) UNSIGNED"  # Alapértelmezés
+            return "INT(11)"  # Alapértelmezés (nem UNSIGNED, mert a kimenet szerint INT(11))
         
         id_type = get_users_id_type()
         print(f"  users.id típusa: {id_type}")
