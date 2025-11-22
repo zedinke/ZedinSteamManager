@@ -233,11 +233,11 @@ def init_db():
             print("ticket_messages tábla létrehozása...")
             try:
                 with engine.connect() as conn:
-                    conn.execute(text("""
+                    conn.execute(text(f"""
                         CREATE TABLE ticket_messages (
-                            id INTEGER NOT NULL AUTO_INCREMENT,
-                            ticket_id INTEGER NOT NULL,
-                            user_id INTEGER NOT NULL,
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            ticket_id {id_type} NOT NULL,
+                            user_id {id_type} NOT NULL,
                             message TEXT NOT NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                             PRIMARY KEY (id),
