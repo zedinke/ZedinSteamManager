@@ -29,12 +29,13 @@ def process_expired_tokens(db: Session):
     
     for token in expired_tokens:
         # Legrégebbi szerver, ami ezt a tokent használja
+        from sqlalchemy import asc
         server = db.query(ServerInstance).filter(
             and_(
                 ServerInstance.token_used_id == token.id,
                 ServerInstance.scheduled_deletion_date.is_(None)  # Még nem ütemezett törlésre
             )
-        ).order_by(ServerInstance.created_at).first()
+        ).order_by(asc(ServerInstance.created_at)).first()
         
         if server:
             # Szerver leállítása
