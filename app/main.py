@@ -8,8 +8,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from pathlib import Path
 from app.config import settings
+from app.middleware import catch_exceptions_middleware
 
 # Projekt gyökér
 BASE_DIR = Path(__file__).parent.parent
@@ -18,8 +20,12 @@ BASE_DIR = Path(__file__).parent.parent
 app = FastAPI(
     title="ZedinArkManager",
     description="Játék szerver kezelő manager rendszer",
-    version="2.0.0"
+    version="2.0.0",
+    debug=True
 )
+
+# Exception handler middleware (legelső)
+app.middleware("http")(catch_exceptions_middleware)
 
 # Session middleware
 app.add_middleware(

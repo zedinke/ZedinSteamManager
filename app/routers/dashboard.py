@@ -28,9 +28,10 @@ async def dashboard(
     stats = {}
     
     if current_user.role.value == "manager_admin":
+        from app.database import UserRole
         stats["total_users"] = db.query(func.count(User.id)).scalar()
-        stats["server_admins"] = db.query(func.count(User.id)).filter(User.role == "server_admin").scalar()
-        stats["admins"] = db.query(func.count(User.id)).filter(User.role == "admin").scalar()
+        stats["server_admins"] = db.query(func.count(User.id)).filter(User.role == UserRole.SERVER_ADMIN).scalar()
+        stats["admins"] = db.query(func.count(User.id)).filter(User.role == UserRole.ADMIN).scalar()
         stats["active_tokens"] = db.query(func.count(Token.id)).filter(
             Token.is_active == True,
             Token.expires_at > func.now()
