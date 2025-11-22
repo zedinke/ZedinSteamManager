@@ -109,76 +109,354 @@ async def send_verification_email(email: str, username: str, token: str) -> bool
     """Email verifikációs email küldése"""
     verification_link = f"{settings.base_url}/verify-email?token={token}"
     
-    body = get_email_template(
-        "verification",
-        username=username,
-        verification_link=verification_link,
-        base_url=settings.base_url
-    )
+    # Gamer design template
+    body = f"""
+    <!DOCTYPE html>
+    <html lang="hu">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background: #1a1a2e; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #0f3460 0%, #16213e 100%); padding: 30px; text-align: center; border-bottom: 3px solid #667eea;">
+                                <h1 style="margin: 0; color: #fff; font-size: 28px; text-shadow: 0 2px 10px rgba(102, 126, 234, 0.5);">
+                                    🎮 <span style="color: #667eea;">Zedin</span><span style="color: #764ba2;">Ark</span>Manager
+                                </h1>
+                                <p style="margin: 10px 0 0 0; color: #a0a0a0; font-size: 14px;">Game Server Management System</p>
+                            </td>
+                        </tr>
+                        
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px 30px; background: #1a1a2e;">
+                                <div style="color: #e0e0e0;">
+                                    <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                                        <h2 style="margin: 0 0 15px 0; color: #fff; font-size: 24px; display: flex; align-items: center; gap: 10px;">
+                                            <span style="font-size: 32px;">✨</span>
+                                            <span>Üdvözöljük a Közösségben!</span>
+                                        </h2>
+                                        <p style="margin: 0; color: #b0b0b0; font-size: 16px; line-height: 1.6;">
+                                            Kedves <strong style="color: #667eea;">{username}</strong>!
+                                        </p>
+                                    </div>
+                                    
+                                    <div style="background: #252540; border-radius: 10px; padding: 25px; margin-bottom: 25px; border: 1px solid #3a3a5a;">
+                                        <p style="margin: 0 0 20px 0; color: #d0d0d0; font-size: 15px; line-height: 1.7;">
+                                            Köszönjük, hogy csatlakoztál hozzánk! Kérjük, erősítsd meg az email címedet a regisztráció befejezéséhez.
+                                        </p>
+                                        
+                                        <div style="text-align: center; margin-top: 30px;">
+                                            <a href="{verification_link}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+                                                ✅ Email Megerősítése
+                                            </a>
+                                        </div>
+                                        
+                                        <p style="margin: 25px 0 0 0; color: #888; font-size: 13px; text-align: center;">
+                                            Vagy másold be ezt a linket: <br>
+                                            <a href="{verification_link}" style="color: #667eea; word-break: break-all;">{verification_link}</a>
+                                        </p>
+                                    </div>
+                                    
+                                    <div style="background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; padding: 15px; border-radius: 6px; margin-top: 20px;">
+                                        <p style="margin: 0; color: #b0b0b0; font-size: 13px; line-height: 1.6;">
+                                            <strong style="color: #667eea;">⚠️ Fontos:</strong> A link 24 órán belül lejár. Ha nem kérted ezt az emailt, kérjük hagyd figyelmen kívül.
+                                        </p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background: #0f0f1e; padding: 25px 30px; text-align: center; border-top: 2px solid #2a2a3e;">
+                                <p style="margin: 0; color: #888; font-size: 12px;">
+                                    © 2024 ZedinArkManager | Game Server Management
+                                </p>
+                                <p style="margin: 10px 0 0 0; color: #666; font-size: 11px;">
+                                    Ez egy automatikus üzenet, kérjük ne válaszolj rá.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
     
-    if not body:
-        body = f"""
-        <html>
-        <body>
-            <h2>Üdvözöljük, {username}!</h2>
-            <p>Kérjük, erősítse meg az email címét a regisztráció befejezéséhez.</p>
-            <a href="{verification_link}">Email megerősítése</a>
-            <p>Vagy másolja be ezt a linket: {verification_link}</p>
-        </body>
-        </html>
-        """
-    
-    return await send_email(email, "Email megerősítés - ZedinArkManager", body)
+    return await send_email(email, "✨ Email Megerősítés - ZedinArkManager", body)
 
 async def send_token_notification(email: str, username: str, token: str, token_type: str, expires_at: str) -> bool:
     """Token értesítő email"""
     activation_link = f"{settings.base_url}/tokens/activate?token={token}"
     type_text = "Szerver Admin" if token_type == "server_admin" else "Felhasználó"
     
+    # Gamer design template
     body = f"""
-    <html>
-    <body>
-        <h2>Új token generálva</h2>
-        <p>Kedves {username}!</p>
-        <p>Ön számára egy új <strong>{type_text}</strong> token lett generálva.</p>
-        <p>Token: <strong>{token}</strong></p>
-        <p>Lejárat: {expires_at}</p>
-        <a href="{activation_link}">Token aktiválása</a>
+    <!DOCTYPE html>
+    <html lang="hu">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background: #1a1a2e; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #0f3460 0%, #16213e 100%); padding: 30px; text-align: center; border-bottom: 3px solid #667eea;">
+                                <h1 style="margin: 0; color: #fff; font-size: 28px; text-shadow: 0 2px 10px rgba(102, 126, 234, 0.5);">
+                                    🎮 <span style="color: #667eea;">Zedin</span><span style="color: #764ba2;">Ark</span>Manager
+                                </h1>
+                                <p style="margin: 10px 0 0 0; color: #a0a0a0; font-size: 14px;">Game Server Management System</p>
+                            </td>
+                        </tr>
+                        
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px 30px; background: #1a1a2e;">
+                                <div style="color: #e0e0e0;">
+                                    <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                                        <h2 style="margin: 0 0 15px 0; color: #fff; font-size: 24px; display: flex; align-items: center; gap: 10px;">
+                                            <span style="font-size: 32px;">🔑</span>
+                                            <span>Új Token Generálva!</span>
+                                        </h2>
+                                        <p style="margin: 0; color: #b0b0b0; font-size: 16px; line-height: 1.6;">
+                                            Kedves <strong style="color: #667eea;">{username}</strong>!
+                                        </p>
+                                    </div>
+                                    
+                                    <div style="background: #252540; border-radius: 10px; padding: 25px; margin-bottom: 25px; border: 1px solid #3a3a5a;">
+                                        <p style="margin: 0 0 20px 0; color: #d0d0d0; font-size: 15px; line-height: 1.7;">
+                                            Ön számára egy új <strong style="color: #764ba2;">{type_text}</strong> token lett generálva.
+                                        </p>
+                                        
+                                        <div style="background: #1a1a2e; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #3a3a5a;">
+                                            <div style="margin-bottom: 15px;">
+                                                <span style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Token</span>
+                                                <div style="background: #0f0f1e; padding: 15px; border-radius: 6px; margin-top: 8px; border: 1px solid #2a2a3e;">
+                                                    <code style="color: #667eea; font-size: 16px; font-weight: bold; letter-spacing: 1px; word-break: break-all;">{token}</code>
+                                                </div>
+                                            </div>
+                                            
+                                            <div style="margin-bottom: 15px;">
+                                                <span style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Lejárat</span>
+                                                <div style="color: #d0d0d0; font-size: 14px; margin-top: 8px;">
+                                                    <span style="color: #764ba2;">⏰</span> {expires_at}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div style="text-align: center; margin-top: 30px;">
+                                            <a href="{activation_link}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+                                                🚀 Token Aktiválása
+                                            </a>
+                                        </div>
+                                        
+                                        <p style="margin: 25px 0 0 0; color: #888; font-size: 13px; text-align: center;">
+                                            Vagy másold be ezt a linket: <br>
+                                            <a href="{activation_link}" style="color: #667eea; word-break: break-all;">{activation_link}</a>
+                                        </p>
+                                    </div>
+                                    
+                                    <div style="background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; padding: 15px; border-radius: 6px; margin-top: 20px;">
+                                        <p style="margin: 0; color: #b0b0b0; font-size: 13px; line-height: 1.6;">
+                                            <strong style="color: #667eea;">💡 Tipp:</strong> A token aktiválása után jogosultságod frissül, és hozzáférhetsz az új funkciókhoz!
+                                        </p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background: #0f0f1e; padding: 25px 30px; text-align: center; border-top: 2px solid #2a2a3e;">
+                                <p style="margin: 0; color: #888; font-size: 12px;">
+                                    © 2024 ZedinArkManager | Game Server Management
+                                </p>
+                                <p style="margin: 10px 0 0 0; color: #666; font-size: 11px;">
+                                    Ez egy automatikus üzenet, kérjük ne válaszolj rá.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
     """
     
-    return await send_email(email, "Új token - ZedinArkManager", body)
+    return await send_email(email, "🔑 Új Token Generálva - ZedinArkManager", body)
 
 async def send_token_expiry_warning(email: str, username: str, token: str, days_left: int) -> bool:
     """Token lejárat figyelmeztetés"""
     body = f"""
-    <html>
-    <body>
-        <h2>Token lejárat figyelmeztetés</h2>
-        <p>Kedves {username}!</p>
-        <p><strong>Fontos:</strong> Tokenje <strong>{days_left} nap</strong> múlva lejár!</p>
-        <p>Token: <strong>{token}</strong></p>
+    <!DOCTYPE html>
+    <html lang="hu">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background: #1a1a2e; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #0f3460 0%, #16213e 100%); padding: 30px; text-align: center; border-bottom: 3px solid #f59e0b;">
+                                <h1 style="margin: 0; color: #fff; font-size: 28px; text-shadow: 0 2px 10px rgba(245, 158, 11, 0.5);">
+                                    🎮 <span style="color: #667eea;">Zedin</span><span style="color: #764ba2;">Ark</span>Manager
+                                </h1>
+                                <p style="margin: 10px 0 0 0; color: #a0a0a0; font-size: 14px;">Game Server Management System</p>
+                            </td>
+                        </tr>
+                        
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px 30px; background: #1a1a2e;">
+                                <div style="color: #e0e0e0;">
+                                    <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%); border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                                        <h2 style="margin: 0 0 15px 0; color: #fff; font-size: 24px; display: flex; align-items: center; gap: 10px;">
+                                            <span style="font-size: 32px;">⏰</span>
+                                            <span>Token Lejárat Figyelmeztetés</span>
+                                        </h2>
+                                        <p style="margin: 0; color: #b0b0b0; font-size: 16px; line-height: 1.6;">
+                                            Kedves <strong style="color: #f59e0b;">{username}</strong>!
+                                        </p>
+                                    </div>
+                                    
+                                    <div style="background: #252540; border-radius: 10px; padding: 25px; margin-bottom: 25px; border: 1px solid #3a3a5a;">
+                                        <div style="background: rgba(245, 158, 11, 0.2); border: 2px solid #f59e0b; border-radius: 8px; padding: 20px; margin-bottom: 20px; text-align: center;">
+                                            <p style="margin: 0; color: #fff; font-size: 18px; font-weight: bold;">
+                                                <span style="font-size: 24px;">⚠️</span> Fontos!
+                                            </p>
+                                            <p style="margin: 10px 0 0 0; color: #f59e0b; font-size: 28px; font-weight: bold;">
+                                                {days_left} nap
+                                            </p>
+                                            <p style="margin: 5px 0 0 0; color: #d0d0d0; font-size: 14px;">
+                                                múlva lejár a tokenje!
+                                            </p>
+                                        </div>
+                                        
+                                        <div style="background: #1a1a2e; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #3a3a5a;">
+                                            <span style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Token</span>
+                                            <div style="background: #0f0f1e; padding: 15px; border-radius: 6px; margin-top: 8px; border: 1px solid #2a2a3e;">
+                                                <code style="color: #f59e0b; font-size: 16px; font-weight: bold; letter-spacing: 1px; word-break: break-all;">{token}</code>
+                                            </div>
+                                        </div>
+                                        
+                                        <p style="margin: 20px 0 0 0; color: #d0d0d0; font-size: 14px; line-height: 1.7;">
+                                            Kérjük, aktiváld a tokent a lejárat előtt, hogy ne veszítsd el a hozzáférésedet!
+                                        </p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background: #0f0f1e; padding: 25px 30px; text-align: center; border-top: 2px solid #2a2a3e;">
+                                <p style="margin: 0; color: #888; font-size: 12px;">
+                                    © 2024 ZedinArkManager | Game Server Management
+                                </p>
+                                <p style="margin: 10px 0 0 0; color: #666; font-size: 11px;">
+                                    Ez egy automatikus üzenet, kérjük ne válaszolj rá.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
     """
     
-    return await send_email(email, "Token lejárat figyelmeztetés - ZedinArkManager", body)
+    return await send_email(email, "⏰ Token Lejárat Figyelmeztetés - ZedinArkManager", body)
 
 async def send_notification_email(email: str, username: str, title: str, message: str) -> bool:
     """Értesítés email küldése"""
     body = f"""
-    <html>
-    <body>
-        <h2>{title}</h2>
-        <p>Kedves {username}!</p>
-        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            {message.replace(chr(10), '<br>')}
-        </div>
-        <p>Üdvözlettel,<br>ZedinArkManager csapat</p>
+    <!DOCTYPE html>
+    <html lang="hu">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background: #1a1a2e; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #0f3460 0%, #16213e 100%); padding: 30px; text-align: center; border-bottom: 3px solid #667eea;">
+                                <h1 style="margin: 0; color: #fff; font-size: 28px; text-shadow: 0 2px 10px rgba(102, 126, 234, 0.5);">
+                                    🎮 <span style="color: #667eea;">Zedin</span><span style="color: #764ba2;">Ark</span>Manager
+                                </h1>
+                                <p style="margin: 10px 0 0 0; color: #a0a0a0; font-size: 14px;">Game Server Management System</p>
+                            </td>
+                        </tr>
+                        
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px 30px; background: #1a1a2e;">
+                                <div style="color: #e0e0e0;">
+                                    <div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                                        <h2 style="margin: 0 0 15px 0; color: #fff; font-size: 24px; display: flex; align-items: center; gap: 10px;">
+                                            <span style="font-size: 32px;">📢</span>
+                                            <span>{title}</span>
+                                        </h2>
+                                        <p style="margin: 0; color: #b0b0b0; font-size: 16px; line-height: 1.6;">
+                                            Kedves <strong style="color: #667eea;">{username}</strong>!
+                                        </p>
+                                    </div>
+                                    
+                                    <div style="background: #252540; border-radius: 10px; padding: 25px; margin-bottom: 25px; border: 1px solid #3a3a5a;">
+                                        <div style="background: #1a1a2e; border-radius: 8px; padding: 20px; border: 1px solid #3a3a5a; color: #d0d0d0; font-size: 15px; line-height: 1.8;">
+                                            {message.replace(chr(10), '<br>')}
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; padding: 15px; border-radius: 6px; margin-top: 20px;">
+                                        <p style="margin: 0; color: #b0b0b0; font-size: 13px; line-height: 1.6;">
+                                            Üdvözlettel,<br>
+                                            <strong style="color: #667eea;">ZedinArkManager</strong> csapat
+                                        </p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background: #0f0f1e; padding: 25px 30px; text-align: center; border-top: 2px solid #2a2a3e;">
+                                <p style="margin: 0; color: #888; font-size: 12px;">
+                                    © 2024 ZedinArkManager | Game Server Management
+                                </p>
+                                <p style="margin: 10px 0 0 0; color: #666; font-size: 11px;">
+                                    Ez egy automatikus üzenet, kérjük ne válaszolj rá.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
     """
     
-    return await send_email(email, f"{title} - ZedinArkManager", body)
+    return await send_email(email, f"📢 {title} - ZedinArkManager", body)
 
