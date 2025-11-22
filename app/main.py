@@ -76,6 +76,8 @@ app.include_router(server_management.router, tags=["Server Management"])
 app.include_router(games_admin.router, tags=["Games Admin"])
 app.include_router(servers.router, tags=["Servers"])
 app.include_router(ai_chat.router, tags=["AI Chat"])
+app.include_router(cart.router, tags=["Cart"])
+app.include_router(cart_admin.router, tags=["Cart Admin"])
 app.include_router(api.router, prefix="/api", tags=["API"])
 
 # Token lejárat kezelés - háttérben futó task
