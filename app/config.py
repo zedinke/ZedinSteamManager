@@ -83,6 +83,12 @@ def load_settings() -> Settings:
                 if 'email' in config_dict:
                     settings.email_from = config_dict['email'].get('from', settings.email_from)
                     settings.email_from_name = config_dict['email'].get('from_name', settings.email_from_name)
+                    # SMTP beállítások is lehetnek a config-ban
+                    if 'smtp' in config_dict['email']:
+                        settings.smtp_host = config_dict['email']['smtp'].get('host', settings.smtp_host)
+                        settings.smtp_port = config_dict['email']['smtp'].get('port', settings.smtp_port)
+                        settings.smtp_user = config_dict['email']['smtp'].get('user', settings.smtp_user)
+                        settings.smtp_pass = config_dict['email']['smtp'].get('pass', settings.smtp_pass)
                 
                 if 'secret_key' in config_dict:
                     settings.secret_key = config_dict['secret_key']

@@ -6,9 +6,10 @@ import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from app.config import settings
+from app.services.smtp_config import get_smtp_settings
 from pathlib import Path
 
-async def send_email(to: str, subject: str, body: str, is_html: bool = True) -> bool:
+async def send_email(to: str, subject: str, body: str, is_html: bool = True, domain: str = None) -> bool:
     """Email küldése"""
     try:
         message = MIMEMultipart("alternative")
@@ -21,13 +22,37 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True) -> 
         else:
             message.attach(MIMEText(body, "plain", "utf-8"))
         
+        # SMTP beállítások lekérése (Exim konfigurációból vagy settings-ből)
+        smtp_config = get_smtp_settings(domain)
+        
+        # Ha van Exim konfiguráció, azt használjuk, különben a settings-ből
+        smtp_host = smtp_config.get('host') or settings.smtp_host
+        smtp_port = smtp_config.get('port') or settings.smtp_port
+        smtp_user = smtp_config.get('user') or settings.smtp_user
+        smtp_pass = smtp_config.get('pass') or settings.smtp_pass
+        use_tls = smtp_config.get('use_tls', False)
+        
+        # TLS beállítások
+        if smtp_port == 465:
+            # Port 465 = SSL/TLS
+            use_tls = True
+            start_tls = False
+        elif smtp_port == 587:
+            # Port 587 = STARTTLS
+            use_tls = False
+            start_tls = True
+        else:
+            # Port 25 = általában nincs TLS
+            start_tls = False
+        
         await aiosmtplib.send(
             message,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user if settings.smtp_user else None,
-            password=settings.smtp_pass if settings.smtp_pass else None,
-            use_tls=False
+            hostname=smtp_host,
+            port=smtp_port,
+            username=smtp_user if smtp_user else None,
+            password=smtp_pass if smtp_pass else None,
+            use_tls=use_tls,
+            start_tls=start_tls if 'start_tls' in locals() else False
         )
         
         return True
