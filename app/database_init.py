@@ -287,9 +287,9 @@ def init_db():
             print("chat_rooms tábla létrehozása...")
             try:
                 with engine.connect() as conn:
-                    conn.execute(text("""
+                    conn.execute(text(f"""
                         CREATE TABLE chat_rooms (
-                            id INTEGER NOT NULL AUTO_INCREMENT,
+                            id {id_type} NOT NULL AUTO_INCREMENT,
                             name VARCHAR(100) NOT NULL,
                             game_name VARCHAR(100) NULL,
                             description TEXT NULL,
