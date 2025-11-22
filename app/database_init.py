@@ -201,6 +201,7 @@ def init_db():
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                     """))
                     conn.commit()
+                    print("  ✓ tickets tábla létrehozva (foreign key nélkül)")
                     
                     # Foreign key-ek hozzáadása külön
                     try:
@@ -210,9 +211,13 @@ def init_db():
                             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                         """))
                         conn.commit()
+                        print("  ✓ user_id foreign key hozzáadva")
                     except Exception as e:
-                        if "Duplicate foreign key" not in str(e) and "already exists" not in str(e).lower():
-                            print(f"    Figyelmeztetés: user_id foreign key: {e}")
+                        error_str = str(e).lower()
+                        if "duplicate foreign key" not in error_str and "already exists" not in error_str:
+                            print(f"    ⚠ Figyelmeztetés: user_id foreign key: {e}")
+                        else:
+                            print("  ✓ user_id foreign key már létezik")
                     
                     try:
                         conn.execute(text("""
@@ -221,12 +226,20 @@ def init_db():
                             FOREIGN KEY (closed_by_id) REFERENCES users(id) ON DELETE SET NULL
                         """))
                         conn.commit()
+                        print("  ✓ closed_by_id foreign key hozzáadva")
                     except Exception as e:
-                        if "Duplicate foreign key" not in str(e) and "already exists" not in str(e).lower():
-                            print(f"    Figyelmeztetés: closed_by_id foreign key: {e}")
+                        error_str = str(e).lower()
+                        if "duplicate foreign key" not in error_str and "already exists" not in error_str:
+                            print(f"    ⚠ Figyelmeztetés: closed_by_id foreign key: {e}")
+                        else:
+                            print("  ✓ closed_by_id foreign key már létezik")
                 print("✓ tickets tábla létrehozva")
             except Exception as e:
-                print(f"  Figyelmeztetés: tickets tábla: {e}")
+                print(f"  ✗ Hiba a tickets tábla létrehozásakor: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("✓ tickets tábla már létezik")
         
         # Frissítjük a létező táblák listáját
         existing_tables = inspector.get_table_names()
