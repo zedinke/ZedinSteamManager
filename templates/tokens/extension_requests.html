@@ -56,9 +56,8 @@
                                 </td>
                                 <td><strong>{{ req.requested_days }} nap</strong></td>
                                 <td>
-                                    {% if req.token and req.token.expires_at %}
-                                        {% set new_expiry = req.token.expires_at + timedelta(days=req.requested_days) %}
-                                        {{ new_expiry.strftime("%Y-%m-%d %H:%M") }}
+                                    {% if req.new_expiry %}
+                                        {{ req.new_expiry.strftime("%Y-%m-%d %H:%M") }}
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
