@@ -1,0 +1,130 @@
+<div class="notification-panel" id="notificationPanel">
+    <div class="notification-panel-header">
+        <h3>Értesítések</h3>
+        <button class="close-btn" id="closeNotifications">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="notification-panel-body" id="notificationList">
+        <div class="loading">Betöltés...</div>
+    </div>
+    <div class="notification-panel-footer">
+        <button class="btn btn-secondary" id="markAllRead">Összes olvasottnak jelölése</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const notificationIcon = document.getElementById('notificationIcon');
+    const notificationPanel = document.getElementById('notificationPanel');
+    const closeBtn = document.getElementById('closeNotifications');
+    const notificationList = document.getElementById('notificationList');
+    const markAllReadBtn = document.getElementById('markAllRead');
+    const notificationBadge = document.getElementById('notificationBadge');
+    
+    function loadNotifications() {
+        fetch('/api/notifications')
+            .then(response => response.json())
+            .then(data => {
+                if (data.notifications.length === 0) {
+                    notificationList.innerHTML = '<div class="no-notifications">Nincsenek értesítések</div>';
+                    return;
+                }
+                
+                let html = '';
+                data.notifications.forEach(notif => {
+                    const date = new Date(notif.created_at);
+                    const timeAgo = getTimeAgo(date);
+                    html += `
+                        <div class="notification-item ${notif.is_read ? 'read' : 'unread'}" data-id="${notif.id}">
+                            <div class="notification-content">
+                                <h4>${escapeHtml(notif.title)}</h4>
+                                <p>${escapeHtml(notif.message)}</p>
+                                <span class="notification-time">${timeAgo}</span>
+                            </div>
+                            ${!notif.is_read ? '<button class="mark-read-btn" data-id="' + notif.id + '"><i class="fas fa-check"></i></button>' : ''}
+                        </div>
+                    `;
+                });
+                notificationList.innerHTML = html;
+                
+                // Badge frissítése
+                if (data.unread_count > 0) {
+                    notificationBadge.textContent = data.unread_count;
+                    notificationBadge.style.display = 'flex';
+                } else {
+                    notificationBadge.style.display = 'none';
+                }
+                
+                // Mark as read buttons
+                document.querySelectorAll('.mark-read-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.dataset.id;
+                        fetch('/api/notifications/mark-read?notification_id=' + id, {
+                            method: 'POST'
+                        }).then(() => loadNotifications());
+                    });
+                });
+            });
+    }
+    
+    function getTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return 'épp most';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return minutes + ' perce';
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + ' órája';
+        const days = Math.floor(hours / 24);
+        return days + ' napja';
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    notificationIcon.addEventListener('click', function() {
+        notificationPanel.classList.toggle('active');
+        if (notificationPanel.classList.contains('active')) {
+            loadNotifications();
+        }
+    });
+    
+    closeBtn.addEventListener('click', function() {
+        notificationPanel.classList.remove('active');
+    });
+    
+    markAllReadBtn.addEventListener('click', function() {
+        fetch('/api/notifications/mark-all-read', {
+            method: 'POST'
+        }).then(() => {
+            loadNotifications();
+            location.reload();
+        });
+    });
+    
+    // Click outside to close
+    document.addEventListener('click', function(e) {
+        if (!notificationPanel.contains(e.target) && !notificationIcon.contains(e.target)) {
+            notificationPanel.classList.remove('active');
+        }
+    });
+    
+    // Auto-refresh badge
+    setInterval(() => {
+        fetch('/api/notifications?unread_only=true')
+            .then(response => response.json())
+            .then(data => {
+                if (data.unread_count > 0) {
+                    notificationBadge.textContent = data.unread_count;
+                    notificationBadge.style.display = 'flex';
+                } else {
+                    notificationBadge.style.display = 'none';
+                }
+            });
+    }, 30000); // 30 másodpercenként
+});
+</script>
+

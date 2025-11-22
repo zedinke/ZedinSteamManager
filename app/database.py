@@ -1,0 +1,147 @@
+"""
+Adatbázis kapcsolat és modell
+"""
+
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, Text, ForeignKey, JSON
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.sql import func
+from datetime import datetime
+import enum
+
+from app.config import settings
+
+# Database URL
+DATABASE_URL = f"mysql+pymysql://{settings.db_user}:{settings.db_pass}@{settings.db_host}/{settings.db_name}?charset=utf8mb4"
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    echo=False
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Enums
+class UserRole(str, enum.Enum):
+    MANAGER_ADMIN = "manager_admin"
+    SERVER_ADMIN = "server_admin"
+    ADMIN = "admin"
+    USER = "user"
+
+class TokenType(str, enum.Enum):
+    SERVER_ADMIN = "server_admin"
+    USER = "user"
+
+class ServerStatus(str, enum.Enum):
+    RUNNING = "running"
+    STOPPED = "stopped"
+    RESTARTING = "restarting"
+
+# Models
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False, index=True)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verification_token = Column(String(100), nullable=True)
+    email_verification_expires = Column(DateTime, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    created_by = relationship("User", remote_side=[id], backref="created_users")
+    tokens = relationship("Token", foreign_keys="Token.user_id", back_populates="user")
+    generated_tokens = relationship("Token", foreign_keys="Token.generated_by_id", back_populates="generated_by")
+    notifications = relationship("Notification", back_populates="user")
+    servers = relationship("Server", back_populates="server_admin")
+    admin_servers = relationship("AdminServer", back_populates="admin")
+
+class Token(Base):
+    __tablename__ = "tokens"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(100), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    token_type = Column(Enum(TokenType), nullable=False)
+    generated_by_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    is_active = Column(Boolean, default=False, nullable=False)
+    activated_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id], back_populates="tokens")
+    generated_by = relationship("User", foreign_keys=[generated_by_id], back_populates="generated_tokens")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="notifications")
+
+class ServerAdminAdmin(Base):
+    __tablename__ = "server_admin_admins"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    server_admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    
+    # Relationships
+    server_admin = relationship("User", foreign_keys=[server_admin_id])
+    admin = relationship("User", foreign_keys=[admin_id])
+
+class Server(Base):
+    __tablename__ = "servers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    server_admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(Enum(ServerStatus), default=ServerStatus.STOPPED, nullable=False)
+    config = Column(JSON, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    server_admin = relationship("User", back_populates="servers")
+    admin_servers = relationship("AdminServer", back_populates="server")
+
+class AdminServer(Base):
+    __tablename__ = "admin_servers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    
+    # Relationships
+    admin = relationship("User", back_populates="admin_servers")
+    server = relationship("Server", back_populates="admin_servers")
+
+# Dependency
+def get_db():
+    """Database session dependency"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+

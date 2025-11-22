@@ -1,0 +1,32 @@
+{% set user_role = request.session.get("user_role") %}
+
+<aside class="sidebar">
+    <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-item">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        
+        {% if user_role == "manager_admin" %}
+            <a href="/tokens/generate" class="nav-item">
+                <i class="fas fa-key"></i> Token generálás
+            </a>
+            <a href="/admin/users" class="nav-item">
+                <i class="fas fa-users"></i> Összes felhasználó
+            </a>
+        {% endif %}
+        
+        {% if user_role in ["manager_admin", "server_admin"] %}
+            <a href="/admin/list" class="nav-item">
+                <i class="fas fa-user-shield"></i> Admin felhasználók
+            </a>
+            <a href="/admin/create" class="nav-item">
+                <i class="fas fa-user-plus"></i> Admin létrehozása
+            </a>
+        {% endif %}
+        
+        <a href="/tokens/activate" class="nav-item">
+            <i class="fas fa-check-circle"></i> Token aktiválás
+        </a>
+    </nav>
+</aside>
+

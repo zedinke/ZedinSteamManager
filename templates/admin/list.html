@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Admin felhasználók - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-user-shield"></i> Admin felhasználók</h2>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if admins %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Felhasználónév</th>
+                            <th>Email</th>
+                            <th>Jogosultság</th>
+                            <th>Regisztrálva</th>
+                            {% if request.session.get("user_role") == "server_admin" %}
+                                <th>Műveletek</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for admin in admins %}
+                            <tr>
+                                <td>{{ admin.username }}</td>
+                                <td>{{ admin.email }}</td>
+                                <td>
+                                    <span class="badge role-{{ admin.role.value }}">
+                                        {% if admin.role.value == "server_admin" %}Szerver Admin{% else %}Admin{% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ admin.created_at.strftime("%Y-%m-%d %H:%M") if admin.created_at else "-" }}</td>
+                                {% if request.session.get("user_role") == "server_admin" and admin.role.value == "admin" %}
+                                    <td>
+                                        <form method="POST" action="/admin/delete" style="display: inline;" onsubmit="return confirm('Biztosan törölni szeretnéd ezt az admin felhasználót?');">
+                                            <input type="hidden" name="admin_id" value="{{ admin.id }}">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i> Törlés
+                                            </button>
+                                        </form>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nincsenek admin felhasználók.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

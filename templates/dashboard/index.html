@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="page-header">
+        <h2><i class="fas fa-home"></i> Dashboard</h2>
+        <p>Üdvözöljük, {{ user.username }}!</p>
+    </div>
+    
+    <div class="stats-grid">
+        {% if user.role.value == "manager_admin" %}
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #667eea;">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.total_users or 0 }}</h3>
+                    <p>Összes felhasználó</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #764ba2;">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.server_admins or 0 }}</h3>
+                    <p>Szerver Admin</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #f093fb;">
+                    <i class="fas fa-user-cog"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.admins or 0 }}</h3>
+                    <p>Admin</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #4facfe;">
+                    <i class="fas fa-key"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.active_tokens or 0 }}</h3>
+                    <p>Aktív tokenek</p>
+                </div>
+            </div>
+        {% elif user.role.value == "server_admin" %}
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #667eea;">
+                    <i class="fas fa-server"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.my_servers or 0 }}</h3>
+                    <p>Szervereim</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #764ba2;">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.my_admins or 0 }}</h3>
+                    <p>Admin felhasználóim</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #4facfe;">
+                    <i class="fas fa-key"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ stats.my_tokens or 0 }}</h3>
+                    <p>Aktív tokenjeim</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    {% if user.role.value == "server_admin" and tokens %}
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-key"></i> Tokenjeim</h3>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>Típus</th>
+                            <th>Lejárat</th>
+                            <th>Státusz</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for token in tokens %}
+                            <tr>
+                                <td><code>{{ token.token[:20] }}...</code></td>
+                                <td>{{ "Szerver Admin" if token.token_type.value == "server_admin" else "Felhasználó" }}</td>
+                                <td>{{ token.expires_at.strftime("%Y-%m-%d %H:%M") if token.expires_at else "-" }}</td>
+                                <td>
+                                    {% if token.is_active %}
+                                        <span class="badge badge-success">Aktív</span>
+                                    {% else %}
+                                        <span class="badge badge-warning">Inaktív</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+

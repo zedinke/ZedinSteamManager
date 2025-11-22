@@ -1,0 +1,35 @@
+{% set user_id = request.session.get("user_id") %}
+{% set user_role = request.session.get("user_role") %}
+{% set username = request.session.get("username") %}
+
+<header class="header">
+    <div class="header-content">
+        <div class="header-left">
+            <h1 class="logo">
+                <i class="fas fa-server"></i> ZedinArkManager
+            </h1>
+        </div>
+        <div class="header-right">
+            <div class="notification-icon" id="notificationIcon">
+                <i class="fas fa-bell"></i>
+                <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+            </div>
+            <div class="user-menu">
+                <span class="username">
+                    <i class="fas fa-user"></i> {{ username }}
+                </span>
+                <span class="user-role role-{{ user_role }}">
+                    {% if user_role == "manager_admin" %}Manager Admin
+                    {% elif user_role == "server_admin" %}Szerver Admin
+                    {% elif user_role == "admin" %}Admin
+                    {% else %}Felhasználó
+                    {% endif %}
+                </span>
+                <a href="/logout" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Kijelentkezés
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
+

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Token aktiválás - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-check-circle"></i> Token aktiválás</h2>
+        <p>Aktiváld a tokenjeidet a jogosultságok megszerzéséhez</p>
+    </div>
+    
+    {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>Token aktiválása</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/tokens/activate">
+                <div class="form-group">
+                    <label for="token">
+                        <i class="fas fa-key"></i> Token
+                    </label>
+                    <input type="text" id="token" name="token" required placeholder="Illessze be a token-t" autofocus>
+                    <small>A tokenet email-ben kaptad meg, vagy a rendszergazdától</small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-check-circle"></i> Token aktiválása
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

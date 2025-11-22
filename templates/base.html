@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ZedinArkManager{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if request.session.get("user_id") %}
+        {% include "partials/header.html" %}
+        {% include "partials/sidebar.html" %}
+    {% endif %}
+    
+    <main class="main-content">
+        {% if request.session.get("success") %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> {{ request.session.pop("success") }}
+            </div>
+        {% endif %}
+        
+        {% if request.session.get("error") %}
+            <div class="alert alert-error">
+                <i class="fas fa-exclamation-circle"></i> {{ request.session.pop("error") }}
+            </div>
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </main>
+    
+    {% if request.session.get("user_id") %}
+        {% include "partials/notifications.html" %}
+    {% endif %}
+    
+    <script src="/static/js/main.js"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
+
