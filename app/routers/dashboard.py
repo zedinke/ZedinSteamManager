@@ -3,7 +3,7 @@ Dashboard router
 """
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db, User, Token, Server, ServerAdminAdmin
@@ -19,23 +19,10 @@ async def dashboard(
     # Session ellenőrzés
     user_id = request.session.get("user_id")
     if not user_id:
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/login", status_code=302)
     
     current_user = db.query(User).filter(User.id == user_id).first()
     if not current_user:
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url="/login", status_code=302)
-    """Dashboard oldal"""
-    # Session ellenőrzés
-    user_id = request.session.get("user_id")
-    if not user_id:
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url="/login", status_code=302)
-    
-    current_user = db.query(User).filter(User.id == user_id).first()
-    if not current_user:
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/login", status_code=302)
     
     stats = {}
@@ -76,4 +63,3 @@ async def dashboard(
             "tokens": tokens if current_user.role.value == "server_admin" else []
         }
     )
-
