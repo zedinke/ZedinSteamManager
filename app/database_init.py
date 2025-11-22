@@ -20,17 +20,26 @@ def init_db():
         # Users tábla ellenőrzése
         if 'users' in inspector.get_table_names():
             columns = [col['name'] for col in inspector.get_columns('users')]
+            indexes = [idx['name'] for idx in inspector.get_indexes('users')]
             
             # created_by_id oszlop hozzáadása ha hiányzik
             if 'created_by_id' not in columns:
                 print("created_by_id oszlop hozzáadása a users táblához...")
                 with engine.connect() as conn:
+                    # Először az oszlop
                     conn.execute(text("""
                         ALTER TABLE users 
-                        ADD COLUMN created_by_id INT(11) UNSIGNED NULL,
-                        ADD INDEX idx_created_by (created_by_id)
+                        ADD COLUMN created_by_id INT(11) UNSIGNED NULL
                     """))
                     conn.commit()
+                    
+                    # Aztán az index, ha még nincs
+                    if 'idx_created_by' not in indexes:
+                        conn.execute(text("""
+                            ALTER TABLE users 
+                            ADD INDEX idx_created_by (created_by_id)
+                        """))
+                        conn.commit()
                 print("✓ created_by_id oszlop hozzáadva")
         
     except Exception as e:
