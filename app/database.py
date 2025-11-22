@@ -280,6 +280,24 @@ class ServerInstance(Base):
     scheduled_deletion_date = Column(DateTime, nullable=True, index=True)  # Ütemezett törlési dátum (30 nap a token lejárata után)
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class TokenExtensionRequest(Base):
+    __tablename__ = "token_extension_requests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_days = Column(Integer, nullable=False)  # Hány napra szeretné meghosszabbítani
+    status = Column(String(20), default="pending", nullable=False, index=True)  # pending, approved, rejected
+    notes = Column(Text, nullable=True)  # Opcionális megjegyzés
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    processed_at = Column(DateTime, nullable=True)
+    processed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
+    # Relationships
+    token = relationship("Token", foreign_keys=[token_id])
+    user = relationship("User", foreign_keys=[user_id])
+    processed_by = relationship("User", foreign_keys=[processed_by_id])
     started_at = Column(DateTime, nullable=True)
     stopped_at = Column(DateTime, nullable=True)
     

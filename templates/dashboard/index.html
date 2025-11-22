@@ -98,6 +98,7 @@
                             <th>Típus</th>
                             <th>Lejárat</th>
                             <th>Státusz</th>
+                            <th>Műveletek</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -111,6 +112,13 @@
                                         <span class="badge badge-success">Aktív</span>
                                     {% else %}
                                         <span class="badge badge-warning">Inaktív</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if token.is_active %}
+                                        <button class="btn btn-primary btn-sm" onclick="showExtensionRequestModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else '' }}')">
+                                            <i class="fas fa-clock"></i> Hosszabbítási kérés
+                                        </button>
                                     {% endif %}
                                 </td>
                             </tr>

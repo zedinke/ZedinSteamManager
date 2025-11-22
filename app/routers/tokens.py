@@ -5,11 +5,12 @@ Token router
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from app.database import get_db, User, TokenType, UserRole
+from app.database import get_db, User, TokenType, UserRole, TokenExtensionRequest
 from app.services.token_service import generate_token, activate_token, send_token_to_user
 from app.services.notification_service import create_notification
-from app.database import Token, User
+from app.database import Token, User, TokenExtensionRequest
 from app.config import settings
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -260,6 +261,77 @@ async def extend_token(
     
     return RedirectResponse(
         url=f"/tokens/list?success=Token+hosszabbítva+{additional_days}+napra.+Új+lejárat:+{new_expires_at.strftime('%Y-%m-%d %H:%M')}",
+        status_code=302
+    )
+
+@router.post("/tokens/request-extension")
+async def request_token_extension(
+    request: Request,
+    token_id: int = Form(...),
+    requested_days: int = Form(...),
+    notes: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Token hosszabbítási kérés küldése"""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login", status_code=302)
+    
+    current_user = db.query(User).filter(User.id == user_id).first()
+    if not current_user or current_user.role.value != "server_admin":
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod")
+    
+    if requested_days < 1 or requested_days > 365:
+        raise HTTPException(status_code=400, detail="A hosszabbítás 1 és 365 nap között lehet")
+    
+    # Token ellenőrzése - csak a saját tokenjeit kérheti
+    token = db.query(Token).filter(
+        Token.id == token_id,
+        Token.user_id == current_user.id
+    ).first()
+    
+    if not token:
+        raise HTTPException(status_code=404, detail="Token nem található vagy nincs hozzáférésed hozzá")
+    
+    # Ellenőrizzük, hogy van-e már pending kérés erre a tokenre
+    existing_request = db.query(TokenExtensionRequest).filter(
+        TokenExtensionRequest.token_id == token_id,
+        TokenExtensionRequest.status == "pending"
+    ).first()
+    
+    if existing_request:
+        return RedirectResponse(
+            url="/dashboard?error=Már+van+folyamatban+lévő+hosszabbítási+kérésed+erre+a+tokenre",
+            status_code=302
+        )
+    
+    # Kérés létrehozása
+    extension_request = TokenExtensionRequest(
+        token_id=token_id,
+        user_id=current_user.id,
+        requested_days=requested_days,
+        notes=notes,
+        status="pending"
+    )
+    
+    db.add(extension_request)
+    db.commit()
+    
+    # Értesítés küldése a Manager Admin-oknak
+    from app.services.notification_service import create_notification
+    manager_admins = db.query(User).filter(User.role == UserRole.MANAGER_ADMIN).all()
+    
+    for admin in manager_admins:
+        create_notification(
+            db,
+            admin.id,
+            "token_extension_request",
+            f"Token hosszabbítási kérés - {current_user.username}",
+            f"{current_user.username} hosszabbítási kérelmet küldött egy tokenre.\n\nKért napok: {requested_days}\nToken: {token.token[:20]}...\nLejárat: {token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else 'Nincs'}"
+        )
+    
+    return RedirectResponse(
+        url="/dashboard?success=Hosszabbítási+kérés+sikeresen+elküldve.+A+Manager+Admin+hamarosan+feldolgozza",
         status_code=302
     )
 

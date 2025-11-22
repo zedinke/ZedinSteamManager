@@ -12,7 +12,7 @@ sys.path.insert(0, str(BASE_DIR))
 from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
-    ChatRoom, ChatMessage, Game, ServerInstance
+    ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -531,6 +531,54 @@ def init_db():
                     print("✓ scheduled_deletion_date oszlop hozzáadva")
                 except Exception as e:
                     print(f"  Figyelmeztetés: scheduled_deletion_date oszlop: {e}")
+        
+        # Token extension requests tábla
+        if 'token_extension_requests' not in existing_tables:
+            print("token_extension_requests tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    # Ellenőrizzük a tokens.id típusát
+                    tokens_id_type = id_type
+                    if 'tokens' in inspector.get_table_names():
+                        result = conn.execute(text("""
+                            SELECT COLUMN_TYPE 
+                            FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                            AND TABLE_NAME = 'tokens' 
+                            AND COLUMN_NAME = 'id'
+                        """))
+                        row = result.fetchone()
+                        if row:
+                            tokens_id_type = row[0]
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE token_extension_requests (
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            token_id {tokens_id_type} NOT NULL,
+                            user_id {id_type} NOT NULL,
+                            requested_days INT NOT NULL,
+                            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                            notes TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            processed_at DATETIME NULL,
+                            processed_by_id {id_type} NULL,
+                            PRIMARY KEY (id),
+                            INDEX ix_token_extension_requests_token_id (token_id),
+                            INDEX ix_token_extension_requests_user_id (user_id),
+                            INDEX ix_token_extension_requests_status (status),
+                            INDEX ix_token_extension_requests_created_at (created_at),
+                            CONSTRAINT fk_token_extension_requests_token_id
+                                FOREIGN KEY (token_id) REFERENCES tokens(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_token_extension_requests_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_token_extension_requests_processed_by_id
+                                FOREIGN KEY (processed_by_id) REFERENCES users(id) ON DELETE SET NULL
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ token_extension_requests tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: token_extension_requests tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
