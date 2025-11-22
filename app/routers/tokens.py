@@ -141,3 +141,39 @@ async def activate_by_token(
     
     return RedirectResponse(url="/dashboard", status_code=302)
 
+@router.get("/tokens/list", response_class=HTMLResponse)
+async def list_tokens(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Tokenek listázása (Manager Admin)"""
+    current_user = require_manager_admin(request, db)
+    
+    # Összes token lekérése
+    tokens = db.query(Token).outerjoin(User, Token.user_id == User.id).order_by(Token.created_at.desc()).all()
+    
+    from app.main import get_templates
+    templates = get_templates()
+    return templates.TemplateResponse(
+        "tokens/list.html",
+        {"request": request, "tokens": tokens}
+    )
+
+@router.post("/tokens/delete")
+async def delete_token(
+    request: Request,
+    token_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Token törlése (Manager Admin)"""
+    current_user = require_manager_admin(request, db)
+    
+    token = db.query(Token).filter(Token.id == token_id).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Token nem található")
+    
+    db.delete(token)
+    db.commit()
+    
+    return RedirectResponse(url="/tokens/list?success=Token+sikeresen+törölve", status_code=302)
+
