@@ -125,6 +125,157 @@ def init_db():
                                 print(f"  Figyelmeztetés: Index hozzáadása: {e}")
                 print("✓ generated_by_id oszlop hozzáadva")
         
+        # Új táblák létrehozása (tickets, chat stb.) - külön kezelés foreign key problémák miatt
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        
+        # Tickets tábla
+        if 'tickets' not in existing_tables:
+            print("tickets tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    # Először a táblát foreign key nélkül
+                    conn.execute(text("""
+                        CREATE TABLE tickets (
+                            id INTEGER NOT NULL AUTO_INCREMENT,
+                            user_id INTEGER NOT NULL,
+                            title VARCHAR(255) NOT NULL,
+                            description TEXT NOT NULL,
+                            status VARCHAR(20) NOT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            closed_at DATETIME NULL,
+                            closed_by_id INTEGER NULL,
+                            PRIMARY KEY (id),
+                            INDEX ix_tickets_user_id (user_id),
+                            INDEX ix_tickets_status (status),
+                            INDEX ix_tickets_created_at (created_at)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                    
+                    # Foreign key-ek hozzáadása külön
+                    conn.execute(text("""
+                        ALTER TABLE tickets
+                        ADD CONSTRAINT fk_tickets_user_id
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    """))
+                    conn.commit()
+                    
+                    conn.execute(text("""
+                        ALTER TABLE tickets
+                        ADD CONSTRAINT fk_tickets_closed_by_id
+                        FOREIGN KEY (closed_by_id) REFERENCES users(id) ON DELETE SET NULL
+                    """))
+                    conn.commit()
+                print("✓ tickets tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: tickets tábla: {e}")
+        
+        # Ticket messages tábla
+        if 'ticket_messages' not in existing_tables:
+            print("ticket_messages tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE ticket_messages (
+                            id INTEGER NOT NULL AUTO_INCREMENT,
+                            ticket_id INTEGER NOT NULL,
+                            user_id INTEGER NOT NULL,
+                            message TEXT NOT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_ticket_messages_ticket_id (ticket_id),
+                            INDEX ix_ticket_messages_user_id (user_id),
+                            INDEX ix_ticket_messages_created_at (created_at),
+                            CONSTRAINT fk_ticket_messages_ticket_id
+                                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_ticket_messages_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ ticket_messages tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: ticket_messages tábla: {e}")
+        
+        # Ticket ratings tábla
+        if 'ticket_ratings' not in existing_tables:
+            print("ticket_ratings tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE ticket_ratings (
+                            id INTEGER NOT NULL AUTO_INCREMENT,
+                            ticket_id INTEGER NOT NULL,
+                            user_id INTEGER NOT NULL,
+                            rating INTEGER NOT NULL,
+                            comment TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            UNIQUE KEY uq_ticket_ratings_ticket_id (ticket_id),
+                            INDEX ix_ticket_ratings_user_id (user_id),
+                            CONSTRAINT fk_ticket_ratings_ticket_id
+                                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_ticket_ratings_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ ticket_ratings tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: ticket_ratings tábla: {e}")
+        
+        # Chat rooms tábla
+        if 'chat_rooms' not in existing_tables:
+            print("chat_rooms tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE chat_rooms (
+                            id INTEGER NOT NULL AUTO_INCREMENT,
+                            name VARCHAR(100) NOT NULL,
+                            game_name VARCHAR(100) NULL,
+                            description TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            UNIQUE KEY uq_chat_rooms_name (name),
+                            INDEX ix_chat_rooms_game_name (game_name)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ chat_rooms tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: chat_rooms tábla: {e}")
+        
+        # Chat messages tábla
+        if 'chat_messages' not in existing_tables:
+            print("chat_messages tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE chat_messages (
+                            id INTEGER NOT NULL AUTO_INCREMENT,
+                            room_id INTEGER NOT NULL,
+                            user_id INTEGER NOT NULL,
+                            message TEXT NOT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_chat_messages_room_id (room_id),
+                            INDEX ix_chat_messages_user_id (user_id),
+                            INDEX ix_chat_messages_created_at (created_at),
+                            CONSTRAINT fk_chat_messages_room_id
+                                FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_chat_messages_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ chat_messages tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: chat_messages tábla: {e}")
+        
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
         raise
