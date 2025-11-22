@@ -48,17 +48,17 @@ async def login(
     user = authenticate_user(db, email, password)
     
     if not user:
-    from app.main import get_templates
-    templates = get_templates()
-    return templates.TemplateResponse(
+        from app.main import get_templates
+        templates = get_templates()
+        return templates.TemplateResponse(
             "auth/login.html",
             {"request": request, "error": "Hibás email vagy jelszó"}
         )
     
     if not user.email_verified:
-    from app.main import get_templates
-    templates = get_templates()
-    return templates.TemplateResponse(
+        from app.main import get_templates
+        templates = get_templates()
+        return templates.TemplateResponse(
             "auth/login.html",
             {"request": request, "error": "Email cím nincs megerősítve"}
         )
