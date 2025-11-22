@@ -95,11 +95,15 @@
         {% endif %}
     </div>
     
-    {% if user.role.value == "server_admin" and tokens %}
+    {% if user.role.value == "server_admin" %}
         <div class="card">
-            <div class="card-header">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3><i class="fas fa-key"></i> Tokenjeim</h3>
+                <button class="btn btn-primary" onclick="showTokenRequestModal()">
+                    <i class="fas fa-plus"></i> Token igénylés
+                </button>
             </div>
+        {% if tokens %}
             <div class="card-body">
                 <table class="table">
                     <thead>
@@ -126,9 +130,13 @@
                                 </td>
                                 <td>
                                     {% if token.is_active %}
-                                        <button class="btn btn-primary btn-sm" onclick="showExtensionRequestModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else '' }}')">
-                                            <i class="fas fa-clock"></i> Hosszabbítási kérés
-                                        </button>
+                                        <form method="POST" action="/cart/add-extension-request" style="display: inline;">
+                                            <input type="hidden" name="token_id" value="{{ token.id }}">
+                                            <input type="hidden" name="requested_days" value="30">
+                                            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Biztosan hozzáadod a kosárhoz?');">
+                                                <i class="fas fa-shopping-cart"></i> Kosárba
+                                            </button>
+                                        </form>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -136,7 +144,26 @@
                     </tbody>
                 </table>
             </div>
+        {% else %}
+            <div class="card-body">
+                <p>Nincsenek tokenjeid. <a href="javascript:void(0)" onclick="showTokenRequestModal()">Igényelj tokent!</a></p>
+            </div>
+        {% endif %}
         </div>
+        
+        {% if stats.cart_count and stats.cart_count > 0 %}
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-shopping-cart"></i> Kosaram</h3>
+                </div>
+                <div class="card-body">
+                    <p>A kosaradban <strong>{{ stats.cart_count }}</strong> elem van.</p>
+                    <a href="/cart" class="btn btn-primary">
+                        <i class="fas fa-shopping-cart"></i> Kosár megtekintése
+                    </a>
+                </div>
+            </div>
+        {% endif %}
     {% endif %}
     
             <!-- Szerver Kihasználtság -->
