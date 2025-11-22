@@ -228,8 +228,11 @@ def init_db():
             except Exception as e:
                 print(f"  Figyelmeztetés: tickets tábla: {e}")
         
-        # Ticket messages tábla
-        if 'ticket_messages' not in existing_tables:
+        # Frissítjük a létező táblák listáját
+        existing_tables = inspector.get_table_names()
+        
+        # Ticket messages tábla - csak akkor hozzuk létre, ha a tickets tábla létezik
+        if 'tickets' in existing_tables and 'ticket_messages' not in existing_tables:
             print("ticket_messages tábla létrehozása...")
             try:
                 with engine.connect() as conn:
@@ -254,9 +257,11 @@ def init_db():
                 print("✓ ticket_messages tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: ticket_messages tábla: {e}")
+        elif 'tickets' not in existing_tables:
+            print("  Figyelmeztetés: ticket_messages tábla nem hozható létre, mert a tickets tábla nem létezik")
         
-        # Ticket ratings tábla
-        if 'ticket_ratings' not in existing_tables:
+        # Ticket ratings tábla - csak akkor hozzuk létre, ha a tickets tábla létezik
+        if 'tickets' in existing_tables and 'ticket_ratings' not in existing_tables:
             print("ticket_ratings tábla létrehozása...")
             try:
                 with engine.connect() as conn:
@@ -281,6 +286,8 @@ def init_db():
                 print("✓ ticket_ratings tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: ticket_ratings tábla: {e}")
+        elif 'tickets' not in existing_tables:
+            print("  Figyelmeztetés: ticket_ratings tábla nem hozható létre, mert a tickets tábla nem létezik")
         
         # Chat rooms tábla
         if 'chat_rooms' not in existing_tables:
@@ -304,8 +311,11 @@ def init_db():
             except Exception as e:
                 print(f"  Figyelmeztetés: chat_rooms tábla: {e}")
         
-        # Chat messages tábla
-        if 'chat_messages' not in existing_tables:
+        # Frissítjük a létező táblák listáját
+        existing_tables = inspector.get_table_names()
+        
+        # Chat messages tábla - csak akkor hozzuk létre, ha a chat_rooms tábla létezik
+        if 'chat_rooms' in existing_tables and 'chat_messages' not in existing_tables:
             print("chat_messages tábla létrehozása...")
             try:
                 with engine.connect() as conn:
@@ -330,6 +340,8 @@ def init_db():
                 print("✓ chat_messages tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: chat_messages tábla: {e}")
+        elif 'chat_rooms' not in existing_tables:
+            print("  Figyelmeztetés: chat_messages tábla nem hozható létre, mert a chat_rooms tábla nem létezik")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
