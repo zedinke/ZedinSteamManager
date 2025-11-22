@@ -22,14 +22,31 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True, dom
         else:
             message.attach(MIMEText(body, "plain", "utf-8"))
         
-        # SMTP beállítások lekérése (Exim konfigurációból vagy settings-ből)
-        smtp_config = get_smtp_settings(domain)
+        # SMTP beállítások prioritása:
+        # 1. config/app.py (settings.smtp_*) - ha be van állítva
+        # 2. Exim konfiguráció
+        # 3. Alapértelmezett (localhost)
         
-        # Ha van Exim konfiguráció, azt használjuk, különben a settings-ből
-        smtp_host = smtp_config.get('host') or settings.smtp_host
-        smtp_port = smtp_config.get('port') or settings.smtp_port
-        smtp_user = smtp_config.get('user') or settings.smtp_user
-        smtp_pass = smtp_config.get('pass') or settings.smtp_pass
+        # Először nézzük meg, hogy van-e beállítva a config/app.py-ban
+        use_config_smtp = (
+            settings.smtp_host and 
+            settings.smtp_host != "localhost" and 
+            settings.smtp_user
+        )
+        
+        if use_config_smtp:
+            # config/app.py-ból használjuk
+            smtp_host = settings.smtp_host
+            smtp_port = settings.smtp_port
+            smtp_user = settings.smtp_user
+            smtp_pass = settings.smtp_pass
+        else:
+            # Próbáljuk az Exim konfigurációt
+            smtp_config = get_smtp_settings(domain)
+            smtp_host = smtp_config.get('host') or settings.smtp_host
+            smtp_port = smtp_config.get('port') or settings.smtp_port
+            smtp_user = smtp_config.get('user') or settings.smtp_user
+            smtp_pass = smtp_config.get('pass') or settings.smtp_pass
         
         # TLS beállítások
         # Port 465 = SSL/TLS (use_tls=True)
@@ -43,10 +60,17 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True, dom
         print(f"[EMAIL] SMTP Host: {smtp_host}:{smtp_port}")
         print(f"[EMAIL] SMTP User: {smtp_user if smtp_user else '(nincs)'}")
         print(f"[EMAIL] TLS: {use_tls_param}, STARTTLS: {start_tls_param}")
+        print(f"[EMAIL] Config forrás: {'config/app.py' if use_config_smtp else 'Exim vagy alapértelmezett'}")
         
         # Ha nincs SMTP host vagy user, akkor nem küldünk emailt
         if not smtp_host or smtp_host == "localhost":
-            print(f"[EMAIL] Figyelmeztetés: SMTP host nincs beállítva vagy localhost. Email nem küldhető.")
+            print(f"[EMAIL] HIBA: SMTP host nincs beállítva vagy localhost. Email nem küldhető.")
+            print(f"[EMAIL] Javaslat: Állítsd be a config/app.py fájlban az SMTP beállításokat!")
+            return False
+        
+        if not smtp_user:
+            print(f"[EMAIL] HIBA: SMTP user nincs beállítva. Email nem küldhető.")
+            print(f"[EMAIL] Javaslat: Állítsd be a config/app.py fájlban az SMTP user-t!")
             return False
         
         await aiosmtplib.send(
