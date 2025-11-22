@@ -67,6 +67,15 @@ async def show_search(
     if query:
         # Mod keresés
         results = await search_mods(query)
+        # Ha nincs találat, de a query szám, akkor lehet mod ID
+        if not results and query.strip().isdigit():
+            results = [{
+                "id": query.strip(),
+                "name": f"Mod {query.strip()}",
+                "icon_url": None,
+                "url": f"https://steamcommunity.com/sharedfiles/filedetails/?id={query.strip()}",
+                "description": "Add meg a mod nevét és ikonját manuálisan"
+            }]
     
     return templates.TemplateResponse("mods/search.html", {
         "request": request,
