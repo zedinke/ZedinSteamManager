@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Mod Tároló - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-box"></i> Mod Tároló</h2>
+        <p>Saját mod csomagjaim kezelése</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    <div style="margin-bottom: 20px;">
+        <a href="/mods/search" class="btn btn-primary">
+            <i class="fas fa-search"></i> Új Mod Keresése
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list"></i> Mod Csomagjaim</h3>
+        </div>
+        <div class="card-body">
+            {% if mods %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+                    {% for mod in mods %}
+                        <div class="card" style="padding: 15px;">
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                {% if mod.icon_url %}
+                                    <img src="{{ mod.icon_url }}" alt="{{ mod.name }}" 
+                                         style="width: 48px; height: 48px; border-radius: 5px; object-fit: cover;">
+                                {% else %}
+                                    <div style="width: 48px; height: 48px; background: #667eea; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">
+                                        <i class="fas fa-puzzle-piece"></i>
+                                    </div>
+                                {% endif %}
+                                <div style="flex: 1;">
+                                    <strong>{{ mod.name }}</strong>
+                                    <br><small style="color: #666;">ID: {{ mod.mod_id }}</small>
+                                </div>
+                            </div>
+                            {% if mod.description %}
+                                <p style="font-size: 0.9rem; color: #666; margin: 10px 0;">{{ mod.description[:100] }}{% if mod.description|length > 100 %}...{% endif %}</p>
+                            {% endif %}
+                            <div style="margin-top: 10px;">
+                                <form method="POST" action="/mods/{{ mod.id }}/delete" style="display: inline;" 
+                                      onsubmit="return confirm('Biztosan törlöd ezt a modot?');">
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="fas fa-trash"></i> Törlés
+                                    </button>
+                                </form>
+                                {% if mod.curseforge_url %}
+                                    <a href="{{ mod.curseforge_url }}" target="_blank" class="btn btn-sm btn-secondary" style="margin-left: 5px;">
+                                        <i class="fas fa-external-link-alt"></i> CurseForge
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Még nincs mod a tárolódban. 
+                    <a href="/mods/search">Keresj modokat és add hozzá őket!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

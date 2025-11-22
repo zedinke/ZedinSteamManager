@@ -73,20 +73,36 @@
                         <label for="active_mods">
                             <i class="fas fa-puzzle-piece"></i> Aktív Modok
                         </label>
-                        <input type="text" id="active_mods" name="active_mods" 
-                               placeholder="pl. 123456,789012 vagy [123456,789012]" 
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                        <small style="color: #666;">Steam Workshop mod ID-k (vesszővel elválasztva vagy JSON tömb)</small>
+                        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                            <select id="active_mods_select" multiple 
+                                    style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; min-height: 100px;">
+                                <!-- Modok betöltése JavaScript-tel -->
+                            </select>
+                            <div>
+                                <a href="/mods/search" target="_blank" class="btn btn-sm btn-secondary" style="margin-bottom: 5px;">
+                                    <i class="fas fa-search"></i> Mod Keresés
+                                </a>
+                                <a href="/mods" target="_blank" class="btn btn-sm btn-info">
+                                    <i class="fas fa-box"></i> Mod Tároló
+                                </a>
+                            </div>
+                        </div>
+                        <input type="hidden" id="active_mods" name="active_mods" value="">
+                        <small style="color: #666;">Válassz modokat a tárolódból, vagy <a href="/mods/search">keress új modokat</a></small>
                     </div>
                     
                     <div class="form-group">
                         <label for="passive_mods">
                             <i class="fas fa-puzzle-piece"></i> Passzív Modok
                         </label>
-                        <input type="text" id="passive_mods" name="passive_mods" 
-                               placeholder="pl. 123456,789012 vagy [123456,789012]" 
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                        <small style="color: #666;">Steam Workshop mod ID-k (vesszővel elválasztva vagy JSON tömb)</small>
+                        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                            <select id="passive_mods_select" multiple 
+                                    style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; min-height: 100px;">
+                                <!-- Modok betöltése JavaScript-tel -->
+                            </select>
+                        </div>
+                        <input type="hidden" id="passive_mods" name="passive_mods" value="">
+                        <small style="color: #666;">Válassz passzív modokat a tárolódból</small>
                     </div>
                     
                     <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -102,5 +118,56 @@
         </div>
     {% endif %}
 </div>
+
+{% block extra_scripts %}
+<script>
+// Modok betöltése
+async function loadMods() {
+    try {
+        const response = await fetch('/mods/api/list');
+        const data = await response.json();
+        
+        if (data.success && data.mods) {
+            const activeSelect = document.getElementById('active_mods_select');
+            const passiveSelect = document.getElementById('passive_mods_select');
+            
+            // Modok hozzáadása mindkét select-hez
+            data.mods.forEach(mod => {
+                const option1 = document.createElement('option');
+                option1.value = mod.mod_id;
+                option1.textContent = mod.name;
+                activeSelect.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = mod.mod_id;
+                option2.textContent = mod.name;
+                passiveSelect.appendChild(option2);
+            });
+        }
+    } catch (error) {
+        console.error('Modok betöltése hiba:', error);
+    }
+}
+
+// Form submit előtt mod ID-k összegyűjtése
+document.addEventListener('DOMContentLoaded', function() {
+    loadMods();
+    
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Aktív modok
+            const activeSelect = document.getElementById('active_mods_select');
+            const activeModIds = Array.from(activeSelect.selectedOptions).map(opt => opt.value);
+            document.getElementById('active_mods').value = activeModIds.join(',');
+            
+            // Passzív modok
+            const passiveSelect = document.getElementById('passive_mods_select');
+            const passiveModIds = Array.from(passiveSelect.selectedOptions).map(opt => opt.value);
+            document.getElementById('passive_mods').value = passiveModIds.join(',');
+        });
+    }
+});
+</script>
 {% endblock %}
 

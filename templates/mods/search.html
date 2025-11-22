@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Mod Keresés - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-search"></i> Mod Keresés</h2>
+        <p>Keresés CurseForge-on és hozzáadás a tárolódhoz</p>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-search"></i> Mod Keresés</h3>
+        </div>
+        <div class="card-body">
+            <form id="searchForm" style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="searchQuery" name="q" 
+                           value="{{ query }}" 
+                           placeholder="Mod neve vagy ID..." 
+                           style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Keresés
+                    </button>
+                </div>
+            </form>
+            
+            <div id="searchResults" style="margin-top: 20px;">
+                {% if query %}
+                    {% if results %}
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+                            {% for result in results %}
+                                <div class="card" style="padding: 15px; cursor: pointer;" 
+                                     onclick="addMod('{{ result.id }}', '{{ result.name|e }}', '{{ result.icon_url or '' }}', '{{ result.url or '' }}')">
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                        {% if result.icon_url %}
+                                            <img src="{{ result.icon_url }}" alt="{{ result.name }}" 
+                                                 style="width: 48px; height: 48px; border-radius: 5px; object-fit: cover;">
+                                        {% else %}
+                                            <div style="width: 48px; height: 48px; background: #667eea; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">
+                                                <i class="fas fa-puzzle-piece"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div style="flex: 1;">
+                                            <strong>{{ result.name }}</strong>
+                                            <br><small style="color: #666;">ID: {{ result.id }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="btn btn-sm btn-success" style="width: 100%;">
+                                        <i class="fas fa-plus"></i> Hozzáadás a tárolóhoz
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Nincs találat. Próbáld meg másik keresési kifejezést.
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Írj be egy keresési kifejezést a fenti mezőbe.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-header">
+            <h3><i class="fas fa-info-circle"></i> Manuális Mod Hozzáadás</h3>
+        </div>
+        <div class="card-body">
+            <p>Ha nem találod a modot a keresésben, hozzáadhatod manuálisan is:</p>
+            <form id="manualAddForm" style="margin-top: 15px;">
+                <div class="form-group">
+                    <label for="manual_mod_id">Mod ID <span style="color: red;">*</span></label>
+                    <input type="text" id="manual_mod_id" name="mod_id" required 
+                           placeholder="pl. 123456" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div class="form-group">
+                    <label for="manual_name">Mod Név <span style="color: red;">*</span></label>
+                    <input type="text" id="manual_name" name="name" required 
+                           placeholder="pl. Awesome Mod" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div class="form-group">
+                    <label for="manual_icon_url">Ikon URL (opcionális)</label>
+                    <input type="url" id="manual_icon_url" name="icon_url" 
+                           placeholder="https://..." 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div class="form-group">
+                    <label for="manual_curseforge_url">CurseForge URL (opcionális)</label>
+                    <input type="url" id="manual_curseforge_url" name="curseforge_url" 
+                           placeholder="https://www.curseforge.com/..." 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Hozzáadás
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+async function addMod(modId, name, iconUrl, url) {
+    if (!confirm(`Hozzáadod a "${name}" modot a tárolódhoz?`)) {
+        return;
+    }
+    
+    try {
+        const formData = new FormData();
+        formData.append('mod_id', modId);
+        formData.append('name', name);
+        if (iconUrl) formData.append('icon_url', iconUrl);
+        if (url) formData.append('curseforge_url', url);
+        
+        const response = await fetch('/mods/add', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Mod hozzáadva a tárolódhoz!');
+            window.location.href = '/mods?success=Mod+hozzáadva';
+        } else {
+            alert('Hiba: ' + (data.detail || 'Ismeretlen hiba'));
+        }
+    } catch (error) {
+        console.error('Hiba:', error);
+        alert('Hiba történt a mod hozzáadásakor.');
+    }
+}
+
+// Manuális hozzáadás form
+document.getElementById('manualAddForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('/mods/add', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Mod hozzáadva a tárolódhoz!');
+            window.location.href = '/mods?success=Mod+hozzáadva';
+        } else {
+            alert('Hiba: ' + (data.detail || 'Ismeretlen hiba'));
+        }
+    } catch (error) {
+        console.error('Hiba:', error);
+        alert('Hiba történt a mod hozzáadásakor.');
+    }
+});
+
+// Keresés form
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const query = document.getElementById('searchQuery').value;
+    if (query.trim()) {
+        window.location.href = `/mods/search?q=${encodeURIComponent(query)}`;
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
+

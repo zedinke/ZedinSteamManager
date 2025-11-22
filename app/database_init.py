@@ -13,7 +13,7 @@ from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
     ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest,
-    TokenPricingRule, TokenBasePrice, Cluster, ArkServerFiles
+    TokenPricingRule, TokenBasePrice, Cluster, ArkServerFiles, UserMod
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -916,6 +916,45 @@ def init_db():
                         print(f"✓ {col_name} oszlop hozzáadva")
                     except Exception as e:
                         print(f"  Figyelmeztetés: {col_name} oszlop: {e}")
+        
+        # User mods tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'user_mods' not in existing_tables:
+            print("user_mods tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE user_mods (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            user_id {users_id_type} NOT NULL,
+                            mod_id VARCHAR(50) NOT NULL,
+                            name VARCHAR(200) NOT NULL,
+                            icon_url VARCHAR(500) NULL,
+                            curseforge_url VARCHAR(500) NULL,
+                            description TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_user_mods_user_id (user_id),
+                            INDEX ix_user_mods_mod_id (mod_id),
+                            CONSTRAINT fk_user_mods_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ user_mods tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: user_mods tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

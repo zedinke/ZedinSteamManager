@@ -326,6 +326,23 @@ class ArkServerFiles(Base):
     # Relationships
     installed_by = relationship("User", foreign_keys=[installed_by_id])
 
+class UserMod(Base):
+    """Felhasználó mod csomagjai (Server Admin)"""
+    __tablename__ = "user_mods"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    mod_id = Column(String(50), nullable=False)  # CurseForge mod ID vagy Steam Workshop ID
+    name = Column(String(200), nullable=False)  # Mod neve
+    icon_url = Column(String(500), nullable=True)  # Mod ikon URL
+    curseforge_url = Column(String(500), nullable=True)  # CurseForge URL
+    description = Column(Text, nullable=True)  # Mod leírás
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+
 class TokenExtensionRequest(Base):
     __tablename__ = "token_extension_requests"
     
