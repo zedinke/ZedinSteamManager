@@ -52,10 +52,15 @@ def get_active_pricing_rules(db: Session, token_type: TokenType, item_type: str,
     
     # Szűrés a feltételek alapján
     applicable_rules = []
+    token_type_value = token_type.value if hasattr(token_type, 'value') else str(token_type)
+    
     for rule in rules:
         # Token típus ellenőrzés
-        if rule.applies_to_token_type and rule.applies_to_token_type != token_type:
-            continue
+        if rule.applies_to_token_type:
+            # EnumType összehasonlítás - érték szerint
+            rule_token_type_value = rule.applies_to_token_type.value if hasattr(rule.applies_to_token_type, 'value') else str(rule.applies_to_token_type)
+            if rule_token_type_value != token_type_value:
+                continue
         # Item típus ellenőrzés
         if rule.applies_to_item_type and rule.applies_to_item_type != item_type:
             continue
