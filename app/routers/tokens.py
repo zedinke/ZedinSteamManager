@@ -51,6 +51,7 @@ async def generate(
     user_id: int = Form(...),
     token_type: str = Form(...),
     expires_in_days: int = Form(None),
+    token_count: int = Form(1),
     db: Session = Depends(get_db)
 ):
     """Token generálás"""
@@ -59,24 +60,56 @@ async def generate(
     if token_type not in ["server_admin", "user"]:
         raise HTTPException(status_code=400, detail="Érvénytelen token típus")
     
+    if token_count < 1 or token_count > 100:
+        raise HTTPException(status_code=400, detail="A tokenek száma 1 és 100 között lehet")
+    
     token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
     
-    token = generate_token(
-        db,
-        current_user.id,
-        token_type_enum,
-        expires_in_days or settings.token_expiry_days
-    )
+    # Több token generálása
+    generated_tokens = []
+    for i in range(token_count):
+        token = generate_token(
+            db,
+            current_user.id,
+            token_type_enum,
+            expires_in_days or settings.token_expiry_days
+        )
+        generated_tokens.append(token)
     
-    # Token küldése
-    await send_token_to_user(db, token, user_id)
+    # Tokenek küldése (csak az elsőt küldjük email-ben, a többit csak értesítésben)
+    if generated_tokens:
+        # Első token email-ben is
+        await send_token_to_user(db, generated_tokens[0], user_id)
+        
+        # További tokenek csak értesítésben
+        if len(generated_tokens) > 1:
+            from app.services.notification_service import create_notification
+            type_text = "Szerver Admin" if token_type_enum == TokenType.SERVER_ADMIN else "Felhasználó"
+            from app.config import settings
+            from datetime import datetime
+            
+            tokens_list = "\n".join([f"- {token.token}" for token in generated_tokens[1:]])
+            activation_links = "\n".join([f"- {settings.base_url}/tokens/activate?token={token.token}" for token in generated_tokens[1:]])
+            
+            create_notification(
+                db,
+                user_id,
+                "token_generated",
+                f"{len(generated_tokens)} új {type_text} token generálva",
+                f"Ön számára {len(generated_tokens)} új {type_text} token lett generálva.\n\nTovábbi tokenek:\n{tokens_list}\n\nAktiválás linkek:\n{activation_links}\n\nLejárat: {generated_tokens[0].expires_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
     
     from app.main import get_templates
     templates = get_templates()
     users = db.query(User).filter(User.role.in_(["user", "server_admin"])).all()
+    
+    success_msg = f"{len(generated_tokens)} token sikeresen generálva!"
+    if len(generated_tokens) > 1:
+        success_msg += f" Az első token email-ben is elküldve, a többi értesítésben."
+    
     return templates.TemplateResponse(
         "tokens/generate.html",
-        {"request": request, "users": users, "success": "Token sikeresen generálva!"}
+        {"request": request, "users": users, "success": success_msg}
     )
 
 @router.get("/tokens/activate", response_class=HTMLResponse)
