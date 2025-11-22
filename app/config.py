@@ -85,10 +85,16 @@ def load_settings() -> Settings:
                     settings.email_from_name = config_dict['email'].get('from_name', settings.email_from_name)
                     # SMTP beállítások is lehetnek a config-ban
                     if 'smtp' in config_dict['email']:
-                        settings.smtp_host = config_dict['email']['smtp'].get('host', settings.smtp_host)
-                        settings.smtp_port = config_dict['email']['smtp'].get('port', settings.smtp_port)
-                        settings.smtp_user = config_dict['email']['smtp'].get('user', settings.smtp_user)
-                        settings.smtp_pass = config_dict['email']['smtp'].get('pass', settings.smtp_pass)
+                        smtp_config = config_dict['email']['smtp']
+                        settings.smtp_host = smtp_config.get('host', settings.smtp_host)
+                        settings.smtp_port = smtp_config.get('port', settings.smtp_port)
+                        settings.smtp_user = smtp_config.get('user', settings.smtp_user)
+                        settings.smtp_pass = smtp_config.get('pass', settings.smtp_pass)
+                        print(f"[CONFIG] SMTP beállítások betöltve: {settings.smtp_host}:{settings.smtp_port}, user: {settings.smtp_user}")
+                    else:
+                        print(f"[CONFIG] Figyelmeztetés: config/app.py-ban nincs 'smtp' beállítás az 'email' objektumban")
+                else:
+                    print(f"[CONFIG] Figyelmeztetés: config/app.py-ban nincs 'email' beállítás")
                 
                 if 'secret_key' in config_dict:
                     settings.secret_key = config_dict['secret_key']
@@ -100,7 +106,11 @@ def load_settings() -> Settings:
                 if 'notification_days_before_expiry' in config_dict:
                     settings.notification_days_before_expiry = config_dict['notification_days_before_expiry']
         except Exception as e:
-            print(f"Config file load error: {e}")
+            import traceback
+            print(f"[CONFIG] Config file load error: {e}")
+            print(f"[CONFIG] Traceback: {traceback.format_exc()}")
+    else:
+        print(f"[CONFIG] Figyelmeztetés: config/app.py fájl nem található: {config_file}")
     
     return settings
 

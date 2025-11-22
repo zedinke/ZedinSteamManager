@@ -31,7 +31,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         plain_password = password_bytes[:72].decode('utf-8', errors='ignore')
     
     try:
-        if pwd_context == "bcrypt_direct":
+        if pwd_context is None:
             # Közvetlenül bcrypt használata
             import bcrypt
             return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -41,8 +41,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         try:
             import bcrypt
             return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-        except:
-            print(f"Password verification error: {e}")
+        except Exception as e2:
+            print(f"Password verification error: {e}, bcrypt fallback error: {e2}")
             return False
 
 def get_password_hash(password: str) -> str:
@@ -63,13 +63,13 @@ def get_password_hash(password: str) -> str:
             password = password_bytes.decode('utf-8', errors='ignore')
     
     try:
-        if pwd_context == "bcrypt_direct":
+        if pwd_context is None:
             # Közvetlenül bcrypt használata
             import bcrypt
             salt = bcrypt.gensalt()
             return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
         return pwd_context.hash(password)
-    except (ValueError, AttributeError) as e:
+    except (ValueError, AttributeError, TypeError) as e:
         # Ha még mindig probléma van, próbáljuk meg közvetlenül bcrypt-tel
         try:
             import bcrypt
