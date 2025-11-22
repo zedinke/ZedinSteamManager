@@ -480,6 +480,8 @@ def init_db():
                             INDEX ix_server_instances_server_admin_id (server_admin_id),
                             INDEX ix_server_instances_status (status),
                             INDEX ix_server_instances_token_used_id (token_used_id),
+                            INDEX ix_server_instances_token_expires_at (token_expires_at),
+                            INDEX ix_server_instances_scheduled_deletion_date (scheduled_deletion_date),
                             INDEX ix_server_instances_created_at (created_at),
                             CONSTRAINT fk_server_instances_game_id
                                 FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
@@ -493,6 +495,40 @@ def init_db():
                 print("✓ server_instances tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: server_instances tábla: {e}")
+        
+        # Ha a server_instances tábla már létezik, ellenőrizzük az új oszlopokat
+        if 'server_instances' in inspector.get_table_names():
+            existing_columns = [col['name'] for col in inspector.get_columns('server_instances')]
+            
+            # token_expires_at oszlop hozzáadása, ha nincs
+            if 'token_expires_at' not in existing_columns:
+                print("token_expires_at oszlop hozzáadása a server_instances táblához...")
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("""
+                            ALTER TABLE server_instances 
+                            ADD COLUMN token_expires_at DATETIME NULL,
+                            ADD INDEX ix_server_instances_token_expires_at (token_expires_at)
+                        """))
+                        conn.commit()
+                    print("✓ token_expires_at oszlop hozzáadva")
+                except Exception as e:
+                    print(f"  Figyelmeztetés: token_expires_at oszlop: {e}")
+            
+            # scheduled_deletion_date oszlop hozzáadása, ha nincs
+            if 'scheduled_deletion_date' not in existing_columns:
+                print("scheduled_deletion_date oszlop hozzáadása a server_instances táblához...")
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("""
+                            ALTER TABLE server_instances 
+                            ADD COLUMN scheduled_deletion_date DATETIME NULL,
+                            ADD INDEX ix_server_instances_scheduled_deletion_date (scheduled_deletion_date)
+                        """))
+                        conn.commit()
+                    print("✓ scheduled_deletion_date oszlop hozzáadva")
+                except Exception as e:
+                    print(f"  Figyelmeztetés: scheduled_deletion_date oszlop: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

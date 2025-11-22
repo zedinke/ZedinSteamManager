@@ -276,6 +276,8 @@ class ServerInstance(Base):
     status = Column(EnumType(ServerStatus), default=ServerStatus.STOPPED, nullable=False, index=True)
     config = Column(JSON, nullable=True)  # Szerver konfiguráció
     token_used_id = Column(Integer, ForeignKey("tokens.id", ondelete="SET NULL"), nullable=True, index=True)  # Használt token
+    token_expires_at = Column(DateTime, nullable=True, index=True)  # Token lejárat dátuma
+    scheduled_deletion_date = Column(DateTime, nullable=True, index=True)  # Ütemezett törlési dátum (30 nap a token lejárata után)
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     started_at = Column(DateTime, nullable=True)

@@ -5,7 +5,7 @@ Servers router - Server Admin szerver indítás
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, asc
 from app.database import get_db, User, Game, ServerInstance, ServerStatus, Token, TokenType
 from app.dependencies import require_manager_admin
 from fastapi.templating import Jinja2Templates
@@ -49,10 +49,41 @@ async def list_servers(
         ServerInstance.server_admin_id == current_user.id
     ).order_by(desc(ServerInstance.created_at)).all()
     
+    # Token információk hozzáadása minden szerverhez
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    
+    servers_data = []
+    for server in servers:
+        server_dict = {
+            "server": server,
+            "token_days_left": None,
+            "deletion_days_left": None,
+            "token_expired": False
+        }
+        
+        if server.token_used_id and server.token_expires_at:
+            # Token lejárat számítás
+            if server.token_expires_at > now:
+                days_left = (server.token_expires_at - now).days
+                server_dict["token_days_left"] = days_left
+                server_dict["token_expired"] = False
+            else:
+                server_dict["token_expired"] = True
+                # Ha lejárt, akkor a törlési dátumot mutatjuk
+                if server.scheduled_deletion_date:
+                    if server.scheduled_deletion_date > now:
+                        days_left = (server.scheduled_deletion_date - now).days
+                        server_dict["deletion_days_left"] = days_left
+                    else:
+                        server_dict["deletion_days_left"] = 0
+        
+        servers_data.append(server_dict)
+    
     return templates.TemplateResponse("servers/list.html", {
         "request": request,
         "current_user": current_user,
-        "servers": servers
+        "servers_data": servers_data
     })
 
 @router.get("/start", response_class=HTMLResponse)
@@ -67,7 +98,8 @@ async def show_start_server(
     games = db.query(Game).filter(Game.is_active == True).order_by(Game.name).all()
     
     # Ellenőrizzük, hogy van-e aktív token
-    active_tokens = db.query(Token).filter(
+    # Számoljuk, hogy hány token van, ami NEM van használatban szerverrel
+    active_tokens_count = db.query(Token).filter(
         and_(
             Token.user_id == current_user.id,
             Token.is_active == True,
@@ -75,11 +107,22 @@ async def show_start_server(
         )
     ).count()
     
+    # Számoljuk, hogy hány szerver van aktív token-nel
+    used_tokens_count = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.server_admin_id == current_user.id,
+            ServerInstance.token_used_id.isnot(None),
+            ServerInstance.scheduled_deletion_date.is_(None)  # Még nem ütemezett törlésre
+        )
+    ).count()
+    
+    available_tokens = active_tokens_count - used_tokens_count
+    
     return templates.TemplateResponse("servers/start.html", {
         "request": request,
         "current_user": current_user,
         "games": games,
-        "active_tokens": active_tokens
+        "active_tokens": available_tokens
     })
 
 @router.post("/start")
@@ -100,20 +143,63 @@ async def start_server(
     if not game:
         raise HTTPException(status_code=404, detail="Játék nem található vagy nem aktív")
     
-    # Ellenőrizzük, hogy van-e aktív token
-    active_token = db.query(Token).filter(
+    # Ellenőrizzük, hogy van-e elég aktív token
+    # Számoljuk, hogy hány token van, ami NEM van használatban szerverrel
+    active_tokens_count = db.query(Token).filter(
         and_(
             Token.user_id == current_user.id,
             Token.is_active == True,
             Token.expires_at > datetime.now()
         )
-    ).first()
+    ).count()
+    
+    # Számoljuk, hogy hány szerver van aktív token-nel
+    used_tokens_count = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.server_admin_id == current_user.id,
+            ServerInstance.token_used_id.isnot(None),
+            ServerInstance.scheduled_deletion_date.is_(None)  # Még nem ütemezett törlésre
+        )
+    ).count()
+    
+    available_tokens = active_tokens_count - used_tokens_count
+    
+    if available_tokens <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Nincs elég aktív token! Szükséges 1 szabad aktív token a szerver indításához."
+        )
+    
+    # Legrégebbi aktív token kiválasztása, ami NEM van használatban
+    # Először keressük a tokeneket, amik nincsenek használatban
+    used_token_ids_subq = db.query(ServerInstance.token_used_id).filter(
+        and_(
+            ServerInstance.server_admin_id == current_user.id,
+            ServerInstance.token_used_id.isnot(None),
+            ServerInstance.scheduled_deletion_date.is_(None)
+        )
+    ).subquery()
+    
+    # Legrégebbi token, ami nincs használatban
+    from sqlalchemy import not_
+    active_token = db.query(Token).filter(
+        and_(
+            Token.user_id == current_user.id,
+            Token.is_active == True,
+            Token.expires_at > datetime.now(),
+            not_(Token.id.in_(db.query(used_token_ids_subq.c.token_used_id)))
+        )
+    ).order_by(asc(Token.created_at)).first()
     
     if not active_token:
         raise HTTPException(
             status_code=400,
-            detail="Nincs aktív token! Szükséges 1 token a szerver indításához."
+            detail="Nincs elérhető aktív token! Szükséges 1 szabad aktív token a szerver indításához."
         )
+    
+    # 30 nap a token lejárata után a törlési dátum
+    from datetime import timedelta
+    scheduled_deletion = active_token.expires_at + timedelta(days=30)
     
     # Új szerver példány létrehozása
     server_instance = ServerInstance(
@@ -123,13 +209,13 @@ async def start_server(
         port=port,
         status=ServerStatus.RUNNING,
         token_used_id=active_token.id,
+        token_expires_at=active_token.expires_at,
+        scheduled_deletion_date=scheduled_deletion,
         started_at=datetime.now()
     )
     
     db.add(server_instance)
-    
-    # Token deaktiválása
-    active_token.is_active = False
+    # Token NEM deaktiváljuk!
     
     db.commit()
     db.refresh(server_instance)
@@ -170,7 +256,7 @@ async def delete_server(
     server_id: int,
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Szerver törlése"""
+    """Server Admin: Szerver törlése - token felszabadítása"""
     current_user = require_server_admin(request, db)
     
     server = db.query(ServerInstance).filter(
@@ -183,11 +269,18 @@ async def delete_server(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
-    db.delete(server)
+    # Token felszabadítása (token_used_id = NULL)
+    # A token marad aktív, hogy újra használható legyen
+    server.token_used_id = None
+    server.token_expires_at = None
+    server.scheduled_deletion_date = None
+    server.status = ServerStatus.STOPPED
+    server.stopped_at = datetime.now()
+    
     db.commit()
     
     return JSONResponse({
         "success": True,
-        "message": "Szerver törölve"
+        "message": "Szerver törölve, token felszabadítva"
     })
 

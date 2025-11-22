@@ -13,7 +13,7 @@
     
     <div class="card">
         <div class="card-body">
-            {% if servers %}
+            {% if servers_data %}
                 <table class="table table-striped">
                     <thead>
                         <tr>
@@ -21,12 +21,14 @@
                             <th>Játék</th>
                             <th>Port</th>
                             <th>Státusz</th>
+                            <th>Token információk</th>
                             <th>Indítva</th>
                             <th>Műveletek</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for server in servers %}
+                        {% for item in servers_data %}
+                        {% set server = item.server %}
                         <tr>
                             <td><strong>{{ server.name }}</strong></td>
                             <td>{{ server.game.name }}</td>
@@ -38,6 +40,28 @@
                                     <span class="badge bg-secondary">Leállítva</span>
                                 {% elif server.status.value == 'restarting' %}
                                     <span class="badge bg-warning">Újraindítás</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if server.token_used_id %}
+                                    {% if item.token_expired %}
+                                        <div class="text-danger">
+                                            <i class="fas fa-exclamation-triangle"></i> Token lejárt
+                                        </div>
+                                        {% if item.deletion_days_left is not none %}
+                                            <small class="text-muted">
+                                                Törlés: {{ item.deletion_days_left }} nap múlva
+                                            </small>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if item.token_days_left is not none %}
+                                            <div class="text-info">
+                                                <i class="fas fa-key"></i> Token lejárat: {{ item.token_days_left }} nap
+                                            </div>
+                                        {% endif %}
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">Nincs token</span>
                                 {% endif %}
                             </td>
                             <td>{{ server.started_at.strftime('%Y-%m-%d %H:%M') if server.started_at else '-' }}</td>

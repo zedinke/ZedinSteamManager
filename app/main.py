@@ -12,6 +12,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pathlib import Path
 from app.config import settings
 from app.middleware import catch_exceptions_middleware
+import asyncio
+import logging
 
 # Projekt gyökér
 BASE_DIR = Path(__file__).parent.parent
@@ -74,6 +76,14 @@ app.include_router(server_management.router, tags=["Server Management"])
 app.include_router(games_admin.router, tags=["Games Admin"])
 app.include_router(servers.router, tags=["Servers"])
 app.include_router(ai_chat.router, tags=["AI Chat"])
+
+# Token lejárat kezelés - háttérben futó task
+@app.on_event("startup")
+async def startup_event():
+    """Alkalmazás indításakor elindítjuk a token lejárat ellenőrzést"""
+    from app.tasks.token_expiry_task import token_expiry_worker
+    asyncio.create_task(token_expiry_worker())
+    logging.info("Token lejárat ellenőrzés elindítva")
 app.include_router(api.router, prefix="/api", tags=["API"])
 
 # Updating oldal router
