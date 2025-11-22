@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Ticketjeim - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-ticket-alt"></i> Ticketjeim</h1>
+        <p>Hibajelentések és támogatási kérések</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Ticketek</h2>
+            <a href="/tickets/create" class="btn btn-primary">
+                <i class="fas fa-plus-circle"></i> Új ticket
+            </a>
+        </div>
+        <div class="card-body">
+            {% if tickets %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Cím</th>
+                            <th>Státusz</th>
+                            <th>Létrehozva</th>
+                            <th>Frissítve</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in tickets %}
+                            <tr>
+                                <td><strong>{{ ticket.title }}</strong></td>
+                                <td>
+                                    <span class="badge 
+                                        {% if ticket.status.value == 'open' %}badge-warning
+                                        {% elif ticket.status.value == 'in_progress' %}badge-info
+                                        {% elif ticket.status.value == 'resolved' %}badge-success
+                                        {% else %}badge-secondary
+                                        {% endif %}">
+                                        {% if ticket.status.value == 'open' %}Nyitott
+                                        {% elif ticket.status.value == 'in_progress' %}Folyamatban
+                                        {% elif ticket.status.value == 'resolved' %}Megoldva
+                                        {% else %}Lezárva
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td>
+                                <td>{{ ticket.updated_at.strftime("%Y-%m-%d %H:%M") if ticket.updated_at else "-" }}</td>
+                                <td>
+                                    <a href="/tickets/{{ ticket.id }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i> Megtekintés
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Még nincs ticket. <a href="/tickets/create">Hozz létre egy újat!</a></p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

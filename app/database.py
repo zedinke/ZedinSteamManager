@@ -94,6 +94,10 @@ class User(Base):
     notifications = relationship("Notification", back_populates="user")
     servers = relationship("Server", back_populates="server_admin")
     admin_servers = relationship("AdminServer", back_populates="admin")
+    tickets = relationship("Ticket", foreign_keys="Ticket.user_id", back_populates="user")
+    ticket_messages = relationship("TicketMessage", back_populates="user")
+    ticket_ratings = relationship("TicketRating", back_populates="user")
+    chat_messages = relationship("ChatMessage", back_populates="user")
 
 class Token(Base):
     __tablename__ = "tokens"
@@ -167,6 +171,83 @@ class AdminServer(Base):
     # Relationships
     admin = relationship("User", back_populates="admin_servers")
     server = relationship("Server", back_populates="admin_servers")
+
+class TicketStatus(str, enum.Enum):
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(EnumType(TicketStatus), default=TicketStatus.OPEN, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    closed_at = Column(DateTime, nullable=True)
+    closed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id], back_populates="tickets")
+    closed_by = relationship("User", foreign_keys=[closed_by_id])
+    messages = relationship("TicketMessage", back_populates="ticket", order_by="TicketMessage.created_at")
+    rating = relationship("TicketRating", back_populates="ticket", uselist=False)
+
+class TicketMessage(Base):
+    __tablename__ = "ticket_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    
+    # Relationships
+    ticket = relationship("Ticket", back_populates="messages")
+    user = relationship("User", back_populates="ticket_messages")
+
+class TicketRating(Base):
+    __tablename__ = "ticket_ratings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    rating = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    
+    # Relationships
+    ticket = relationship("Ticket", back_populates="rating")
+    user = relationship("User", back_populates="ticket_ratings")
+
+class ChatRoom(Base):
+    __tablename__ = "chat_rooms"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)
+    game_name = Column(String(100), nullable=True, index=True)  # Játék neve
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    
+    # Relationships
+    messages = relationship("ChatMessage", back_populates="room", order_by="ChatMessage.created_at")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    room_id = Column(Integer, ForeignKey("chat_rooms.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    
+    # Relationships
+    room = relationship("ChatRoom", back_populates="messages")
+    user = relationship("User", back_populates="chat_messages")
 
 # Dependency
 def get_db():

@@ -67,6 +67,51 @@
             </div>
         {% endif %}
         
+        {% if user_role in ["user", "admin", "server_admin"] %}
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-ticket-alt"></i> Ticket rendszer
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/tickets" class="nav-item nav-sub-item">
+                        <i class="fas fa-list"></i> Ticketjeim
+                    </a>
+                    <a href="/tickets/create" class="nav-item nav-sub-item">
+                        <i class="fas fa-plus-circle"></i> Új ticket
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+        
+        {% if user_role == "manager_admin" %}
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-headset"></i> Ticket kezelés
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/admin/tickets" class="nav-item nav-sub-item">
+                        <i class="fas fa-list"></i> Összes ticket
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+        
+        {% if user_role in ["manager_admin", "server_admin", "admin"] %}
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-comments"></i> Global Chat
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/chat" class="nav-item nav-sub-item">
+                        <i class="fas fa-comments"></i> Chat szobák
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+        
         <div class="nav-category">
             <div class="nav-category-header" onclick="toggleCategory(this)">
                 <i class="fas fa-cog"></i> Beállítások

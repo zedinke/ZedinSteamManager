@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Chat szobák - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-comments"></i> Global Chat</h1>
+        <p>Chat szobák listája</p>
+    </div>
+
+    {% if user.role.value == "manager_admin" %}
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+                <h2>Új chat szoba létrehozása</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/admin/chat/create-room" class="auth-form">
+                    <div class="form-group">
+                        <label for="name">Szoba neve</label>
+                        <input type="text" id="name" name="name" required maxlength="100" placeholder="pl. ARK: Survival Evolved">
+                    </div>
+                    <div class="form-group">
+                        <label for="game_name">Játék neve (opcionális)</label>
+                        <input type="text" id="game_name" name="game_name" maxlength="100" placeholder="pl. ARK">
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Leírás (opcionális)</label>
+                        <textarea id="description" name="description" rows="2" placeholder="Rövid leírás a szobáról..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus-circle"></i> Szoba létrehozása
+                    </button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Chat szobák</h2>
+        </div>
+        <div class="card-body">
+            {% if rooms %}
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                    {% for room in rooms %}
+                        <div class="card" style="border: 1px solid #ddd;">
+                            <div class="card-body">
+                                <h3>{{ room.name }}</h3>
+                                {% if room.game_name %}
+                                    <p class="text-muted"><i class="fas fa-gamepad"></i> {{ room.game_name }}</p>
+                                {% endif %}
+                                {% if room.description %}
+                                    <p>{{ room.description }}</p>
+                                {% endif %}
+                                <p class="text-muted">
+                                    <small>
+                                        <i class="fas fa-comments"></i> 
+                                        {{ room_stats[room.id].message_count }} üzenet
+                                        {% if room_stats[room.id].last_message %}
+                                            | Utolsó: {{ room_stats[room.id].last_message.created_at.strftime("%Y-%m-%d %H:%M") }}
+                                        {% endif %}
+                                    </small>
+                                </p>
+                                <a href="/chat/{{ room.id }}" class="btn btn-primary btn-block">
+                                    <i class="fas fa-sign-in-alt"></i> Belépés
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>Még nincs chat szoba. {% if user.role.value == "manager_admin" %}Hozz létre egy újat!{% endif %}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

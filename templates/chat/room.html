@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}{{ room.name }} - Chat - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-comments"></i> {{ room.name }}</h1>
+        <p>
+            {% if room.game_name %}<i class="fas fa-gamepad"></i> {{ room.game_name }} | {% endif %}
+            <a href="/chat" class="btn btn-sm btn-secondary">
+                <i class="fas fa-arrow-left"></i> Vissza a szobákhoz
+            </a>
+        </p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div id="chat-messages" style="height: 500px; overflow-y: auto; padding: 15px; background: #f9fafb; border-radius: 5px; margin-bottom: 20px;">
+                {% for msg in messages %}
+                    <div class="message" style="margin-bottom: 10px; padding: 8px; background: {% if msg.user_id == user.id %}#e3f2fd{% else %}#fff{% endif %}; border-radius: 5px; border-left: 3px solid {% if msg.user_id == user.id %}#2196f3{% else %}#4caf50{% endif %};">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <strong>
+                                {% if msg.user_id == user.id %}Te
+                                {% elif msg.user.role.value == 'manager_admin' %}<span style="color: #f44336;">Manager Admin</span>
+                                {% elif msg.user.role.value == 'server_admin' %}<span style="color: #ff9800;">Server Admin</span>
+                                {% else %}{{ msg.user.username }}
+                                {% endif %}
+                            </strong>
+                            <small style="color: #666;">{{ msg.created_at.strftime("%H:%M:%S") if msg.created_at else "-" }}</small>
+                        </div>
+                        <div style="white-space: pre-wrap;">{{ msg.message }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <form id="chat-form" method="POST" action="/chat/{{ room.id }}/message" class="auth-form">
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <textarea 
+                        id="message" 
+                        name="message" 
+                        rows="2"
+                        required
+                        placeholder="Írj egy üzenetet..."
+                        style="flex: 1;"
+                    ></textarea>
+                    <button type="submit" class="btn btn-primary" style="align-self: flex-end;">
+                        <i class="fas fa-paper-plane"></i> Küldés
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let lastMessageTimestamp = {{ messages[-1].created_at.timestamp() if messages else 0 }};
+
+// Auto-scroll
+function scrollToBottom() {
+    const messagesDiv = document.getElementById('chat-messages');
+    if (messagesDiv) {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+}
+
+// Új üzenetek lekérése (polling)
+function loadNewMessages() {
+    fetch(`/api/chat/{{ room.id }}/messages?since=${lastMessageTimestamp}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.messages && data.messages.length > 0) {
+                const messagesDiv = document.getElementById('chat-messages');
+                data.messages.forEach(msg => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message';
+                    messageDiv.style.cssText = 'margin-bottom: 10px; padding: 8px; background: #fff; border-radius: 5px; border-left: 3px solid #4caf50;';
+                    
+                    const isOwn = msg.user_id === {{ user.id }};
+                    if (isOwn) {
+                        messageDiv.style.background = '#e3f2fd';
+                        messageDiv.style.borderLeftColor = '#2196f3';
+                    }
+                    
+                    messageDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <strong>${msg.username}</strong>
+                            <small style="color: #666;">${new Date(msg.created_at).toLocaleTimeString()}</small>
+                        </div>
+                        <div style="white-space: pre-wrap;">${msg.message}</div>
+                    `;
+                    
+                    messagesDiv.appendChild(messageDiv);
+                    lastMessageTimestamp = msg.timestamp;
+                });
+                scrollToBottom();
+            }
+        })
+        .catch(error => console.error('Error loading messages:', error));
+}
+
+// Form submit
+document.getElementById('chat-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const message = formData.get('message');
+    
+    if (!message.trim()) return;
+    
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(() => {
+        document.getElementById('message').value = '';
+        setTimeout(loadNewMessages, 500);
+    })
+    .catch(error => console.error('Error sending message:', error));
+});
+
+// Auto-scroll on load
+document.addEventListener('DOMContentLoaded', function() {
+    scrollToBottom();
+    // Polling minden 2 másodpercben
+    setInterval(loadNewMessages, 2000);
+});
+</script>
+{% endblock %}
+

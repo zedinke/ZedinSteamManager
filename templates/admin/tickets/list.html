@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket kezelés - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-headset"></i> Ticket kezelés</h1>
+        <p>Manager Admin - Összes ticket</p>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-body">
+            <h3>Statisztikák</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                <div style="text-align: center; padding: 15px; background: #fff3cd; border-radius: 5px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #856404;">{{ stats.open }}</div>
+                    <div>Nyitott</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: #d1ecf1; border-radius: 5px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #0c5460;">{{ stats.in_progress }}</div>
+                    <div>Folyamatban</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: #d4edda; border-radius: 5px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #155724;">{{ stats.resolved }}</div>
+                    <div>Megoldva</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: #e2e3e5; border-radius: 5px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #383d41;">{{ stats.closed }}</div>
+                    <div>Lezárva</div>
+                </div>
+                <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #212529;">{{ stats.total }}</div>
+                    <div>Összesen</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Ticketek</h2>
+            <div style="margin-top: 10px;">
+                <a href="/admin/tickets?status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}">Összes</a>
+                <a href="/admin/tickets?status=open" class="btn btn-sm {% if status_filter == 'open' %}btn-primary{% else %}btn-secondary{% endif %}">Nyitott</a>
+                <a href="/admin/tickets?status=in_progress" class="btn btn-sm {% if status_filter == 'in_progress' %}btn-primary{% else %}btn-secondary{% endif %}">Folyamatban</a>
+                <a href="/admin/tickets?status=resolved" class="btn btn-sm {% if status_filter == 'resolved' %}btn-primary{% else %}btn-secondary{% endif %}">Megoldva</a>
+                <a href="/admin/tickets?status=closed" class="btn btn-sm {% if status_filter == 'closed' %}btn-primary{% else %}btn-secondary{% endif %}">Lezárva</a>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if tickets %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cím</th>
+                            <th>Felhasználó</th>
+                            <th>Státusz</th>
+                            <th>Létrehozva</th>
+                            <th>Frissítve</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in tickets %}
+                            <tr>
+                                <td>#{{ ticket.id }}</td>
+                                <td><strong>{{ ticket.title }}</strong></td>
+                                <td>{{ ticket.user.username }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if ticket.status.value == 'open' %}badge-warning
+                                        {% elif ticket.status.value == 'in_progress' %}badge-info
+                                        {% elif ticket.status.value == 'resolved' %}badge-success
+                                        {% else %}badge-secondary
+                                        {% endif %}">
+                                        {% if ticket.status.value == 'open' %}Nyitott
+                                        {% elif ticket.status.value == 'in_progress' %}Folyamatban
+                                        {% elif ticket.status.value == 'resolved' %}Megoldva
+                                        {% else %}Lezárva
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}</td>
+                                <td>{{ ticket.updated_at.strftime("%Y-%m-%d %H:%M") if ticket.updated_at else "-" }}</td>
+                                <td>
+                                    <a href="/admin/tickets/{{ ticket.id }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i> Megtekintés
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nincsenek ticketek ebben a kategóriában.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

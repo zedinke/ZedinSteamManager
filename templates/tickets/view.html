@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket: {{ ticket.title }} - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-ticket-alt"></i> {{ ticket.title }}</h1>
+        <p>
+            <span class="badge 
+                {% if ticket.status.value == 'open' %}badge-warning
+                {% elif ticket.status.value == 'in_progress' %}badge-info
+                {% elif ticket.status.value == 'resolved' %}badge-success
+                {% else %}badge-secondary
+                {% endif %}">
+                {% if ticket.status.value == 'open' %}Nyitott
+                {% elif ticket.status.value == 'in_progress' %}Folyamatban
+                {% elif ticket.status.value == 'resolved' %}Megoldva
+                {% else %}Lezárva
+                {% endif %}
+            </span>
+            | Létrehozva: {{ ticket.created_at.strftime("%Y-%m-%d %H:%M") if ticket.created_at else "-" }}
+        </p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Beszélgetés</h2>
+        </div>
+        <div class="card-body">
+            <div class="ticket-messages" style="max-height: 500px; overflow-y: auto; margin-bottom: 20px; padding: 15px; background: #f9fafb; border-radius: 5px;">
+                {% for msg in messages %}
+                    <div class="message" style="margin-bottom: 15px; padding: 10px; background: {% if msg.user_id == user.id %}#e3f2fd{% else %}#fff{% endif %}; border-radius: 5px; border-left: 3px solid {% if msg.user_id == user.id %}#2196f3{% else %}#4caf50{% endif %};">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <strong>
+                                {% if msg.user_id == user.id %}Te
+                                {% elif msg.user.role.value == 'manager_admin' %}<span style="color: #f44336;">Manager Admin</span>
+                                {% else %}{{ msg.user.username }}
+                                {% endif %}
+                            </strong>
+                            <small style="color: #666;">{{ msg.created_at.strftime("%Y-%m-%d %H:%M:%S") if msg.created_at else "-" }}</small>
+                        </div>
+                        <div style="white-space: pre-wrap;">{{ msg.message }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if ticket.status.value != 'closed' %}
+                <form method="POST" action="/tickets/{{ ticket.id }}/message" class="auth-form">
+                    <div class="form-group">
+                        <label for="message">
+                            <i class="fas fa-comment"></i> Üzenet
+                        </label>
+                        <textarea 
+                            id="message" 
+                            name="message" 
+                            rows="4"
+                            required
+                            placeholder="Írj egy üzenetet..."
+                        ></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Küldés
+                    </button>
+                </form>
+            {% else %}
+                <p class="text-muted">Ez a ticket le van zárva. Nem lehet új üzenetet írni.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if can_rate %}
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h2>Értékelés</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/tickets/{{ ticket.id }}/rate" class="auth-form">
+                    <div class="form-group">
+                        <label>Értékelés (1-5 csillag)</label>
+                        <div style="font-size: 24px; margin: 10px 0;">
+                            {% for i in range(1, 6) %}
+                                <label style="cursor: pointer; margin-right: 5px;">
+                                    <input type="radio" name="rating" value="{{ i }}" required>
+                                    <span style="color: #ffc107;">★</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="comment">Megjegyzés (opcionális)</label>
+                        <textarea id="comment" name="comment" rows="3" placeholder="Véleményed a kezelésről..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-star"></i> Értékelés elküldése
+                    </button>
+                </form>
+            </div>
+        </div>
+    {% elif rating %}
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h2>Értékelés</h2>
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>Értékelés:</strong> 
+                    {% for i in range(1, 6) %}
+                        <span style="color: {% if i <= rating.rating %}#ffc107{% else %}#ddd{% endif %};">★</span>
+                    {% endfor %}
+                    ({{ rating.rating }}/5)
+                </p>
+                {% if rating.comment %}
+                    <p><strong>Megjegyzés:</strong> {{ rating.comment }}</p>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if ticket.status.value != 'closed' and ticket.user_id == user.id %}
+        <div style="margin-top: 20px;">
+            <form method="POST" action="/tickets/{{ ticket.id }}/close" onsubmit="return confirm('Biztosan le szeretnéd zárni ezt a ticketet?');">
+                <button type="submit" class="btn btn-secondary">
+                    <i class="fas fa-lock"></i> Ticket lezárása
+                </button>
+            </form>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-scroll az üzenetekhez
+document.addEventListener('DOMContentLoaded', function() {
+    const messagesDiv = document.querySelector('.ticket-messages');
+    if (messagesDiv) {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+});
+</script>
+{% endblock %}
+
