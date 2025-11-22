@@ -2,7 +2,11 @@
 Adatbázis inicializálás
 """
 
-from app.database import Base, engine, SessionLocal, User, UserRole
+from app.database import (
+    Base, engine, SessionLocal, User, UserRole,
+    Ticket, TicketMessage, TicketRating, TicketStatus,
+    ChatRoom, ChatMessage
+)
 from app.services.auth_service import get_password_hash
 from app.config import settings
 

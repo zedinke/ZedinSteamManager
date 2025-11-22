@@ -54,7 +54,7 @@
 </div>
 
 <script>
-let lastMessageTimestamp = {{ messages[-1].created_at.timestamp() if messages else 0 }};
+let lastMessageTimestamp = {% if messages %}{{ messages[-1].created_at.timestamp() }}{% else %}0{% endif %};
 
 // Auto-scroll
 function scrollToBottom() {
