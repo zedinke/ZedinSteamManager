@@ -59,29 +59,42 @@
 <script>
 // Aktív akciók betöltése
 fetch('/api/pricing/active-promotions')
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('Promotions data:', data);
         if (data.promotions && data.promotions.length > 0) {
             const promotionsDiv = document.getElementById('activePromotions');
             const promotionsList = document.getElementById('promotionsList');
             
-            let html = '';
-            data.promotions.forEach(promo => {
-                let description = '';
-                if (promo.type === 'general_sale') {
-                    description = `<strong>${promo.discount_percent}% kedvezmény</strong> minden tokenre!`;
-                } else if (promo.type === 'duration_discount') {
-                    description = `<strong>${promo.discount_percent}% kedvezmény</strong> ${promo.min_duration_days}+ napos tokenekre!`;
-                }
+            if (promotionsDiv && promotionsList) {
+                let html = '';
+                data.promotions.forEach(promo => {
+                    let description = '';
+                    if (promo.type === 'general_sale') {
+                        description = `<strong>${promo.discount_percent}% kedvezmény</strong> minden tokenre!`;
+                    } else if (promo.type === 'duration_discount') {
+                        description = `<strong>${promo.discount_percent}% kedvezmény</strong> ${promo.min_duration_days}+ napos tokenekre!`;
+                    }
+                    
+                    html += `<div style="padding: 8px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-bottom: 8px;">
+                        <strong>${promo.name}</strong><br>
+                        <small>${description}</small>
+                        ${promo.notes ? `<br><small style="opacity: 0.8; font-style: italic;">${promo.notes}</small>` : ''}
+                    </div>`;
+                });
                 
-                html += `<div style="padding: 8px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-bottom: 8px;">
-                    <strong>${promo.name}</strong><br>
-                    <small>${description}</small>
-                </div>`;
-            });
-            
-            promotionsList.innerHTML = html;
-            promotionsDiv.style.display = 'block';
+                promotionsList.innerHTML = html;
+                promotionsDiv.style.display = 'block';
+            } else {
+                console.warn('Promotions div or list not found');
+            }
+        } else {
+            console.log('No active promotions found');
         }
     })
     .catch(error => {

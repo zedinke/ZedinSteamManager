@@ -20,12 +20,25 @@ async def get_active_promotions(
     now = datetime.now()
     
     # Csak az aktív, általános akciókat és időtartam kedvezményeket mutatjuk
-    rules = db.query(TokenPricingRule).filter(
+    # (mennyiségi kedvezményeket nem, mert azok csak a kosárban relevánsak)
+    all_rules = db.query(TokenPricingRule).filter(
         TokenPricingRule.is_active == True,
-        TokenPricingRule.rule_type.in_(["general_sale", "duration_discount"]),
-        (TokenPricingRule.valid_from.is_(None)) | (TokenPricingRule.valid_from <= now),
-        (TokenPricingRule.valid_until.is_(None)) | (TokenPricingRule.valid_until >= now)
-    ).order_by(TokenPricingRule.priority.desc()).all()
+        TokenPricingRule.rule_type.in_(["general_sale", "duration_discount"])
+    ).all()
+    
+    # Dátum ellenőrzés
+    rules = []
+    for rule in all_rules:
+        # Ha van valid_from, akkor ellenőrizzük
+        if rule.valid_from and rule.valid_from > now:
+            continue
+        # Ha van valid_until, akkor ellenőrizzük
+        if rule.valid_until and rule.valid_until < now:
+            continue
+        rules.append(rule)
+    
+    # Prioritás szerint rendezés
+    rules.sort(key=lambda x: x.priority, reverse=True)
     
     promotions = []
     for rule in rules:

@@ -443,8 +443,14 @@ updateSystemStats(); // Azonnali frissítés
 // Aktív akciók betöltése
 function loadActivePromotions() {
     fetch('/api/pricing/active-promotions')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('Promotions data:', data);
             if (data.promotions && data.promotions.length > 0) {
                 const promotionsDiv = document.getElementById('activePromotions');
                 const promotionsList = document.getElementById('promotionsList');
@@ -477,7 +483,11 @@ function loadActivePromotions() {
                     
                     promotionsList.innerHTML = html;
                     promotionsDiv.style.display = 'block';
+                } else {
+                    console.warn('Promotions div or list not found');
                 }
+            } else {
+                console.log('No active promotions found');
             }
         })
         .catch(error => {
