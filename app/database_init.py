@@ -244,11 +244,10 @@ def init_db():
         # Frissítjük a létező táblák listáját
         existing_tables = inspector.get_table_names()
         
-        # Ticket messages tábla - csak akkor hozzuk létre, ha a tickets tábla létezik
-        if 'tickets' in existing_tables and 'ticket_messages' not in existing_tables:
-            print("ticket_messages tábla létrehozása...")
+        # Helper függvény a tickets.id típusának lekéréséhez
+        def get_tickets_id_type():
+            """Lekéri a tickets.id oszlop típusát"""
             try:
-                # Először ellenőrizzük a tickets.id típusát
                 with engine.connect() as conn:
                     result = conn.execute(text("""
                         SELECT COLUMN_TYPE 
@@ -259,29 +258,36 @@ def init_db():
                     """))
                     row = result.fetchone()
                     if row:
-                        tickets_id_type = row[0]
-                        # Használjuk a tickets.id típusát a ticket_id oszlophoz
-                        conn.execute(text(f"""
-                            CREATE TABLE ticket_messages (
-                                id {id_type} NOT NULL AUTO_INCREMENT,
-                                ticket_id {tickets_id_type} NOT NULL,
-                                user_id {id_type} NOT NULL,
-                                message TEXT NOT NULL,
-                                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                PRIMARY KEY (id),
-                                INDEX ix_ticket_messages_ticket_id (ticket_id),
-                                INDEX ix_ticket_messages_user_id (user_id),
-                                INDEX ix_ticket_messages_created_at (created_at),
-                                CONSTRAINT fk_ticket_messages_ticket_id
-                                    FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
-                                CONSTRAINT fk_ticket_messages_user_id
-                                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                        """))
-                        conn.commit()
-                        print("✓ ticket_messages tábla létrehozva")
-                    else:
-                        print("  ✗ Hiba: tickets.id oszlop nem található")
+                        return row[0]
+            except:
+                pass
+            return id_type  # Fallback
+        
+        # Ticket messages tábla - csak akkor hozzuk létre, ha a tickets tábla létezik
+        if 'tickets' in existing_tables and 'ticket_messages' not in existing_tables:
+            print("ticket_messages tábla létrehozása...")
+            try:
+                tickets_id_type = get_tickets_id_type()
+                with engine.connect() as conn:
+                    conn.execute(text(f"""
+                        CREATE TABLE ticket_messages (
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            ticket_id {tickets_id_type} NOT NULL,
+                            user_id {id_type} NOT NULL,
+                            message TEXT NOT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_ticket_messages_ticket_id (ticket_id),
+                            INDEX ix_ticket_messages_user_id (user_id),
+                            INDEX ix_ticket_messages_created_at (created_at),
+                            CONSTRAINT fk_ticket_messages_ticket_id
+                                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_ticket_messages_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                    print("✓ ticket_messages tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: ticket_messages tábla: {e}")
                 import traceback
