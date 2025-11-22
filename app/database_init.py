@@ -12,6 +12,27 @@ def init_db():
     try:
         Base.metadata.create_all(bind=engine)
         print("✓ Táblák létrehozva")
+        
+        # Ellenőrzés és hiányzó oszlopok hozzáadása
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        
+        # Users tábla ellenőrzése
+        if 'users' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('users')]
+            
+            # created_by_id oszlop hozzáadása ha hiányzik
+            if 'created_by_id' not in columns:
+                print("created_by_id oszlop hozzáadása a users táblához...")
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        ALTER TABLE users 
+                        ADD COLUMN created_by_id INT(11) UNSIGNED NULL,
+                        ADD INDEX idx_created_by (created_by_id)
+                    """))
+                    conn.commit()
+                print("✓ created_by_id oszlop hozzáadva")
+        
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
         raise
