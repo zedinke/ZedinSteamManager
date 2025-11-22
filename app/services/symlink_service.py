@@ -10,25 +10,37 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import ArkServerFiles, SessionLocal
 
+def get_cluster_serverfiles_path(cluster_id: str) -> Path:
+    """
+    Cluster serverfiles mappa útvonala
+    
+    Args:
+        cluster_id: Cluster ID
+    
+    Returns:
+        Path objektum a cluster serverfiles mappájához
+    """
+    base_path = Path(settings.ark_serverfiles_base)
+    cluster_serverfiles_path = base_path / cluster_id
+    return cluster_serverfiles_path
+
 def get_server_path(server_id: Optional[int], cluster_id: Optional[str] = None) -> Path:
     """
-    Szerver útvonal generálása
+    Szerver útvonal generálása (cluster serverfiles mappában)
     
     Args:
         server_id: Szerver ID
-        cluster_id: Cluster ID (opcionális)
+        cluster_id: Cluster ID (kötelező)
     
     Returns:
         Path objektum a szerver útvonalához
     """
-    base_path = Path(settings.ark_base_path)
+    if not cluster_id:
+        raise ValueError("cluster_id kötelező az Ark szerverekhez")
     
-    if cluster_id:
-        # Ha van cluster, akkor cluster/szerver struktúra
-        server_path = base_path / "clusters" / cluster_id / f"server_{server_id}"
-    else:
-        # Egyébként csak szerver
-        server_path = base_path / "servers" / f"server_{server_id}"
+    # Cluster serverfiles mappa
+    cluster_serverfiles = get_cluster_serverfiles_path(cluster_id)
+    server_path = cluster_serverfiles / f"server_{server_id}"
     
     return server_path
 
@@ -40,16 +52,19 @@ def get_active_ark_files(db: Session) -> Optional[ArkServerFiles]:
 
 def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = None, db: Session = None) -> Optional[Path]:
     """
-    Symlink létrehozása a szerverhez
+    Symlink létrehozása a szerverhez (cluster serverfiles mappában)
     
     Args:
         server_id: Szerver ID
-        cluster_id: Cluster ID (opcionális)
+        cluster_id: Cluster ID (kötelező)
         db: Adatbázis session
     
     Returns:
         Path objektum a symlink útvonalához vagy None
     """
+    if not cluster_id:
+        raise ValueError("cluster_id kötelező az Ark szerverekhez")
+    
     if db is None:
         db = SessionLocal()
         should_close = True
@@ -66,9 +81,13 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         if not install_path.exists():
             return None
         
-        # Szerver útvonal
+        # Szerver útvonal (cluster serverfiles mappában)
         if server_id is None:
             return None
+        
+        # Cluster serverfiles mappa létrehozása
+        cluster_serverfiles = get_cluster_serverfiles_path(cluster_id)
+        cluster_serverfiles.mkdir(parents=True, exist_ok=True)
         
         server_path = get_server_path(server_id, cluster_id)
         
@@ -82,7 +101,7 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
             else:
                 shutil.rmtree(server_path)
         
-        # Symlink létrehozása
+        # Symlink létrehozása az aktív Ark fájlokhoz
         server_path.symlink_to(install_path)
         
         return server_path
