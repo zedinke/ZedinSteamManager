@@ -156,6 +156,36 @@ document.getElementById('executeUpdateBtn').addEventListener('click', async () =
         btn.innerHTML = '<span class="btn-icon">🚀</span> Frissítés Végrehajtása';
     }
 });
+
+// Update flag törlése
+const clearFlagBtn = document.getElementById('clearUpdateFlagBtn');
+if (clearFlagBtn) {
+    clearFlagBtn.addEventListener('click', async () => {
+        if (!confirm('Biztosan törölni szeretnéd az update flagot? Ez csak akkor szükséges, ha az update script nem fut, de a flag még ott van.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/admin/update/clear-flag', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Update flag törölve! Most újra próbálhatod az update-t.');
+                location.reload();
+            } else {
+                alert('Hiba: ' + (data.error || 'Ismeretlen hiba'));
+            }
+        } catch (error) {
+            alert('Hiba: ' + error.message);
+        }
+    });
+}
 </script>
 
 <style>
