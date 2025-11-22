@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Ark Szerverek - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-server"></i> Ark Szerverek</h2>
+        <p>Ark Survival Ascended szerverek kezelése</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div style="margin-bottom: 20px;">
+        <a href="/ark/servers/create" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Új Szerver Létrehozása
+        </a>
+        <a href="/ark/clusters" class="btn btn-secondary" style="margin-left: 10px;">
+            <i class="fas fa-network-wired"></i> Cluster-ek
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list"></i> Szerverek</h3>
+        </div>
+        <div class="card-body">
+            {% if servers_data %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Név</th>
+                            <th>Cluster</th>
+                            <th>Port</th>
+                            <th>Query Port</th>
+                            <th>Max Játékosok</th>
+                            <th>Státusz</th>
+                            <th>Token információk</th>
+                            <th>Létrehozva</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in servers_data %}
+                        {% set server = item.server %}
+                            <tr>
+                                <td><strong>{{ server.name }}</strong></td>
+                                <td>
+                                    {% if server.cluster %}
+                                        <code>{{ server.cluster.cluster_id }}</code>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ server.port or '-' }}</td>
+                                <td>{{ server.query_port or '-' }}</td>
+                                <td>{{ server.max_players }}</td>
+                                <td>
+                                    {% if server.status.value == 'running' %}
+                                        <span class="badge badge-success">Fut</span>
+                                    {% elif server.status.value == 'stopped' %}
+                                        <span class="badge badge-secondary">Leállítva</span>
+                                    {% elif server.status.value == 'restarting' %}
+                                        <span class="badge badge-warning">Újraindítás</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if server.token_used_id %}
+                                        {% if item.token_expired %}
+                                            <div class="text-danger">
+                                                <i class="fas fa-exclamation-triangle"></i> Token lejárt
+                                            </div>
+                                        {% else %}
+                                            {% if item.token_days_left is not none %}
+                                                <div class="text-info">
+                                                    <i class="fas fa-key"></i> {{ item.token_days_left }} nap
+                                                </div>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Nincs token</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ server.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-edit"></i> Szerkesztés
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Még nincs létrehozott Ark szerver. 
+                    <a href="/ark/servers/create">Hozz létre egyet most!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

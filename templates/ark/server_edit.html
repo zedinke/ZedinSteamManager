@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Ark Szerver Szerkesztése - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-edit"></i> Ark Szerver Szerkesztése</h2>
+        <p>{{ server.name }} szerver beállításainak módosítása</p>
+    </div>
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-cog"></i> Szerver Beállítások</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Információ:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li>A cluster módosítása újra létrehozza a szerver symlink-jét</li>
+                    <li>A modok módosítása csak a szerver újraindítása után lép életbe</li>
+                </ul>
+            </div>
+            
+            <form method="POST" action="/ark/servers/{{ server.id }}/edit" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label for="cluster_id">
+                        <i class="fas fa-network-wired"></i> Cluster <span style="color: red;">*</span>
+                    </label>
+                    <select id="cluster_id" name="cluster_id" required 
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        {% for cluster in clusters %}
+                            <option value="{{ cluster.id }}" {% if server.cluster_id == cluster.id %}selected{% endif %}>
+                                {{ cluster.name }} ({{ cluster.cluster_id }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="active_mods">
+                        <i class="fas fa-puzzle-piece"></i> Aktív Modok
+                    </label>
+                    <input type="text" id="active_mods" name="active_mods" 
+                           value="{% if server.active_mods %}{{ server.active_mods|join(',') }}{% endif %}" 
+                           placeholder="pl. 123456,789012" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <small style="color: #666;">Steam Workshop mod ID-k (vesszővel elválasztva)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="passive_mods">
+                        <i class="fas fa-puzzle-piece"></i> Passzív Modok
+                    </label>
+                    <input type="text" id="passive_mods" name="passive_mods" 
+                           value="{% if server.passive_mods %}{{ server.passive_mods|join(',') }}{% endif %}" 
+                           placeholder="pl. 123456,789012" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <small style="color: #666;">Steam Workshop mod ID-k (vesszővel elválasztva)</small>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px;">
+                    <h4 style="margin-top: 0;">Szerver Információ</h4>
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Név:</td>
+                            <td style="padding: 5px;">{{ server.name }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Port:</td>
+                            <td style="padding: 5px;">{{ server.port }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Query Port:</td>
+                            <td style="padding: 5px;">{{ server.query_port }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Max Játékosok:</td>
+                            <td style="padding: 5px;">{{ server.max_players }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Státusz:</td>
+                            <td style="padding: 5px;">
+                                {% if server.status.value == 'running' %}
+                                    <span class="badge badge-success">Fut</span>
+                                {% elif server.status.value == 'stopped' %}
+                                    <span class="badge badge-secondary">Leállítva</span>
+                                {% else %}
+                                    <span class="badge badge-warning">Újraindítás</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Módosítások Mentése
+                    </button>
+                    <a href="/ark/servers" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

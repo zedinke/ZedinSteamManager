@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Ark Szerver Létrehozása - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-server"></i> Ark Szerver Létrehozása</h2>
+        <p>Új Ark Survival Ascended szerver bérlése</p>
+    </div>
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    {% if available_tokens <= 0 %}
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> Nincs elég aktív token! Szükséges 1 szabad aktív token a szerver létrehozásához.
+            <a href="/dashboard">Vissza a dashboard-ra</a>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-info-circle"></i> Szerver Információ</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong><i class="fas fa-info-circle"></i> Fontos:</strong>
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li>A portokat a rendszer automatikusan hozzárendeli</li>
+                        <li>Alapértelmezett max játékosok száma: 40</li>
+                        <li>A szerverfájlok symlink-ként lesznek kezelve (hely és erőforrás spórolás)</li>
+                        <li>Modokat később is módosíthatod a szerver beállításaiban</li>
+                    </ul>
+                </div>
+                
+                <form method="POST" action="/ark/servers/create" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label for="cluster_id">
+                            <i class="fas fa-network-wired"></i> Cluster <span style="color: red;">*</span>
+                        </label>
+                        <select id="cluster_id" name="cluster_id" required 
+                                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            {% for cluster in clusters %}
+                                <option value="{{ cluster.id }}">{{ cluster.name }} ({{ cluster.cluster_id }})</option>
+                            {% endfor %}
+                        </select>
+                        <small style="color: #666;">Válassz egy cluster-t. Ha nincs, <a href="/ark/clusters/create">hozz létre egyet</a>!</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="name">
+                            <i class="fas fa-tag"></i> Szerver Név <span style="color: red;">*</span>
+                        </label>
+                        <input type="text" id="name" name="name" required 
+                               placeholder="pl. Szerverem" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="max_players">
+                            <i class="fas fa-users"></i> Max Játékosok
+                        </label>
+                        <input type="number" id="max_players" name="max_players" 
+                               value="40" min="1" max="100" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        <small style="color: #666;">Maximum 40 játékos (Ark alapértelmezett)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="active_mods">
+                            <i class="fas fa-puzzle-piece"></i> Aktív Modok
+                        </label>
+                        <input type="text" id="active_mods" name="active_mods" 
+                               placeholder="pl. 123456,789012 vagy [123456,789012]" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        <small style="color: #666;">Steam Workshop mod ID-k (vesszővel elválasztva vagy JSON tömb)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="passive_mods">
+                            <i class="fas fa-puzzle-piece"></i> Passzív Modok
+                        </label>
+                        <input type="text" id="passive_mods" name="passive_mods" 
+                               placeholder="pl. 123456,789012 vagy [123456,789012]" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        <small style="color: #666;">Steam Workshop mod ID-k (vesszővel elválasztva vagy JSON tömb)</small>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Szerver Létrehozása
+                        </button>
+                        <a href="/ark/servers" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Mégse
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+

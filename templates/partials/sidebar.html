@@ -93,6 +93,18 @@
                     </a>
                 </div>
             </div>
+            
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-dinosaur"></i> Ark Survival Ascended
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/admin/ark/files" class="nav-item nav-sub-item">
+                        <i class="fas fa-server"></i> Szerverfájlok kezelése
+                    </a>
+                </div>
+            </div>
         {% endif %}
         
         {% if user_role == "server_admin" %}
@@ -107,6 +119,21 @@
                     </a>
                     <a href="/servers/start" class="nav-item nav-sub-item">
                         <i class="fas fa-play"></i> Szerver indítása
+                    </a>
+                </div>
+            </div>
+            
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-dinosaur"></i> Ark Survival Ascended
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/ark/clusters" class="nav-item nav-sub-item">
+                        <i class="fas fa-network-wired"></i> Cluster-ek
+                    </a>
+                    <a href="/ark/servers" class="nav-item nav-sub-item">
+                        <i class="fas fa-server"></i> Ark Szerverek
                     </a>
                 </div>
             </div>

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Ark Szerverfájlok - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-server"></i> Ark Szerverfájlok Kezelése</h2>
+        <p>Telepített Ark Survival Ascended szerverfájlok kezelése</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div style="margin-bottom: 20px;">
+        <a href="/admin/ark/files/install" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Új Szerverfájlok Telepítése
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list"></i> Telepített Verziók</h3>
+        </div>
+        <div class="card-body">
+            {% if ark_files %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Verzió</th>
+                            <th>Telepítési Útvonal</th>
+                            <th>Státusz</th>
+                            <th>Telepítve</th>
+                            <th>Telepítette</th>
+                            <th>Megjegyzés</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for file in ark_files %}
+                            <tr>
+                                <td><strong>{{ file.version }}</strong></td>
+                                <td><code>{{ file.install_path }}</code></td>
+                                <td>
+                                    {% if file.is_active %}
+                                        <span class="badge badge-success">Aktív</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inaktív</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ file.installed_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                                <td>
+                                    {% if file.installed_by %}
+                                        {{ file.installed_by.username }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if file.notes %}
+                                        <small>{{ file.notes[:50] }}{% if file.notes|length > 50 %}...{% endif %}</small>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not file.is_active %}
+                                        <form method="POST" action="/admin/ark/files/{{ file.id }}/activate" style="display: inline;" onsubmit="return confirm('Biztosan aktiválod ezt a verziót?');">
+                                            <button type="submit" class="btn btn-success btn-sm">
+                                                <i class="fas fa-check"></i> Aktiválás
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                    {% if not file.is_active %}
+                                        <form method="POST" action="/admin/ark/files/{{ file.id }}/delete" style="display: inline; margin-left: 5px;" onsubmit="return confirm('Biztosan törlöd ezt a verziót?');">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i> Törlés
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Még nincs telepített Ark szerverfájl.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
