@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Token Igénylések - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-key"></i> Token Igénylések</h2>
+        <p>Manager Adminisztrátor jóváhagyásra váró token igénylések</p>
+    </div>
+    
+    {% if request.session.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.session.pop("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.session.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.session.pop("error") }}
+        </div>
+    {% endif %}
+    
+    {% if token_requests %}
+        <div class="card">
+            <div class="card-header">
+                <h3>Jóváhagyásra váró igénylések</h3>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Felhasználó</th>
+                            <th>Token típusa</th>
+                            <th>Mennyiség</th>
+                            <th>Lejárat</th>
+                            <th>Igénylés dátuma</th>
+                            <th>Megjegyzés</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in token_requests %}
+                            <tr>
+                                <td>
+                                    <strong>{{ req.user.username }}</strong><br>
+                                    <small>{{ req.user.email }}</small>
+                                </td>
+                                <td>
+                                    {% if req.token_type.value == "server_admin" %}
+                                        <span class="badge badge-info">Szerver Admin</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Felhasználó</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ req.quantity }}</strong> db</td>
+                                <td>
+                                    {% if req.expires_in_days %}
+                                        {{ req.expires_in_days }} nap
+                                    {% else %}
+                                        <span class="text-muted">Alapértelmezett</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                                <td>
+                                    {% if req.notes %}
+                                        <small>{{ req.notes[:50] }}{% if req.notes|length > 50 %}...{% endif %}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div style="display: flex; gap: 5px;">
+                                        <form method="POST" action="/tokens/requests/{{ req.id }}/process" style="display: inline;">
+                                            <input type="hidden" name="action" value="approve">
+                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Biztosan jóváhagyod ezt a token igénylést?')">
+                                                <i class="fas fa-check"></i> Jóváhagyás
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="showRejectModal({{ req.id }})">
+                                            <i class="fas fa-times"></i> Elutasítás
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted">Nincsenek jóváhagyásra váró token igénylések.</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Elutasítás Modal -->
+<div id="rejectModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content" style="background-color: white; margin: 15% auto; padding: 20px; border-radius: 10px; width: 500px; max-width: 90%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3><i class="fas fa-times-circle"></i> Token Igénylés Elutasítása</h3>
+            <button onclick="closeRejectModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <form method="POST" action="/tokens/requests/0/process" id="rejectForm">
+            <input type="hidden" name="action" value="reject">
+            <input type="hidden" name="request_id" id="rejectRequestId">
+            <div style="margin-bottom: 15px;">
+                <label for="rejectNotes" style="display: block; margin-bottom: 5px; font-weight: bold;">Megjegyzés (opcionális):</label>
+                <textarea id="rejectNotes" name="notes" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; resize: vertical;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeRejectModal()" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Mégse</button>
+                <button type="submit" class="btn btn-danger" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    <i class="fas fa-times"></i> Elutasítás
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showRejectModal(requestId) {
+    document.getElementById('rejectRequestId').value = requestId;
+    const form = document.getElementById('rejectForm');
+    form.action = `/tokens/requests/${requestId}/process`;
+    document.getElementById('rejectModal').style.display = 'block';
+}
+
+function closeRejectModal() {
+    document.getElementById('rejectModal').style.display = 'none';
+    document.getElementById('rejectNotes').value = '';
+}
+
+// Modal bezárása kattintásra a háttérre
+window.onclick = function(event) {
+    const modal = document.getElementById('rejectModal');
+    if (event.target == modal) {
+        closeRejectModal();
+    }
+}
+</script>
+{% endblock %}
+

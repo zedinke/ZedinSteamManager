@@ -306,6 +306,25 @@ class TokenExtensionRequest(Base):
     user = relationship("User", foreign_keys=[user_id])
     processed_by = relationship("User", foreign_keys=[processed_by_id])
 
+class TokenRequest(Base):
+    """Token igénylések manager admintól (ingyenes)"""
+    __tablename__ = "token_requests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_type = Column(EnumType(TokenType), nullable=False)  # server_admin vagy user
+    quantity = Column(Integer, nullable=False, default=1)  # Hány darab tokent kér
+    expires_in_days = Column(Integer, nullable=True)  # Opcionális lejárat napokban
+    status = Column(String(20), default="pending", nullable=False, index=True)  # pending, approved, rejected
+    notes = Column(Text, nullable=True)  # Opcionális megjegyzés
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    processed_at = Column(DateTime, nullable=True)
+    processed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+    processed_by = relationship("User", foreign_keys=[processed_by_id])
+
 class CartItem(Base):
     """Kosár elemek - token igénylés vagy hosszabbítási kérés"""
     __tablename__ = "cart_items"

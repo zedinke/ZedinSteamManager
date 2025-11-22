@@ -12,7 +12,7 @@ sys.path.insert(0, str(BASE_DIR))
 from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
-    ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem
+    ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -625,6 +625,50 @@ def init_db():
                 print("✓ cart_items tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: cart_items tábla: {e}")
+        
+        # Token requests tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'token_requests' not in existing_tables:
+            print("token_requests tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    # Users és tokens tábla ID típusának lekérése
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE token_requests (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            user_id {users_id_type} NOT NULL,
+                            token_type VARCHAR(20) NOT NULL,
+                            quantity INT NOT NULL DEFAULT 1,
+                            expires_in_days INT NULL,
+                            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                            notes TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            processed_at DATETIME NULL,
+                            processed_by_id {users_id_type} NULL,
+                            PRIMARY KEY (id),
+                            INDEX ix_token_requests_user_id (user_id),
+                            INDEX ix_token_requests_status (status),
+                            INDEX ix_token_requests_created_at (created_at),
+                            CONSTRAINT fk_token_requests_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_token_requests_processed_by_id
+                                FOREIGN KEY (processed_by_id) REFERENCES users(id) ON DELETE SET NULL
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ token_requests tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: token_requests tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
