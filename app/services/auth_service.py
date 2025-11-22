@@ -31,18 +31,52 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         plain_password = password_bytes[:72].decode('utf-8', errors='ignore')
     
     try:
+        if pwd_context == "bcrypt_direct":
+            # Közvetlenül bcrypt használata
+            import bcrypt
+            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
         return pwd_context.verify(plain_password, hashed_password)
-    except (ValueError, TypeError) as e:
-        # Ha a hash formátuma nem megfelelő, próbáljuk meg újra hash-elni
-        print(f"Password verification error: {e}")
-        return False
+    except (ValueError, TypeError, AttributeError) as e:
+        # Ha a hash formátuma nem megfelelő, próbáljuk meg közvetlenül bcrypt-tel
+        try:
+            import bcrypt
+            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        except:
+            print(f"Password verification error: {e}")
+            return False
 
 def get_password_hash(password: str) -> str:
     """Jelszó hash-elése"""
+    if not password:
+        raise ValueError("Jelszó nem lehet üres")
+    
     # Bcrypt 72 bájt limit kezelése
-    if len(password.encode('utf-8')) > 72:
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # 72 bájt = kb 72 karakter UTF-8-ban (egyszerű karakterek esetén)
+        # De biztonságosabb, ha karaktereket számolunk, nem bájtokat
         password = password[:72]
-    return pwd_context.hash(password)
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            # Ha még mindig túl hosszú (pl. multi-byte karakterek), vágjuk bájtokban
+            password_bytes = password_bytes[:72]
+            password = password_bytes.decode('utf-8', errors='ignore')
+    
+    try:
+        if pwd_context == "bcrypt_direct":
+            # Közvetlenül bcrypt használata
+            import bcrypt
+            salt = bcrypt.gensalt()
+            return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+        return pwd_context.hash(password)
+    except (ValueError, AttributeError) as e:
+        # Ha még mindig probléma van, próbáljuk meg közvetlenül bcrypt-tel
+        try:
+            import bcrypt
+            salt = bcrypt.gensalt()
+            return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+        except Exception as e2:
+            raise ValueError(f"Jelszó hash-elés sikertelen: {e2}")
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """JWT token létrehozása"""

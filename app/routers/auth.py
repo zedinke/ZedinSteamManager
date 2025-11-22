@@ -130,9 +130,23 @@ async def register(
     except ValueError as e:
         from app.main import get_templates
         templates = get_templates()
+        # Felhasználóbarát hibaüzenet
+        error_msg = str(e)
+        if "password cannot be longer" in error_msg.lower() or "72 bytes" in error_msg.lower():
+            error_msg = "A jelszó túl hosszú. Maximum 72 karakter lehet."
         return templates.TemplateResponse(
             "auth/register.html",
-            {"request": request, "error": str(e)}
+            {"request": request, "error": error_msg}
+        )
+    except Exception as e:
+        from app.main import get_templates
+        templates = get_templates()
+        # Általános hibaüzenet
+        error_msg = "Hiba történt a regisztráció során. Kérjük, próbálja újra."
+        print(f"Registration error: {e}")
+        return templates.TemplateResponse(
+            "auth/register.html",
+            {"request": request, "error": error_msg}
         )
 
 @router.get("/verify-email")
