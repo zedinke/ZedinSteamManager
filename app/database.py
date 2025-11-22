@@ -343,6 +343,52 @@ class CartItem(Base):
     user = relationship("User", foreign_keys=[user_id])
     token = relationship("Token", foreign_keys=[token_id])
 
+class TokenPricingRule(Base):
+    """Token árazási szabályok"""
+    __tablename__ = "token_pricing_rules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)  # Szabály neve
+    rule_type = Column(String(20), nullable=False, index=True)  # "general_sale", "quantity_discount", "duration_discount"
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    
+    # Általános akció (general_sale)
+    discount_percent = Column(Integer, nullable=True)  # Kedvezmény százalék (pl. 20 = 20%)
+    
+    # Mennyiségi kedvezmény (quantity_discount)
+    min_quantity = Column(Integer, nullable=True)  # Minimum mennyiség
+    quantity_discount_percent = Column(Integer, nullable=True)  # Kedvezmény százalék
+    
+    # Időtartam kedvezmény (duration_discount)
+    min_duration_days = Column(Integer, nullable=True)  # Minimum napok száma
+    duration_discount_percent = Column(Integer, nullable=True)  # Kedvezmény százalék
+    
+    # Alkalmazási feltételek
+    applies_to_token_type = Column(EnumType(TokenType), nullable=True)  # NULL = mindkét típusra
+    applies_to_item_type = Column(String(20), nullable=True)  # "token_request" vagy "token_extension" vagy NULL = mindkettőre
+    
+    # Időszak
+    valid_from = Column(DateTime, nullable=True)
+    valid_until = Column(DateTime, nullable=True)
+    
+    # Meta
+    priority = Column(Integer, default=0, nullable=False)  # Magasabb prioritás = előbb alkalmazva
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class TokenBasePrice(Base):
+    """Token alapárak"""
+    __tablename__ = "token_base_prices"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    token_type = Column(EnumType(TokenType), nullable=False, unique=True, index=True)
+    item_type = Column(String(20), nullable=False, index=True)  # "token_request" vagy "token_extension"
+    base_price = Column(Integer, nullable=False)  # Alapár (pl. forintban)
+    price_per_day = Column(Integer, nullable=True)  # Napi ár (hosszabbítás esetén)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
 # Dependency
 def get_db():
     """Database session dependency"""

@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}Token Árazás Kezelése - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-tags"></i> Token Árazás Kezelése</h2>
+        <p>Alapárak és árazási szabályok beállítása</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <!-- Alapárak -->
+    <div class="card" style="margin-bottom: 30px;">
+        <div class="card-header">
+            <h3><i class="fas fa-dollar-sign"></i> Alapárak</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <!-- Token igénylés árak -->
+                <div>
+                    <h4>Token Igénylés</h4>
+                    <form method="POST" action="/admin/pricing/base-price" style="margin-bottom: 15px;">
+                        <input type="hidden" name="item_type" value="token_request">
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin Token:</label>
+                            <input type="number" name="base_price" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 10000 }}" 
+                                   min="0" required style="width: 100%; padding: 8px;">
+                            <input type="hidden" name="token_type" value="server_admin">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
+                    </form>
+                    
+                    <form method="POST" action="/admin/pricing/base-price">
+                        <input type="hidden" name="item_type" value="token_request">
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó Token:</label>
+                            <input type="number" name="base_price" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 5000 }}" 
+                                   min="0" required style="width: 100%; padding: 8px;">
+                            <input type="hidden" name="token_type" value="user">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
+                    </form>
+                </div>
+                
+                <!-- Token hosszabbítás árak -->
+                <div>
+                    <h4>Token Hosszabbítás</h4>
+                    <form method="POST" action="/admin/pricing/base-price" style="margin-bottom: 15px;">
+                        <input type="hidden" name="item_type" value="token_extension">
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin (Ft/nap):</label>
+                            <input type="number" name="price_per_day" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 1000 }}" 
+                                   min="0" required style="width: 100%; padding: 8px;">
+                            <input type="hidden" name="token_type" value="server_admin">
+                            <input type="hidden" name="base_price" value="0">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
+                    </form>
+                    
+                    <form method="POST" action="/admin/pricing/base-price">
+                        <input type="hidden" name="item_type" value="token_extension">
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó (Ft/nap):</label>
+                            <input type="number" name="price_per_day" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 500 }}" 
+                                   min="0" required style="width: 100%; padding: 8px;">
+                            <input type="hidden" name="token_type" value="user">
+                            <input type="hidden" name="base_price" value="0">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Árazási szabályok -->
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3><i class="fas fa-percent"></i> Árazási Szabályok</h3>
+            <button class="btn btn-primary" onclick="showAddRuleModal()">
+                <i class="fas fa-plus"></i> Új Szabály
+            </button>
+        </div>
+        <div class="card-body">
+            {% if pricing_rules %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Név</th>
+                            <th>Típus</th>
+                            <th>Kedvezmény</th>
+                            <th>Feltételek</th>
+                            <th>Időszak</th>
+                            <th>Prioritás</th>
+                            <th>Státusz</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rule in pricing_rules %}
+                            <tr>
+                                <td><strong>{{ rule.name }}</strong></td>
+                                <td>
+                                    {% if rule.rule_type == "general_sale" %}
+                                        <span class="badge badge-info">Általános akció</span>
+                                    {% elif rule.rule_type == "quantity_discount" %}
+                                        <span class="badge badge-warning">Mennyiségi kedvezmény</span>
+                                    {% elif rule.rule_type == "duration_discount" %}
+                                        <span class="badge badge-success">Időtartam kedvezmény</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if rule.rule_type == "general_sale" %}
+                                        {{ rule.discount_percent }}%
+                                    {% elif rule.rule_type == "quantity_discount" %}
+                                        {{ rule.quantity_discount_percent }}%
+                                    {% elif rule.rule_type == "duration_discount" %}
+                                        {{ rule.duration_discount_percent }}%
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if rule.rule_type == "quantity_discount" %}
+                                        Minimum {{ rule.min_quantity }} db
+                                    {% elif rule.rule_type == "duration_discount" %}
+                                        Minimum {{ rule.min_duration_days }} nap
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                    <br>
+                                    <small>
+                                        {% if rule.applies_to_token_type %}
+                                            Token: {{ "Szerver Admin" if rule.applies_to_token_type.value == "server_admin" else "Felhasználó" }}
+                                        {% else %}
+                                            Minden token típus
+                                        {% endif %}
+                                        <br>
+                                        {% if rule.applies_to_item_type %}
+                                            Típus: {{ "Igénylés" if rule.applies_to_item_type == "token_request" else "Hosszabbítás" }}
+                                        {% else %}
+                                            Minden típus
+                                        {% endif %}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if rule.valid_from or rule.valid_until %}
+                                        {% if rule.valid_from %}
+                                            <small>Kezdés: {{ rule.valid_from.strftime("%Y-%m-%d") }}</small><br>
+                                        {% endif %}
+                                        {% if rule.valid_until %}
+                                            <small>Vég: {{ rule.valid_until.strftime("%Y-%m-%d") }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Korlátlan</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ rule.priority }}</td>
+                                <td>
+                                    {% if rule.is_active %}
+                                        <span class="badge badge-success">Aktív</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inaktív</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div style="display: flex; gap: 5px;">
+                                        <form method="POST" action="/admin/pricing/rule/{{ rule.id }}/toggle" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm {{ 'btn-warning' if rule.is_active else 'btn-success' }}">
+                                                <i class="fas fa-{{ 'pause' if rule.is_active else 'play' }}"></i>
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="/admin/pricing/rule/{{ rule.id }}/delete" style="display: inline;" onsubmit="return confirm('Biztosan törölni szeretnéd ezt a szabályt?')">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted">Nincsenek árazási szabályok. Kattints az "Új Szabály" gombra egy létrehozásához.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Új Szabály Modal -->
+<div id="addRuleModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content" style="background-color: white; margin: 5% auto; padding: 20px; border-radius: 10px; width: 700px; max-width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3><i class="fas fa-plus-circle"></i> Új Árazási Szabály</h3>
+            <button onclick="closeAddRuleModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        
+        <form method="POST" action="/admin/pricing/rule" id="addRuleForm">
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szabály neve:</label>
+                <input type="text" name="name" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szabály típusa:</label>
+                <select name="rule_type" id="ruleType" required onchange="updateRuleFields()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <option value="general_sale">Általános akció</option>
+                    <option value="quantity_discount">Mennyiségi kedvezmény</option>
+                    <option value="duration_discount">Időtartam kedvezmény</option>
+                </select>
+            </div>
+            
+            <!-- Általános akció mezők -->
+            <div id="generalSaleFields" style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Kedvezmény százalék:</label>
+                <input type="number" name="discount_percent" min="0" max="100" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                <small style="color: #666;">Pl. 20 = 20% kedvezmény</small>
+            </div>
+            
+            <!-- Mennyiségi kedvezmény mezők -->
+            <div id="quantityDiscountFields" style="margin-bottom: 15px; display: none;">
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Minimum mennyiség:</label>
+                    <input type="number" name="min_quantity" min="1" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Kedvezmény százalék:</label>
+                    <input type="number" name="quantity_discount_percent" min="0" max="100" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+            </div>
+            
+            <!-- Időtartam kedvezmény mezők -->
+            <div id="durationDiscountFields" style="margin-bottom: 15px; display: none;">
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Minimum napok száma:</label>
+                    <input type="number" name="min_duration_days" min="1" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Kedvezmény százalék:</label>
+                    <input type="number" name="duration_discount_percent" min="0" max="100" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Alkalmazás:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px;">Token típusa:</label>
+                        <select name="applies_to_token_type" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            <option value="">Minden típus</option>
+                            <option value="server_admin">Szerver Admin</option>
+                            <option value="user">Felhasználó</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px;">Item típusa:</label>
+                        <select name="applies_to_item_type" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            <option value="">Minden típus</option>
+                            <option value="token_request">Token igénylés</option>
+                            <option value="token_extension">Token hosszabbítás</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Időszak (opcionális):</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px;">Kezdés:</label>
+                        <input type="datetime-local" name="valid_from" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px;">Vég:</label>
+                        <input type="datetime-local" name="valid_until" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Prioritás:</label>
+                <input type="number" name="priority" value="0" min="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                <small style="color: #666;">Magasabb prioritás = előbb alkalmazva (0 = alapértelmezett)</small>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Megjegyzés (opcionális):</label>
+                <textarea name="notes" rows="2" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;"></textarea>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" name="is_active" checked>
+                    <span>Szabály aktív</span>
+                </label>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeAddRuleModal()" class="btn btn-secondary">Mégse</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Mentés
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function showAddRuleModal() {
+    document.getElementById('addRuleModal').style.display = 'block';
+    updateRuleFields();
+}
+
+function closeAddRuleModal() {
+    document.getElementById('addRuleModal').style.display = 'none';
+    document.getElementById('addRuleForm').reset();
+}
+
+function updateRuleFields() {
+    const ruleType = document.getElementById('ruleType').value;
+    const generalSaleFields = document.getElementById('generalSaleFields');
+    const quantityDiscountFields = document.getElementById('quantityDiscountFields');
+    const durationDiscountFields = document.getElementById('durationDiscountFields');
+    
+    // Minden mező elrejtése
+    generalSaleFields.style.display = 'none';
+    quantityDiscountFields.style.display = 'none';
+    durationDiscountFields.style.display = 'none';
+    
+    // Megfelelő mezők megjelenítése
+    if (ruleType === 'general_sale') {
+        generalSaleFields.style.display = 'block';
+    } else if (ruleType === 'quantity_discount') {
+        quantityDiscountFields.style.display = 'block';
+    } else if (ruleType === 'duration_discount') {
+        durationDiscountFields.style.display = 'block';
+    }
+}
+
+// Modal bezárása kattintásra a háttérre
+window.onclick = function(event) {
+    const modal = document.getElementById('addRuleModal');
+    if (event.target == modal) {
+        closeAddRuleModal();
+    }
+}
+</script>
+{% endblock %}
+

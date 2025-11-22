@@ -96,6 +96,18 @@
     </div>
     
     {% if user.role.value == "server_admin" %}
+        <!-- Aktív Akciók -->
+        <div id="activePromotions" class="card" style="display: none; margin-bottom: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.2);">
+                <h3 style="margin: 0; color: white;">
+                    <i class="fas fa-fire"></i> Aktuális Akciók
+                </h3>
+            </div>
+            <div class="card-body" id="promotionsList" style="color: white;">
+                <!-- Promóciók betöltése JavaScript-tel -->
+            </div>
+        </div>
+        
         <div class="card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3><i class="fas fa-key"></i> Tokenjeim</h3>
@@ -427,6 +439,54 @@ function updateChart(chart, newValue) {
 // 2 másodpercenként frissítés
 setInterval(updateSystemStats, 2000);
 updateSystemStats(); // Azonnali frissítés
+
+// Aktív akciók betöltése
+function loadActivePromotions() {
+    fetch('/api/pricing/active-promotions')
+        .then(response => response.json())
+        .then(data => {
+            if (data.promotions && data.promotions.length > 0) {
+                const promotionsDiv = document.getElementById('activePromotions');
+                const promotionsList = document.getElementById('promotionsList');
+                
+                if (promotionsDiv && promotionsList) {
+                    let html = '';
+                    data.promotions.forEach(promo => {
+                        let description = '';
+                        let icon = 'fas fa-percent';
+                        
+                        if (promo.type === 'general_sale') {
+                            description = `<strong>${promo.discount_percent}% kedvezmény</strong> minden tokenre!`;
+                            icon = 'fas fa-fire';
+                        } else if (promo.type === 'duration_discount') {
+                            description = `<strong>${promo.discount_percent}% kedvezmény</strong> ${promo.min_duration_days}+ napos tokenekre!`;
+                            icon = 'fas fa-calendar-check';
+                        }
+                        
+                        html += `<div style="padding: 12px; background: rgba(255,255,255,0.15); border-radius: 8px; margin-bottom: 10px; border-left: 4px solid rgba(255,255,255,0.5);">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="${icon}" style="font-size: 20px;"></i>
+                                <div>
+                                    <strong style="font-size: 16px;">${promo.name}</strong><br>
+                                    <small style="opacity: 0.9;">${description}</small>
+                                    ${promo.notes ? `<br><small style="opacity: 0.8; font-style: italic;">${promo.notes}</small>` : ''}
+                                </div>
+                            </div>
+                        </div>`;
+                    });
+                    
+                    promotionsList.innerHTML = html;
+                    promotionsDiv.style.display = 'block';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading promotions:', error);
+        });
+}
+
+// Akciók betöltése oldal betöltésekor
+loadActivePromotions();
 
 // AI Chat funkciók
 const aiChatInput = document.getElementById('aiChatInput');

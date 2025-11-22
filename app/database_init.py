@@ -12,7 +12,8 @@ sys.path.insert(0, str(BASE_DIR))
 from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
-    ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest
+    ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest,
+    TokenPricingRule, TokenBasePrice
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -669,6 +670,87 @@ def init_db():
                 print("✓ token_requests tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: token_requests tábla: {e}")
+        
+        # Token base prices tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'token_base_prices' not in existing_tables:
+            print("token_base_prices tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE token_base_prices (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            token_type VARCHAR(20) NOT NULL,
+                            item_type VARCHAR(20) NOT NULL,
+                            base_price INT NOT NULL,
+                            price_per_day INT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            UNIQUE KEY uk_token_base_prices (token_type, item_type),
+                            INDEX ix_token_base_prices_token_type (token_type),
+                            INDEX ix_token_base_prices_item_type (item_type)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ token_base_prices tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: token_base_prices tábla: {e}")
+        
+        # Token pricing rules tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'token_pricing_rules' not in existing_tables:
+            print("token_pricing_rules tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE token_pricing_rules (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            name VARCHAR(100) NOT NULL,
+                            rule_type VARCHAR(20) NOT NULL,
+                            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                            discount_percent INT NULL,
+                            min_quantity INT NULL,
+                            quantity_discount_percent INT NULL,
+                            min_duration_days INT NULL,
+                            duration_discount_percent INT NULL,
+                            applies_to_token_type VARCHAR(20) NULL,
+                            applies_to_item_type VARCHAR(20) NULL,
+                            valid_from DATETIME NULL,
+                            valid_until DATETIME NULL,
+                            priority INT NOT NULL DEFAULT 0,
+                            notes TEXT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_token_pricing_rules_rule_type (rule_type),
+                            INDEX ix_token_pricing_rules_is_active (is_active)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ token_pricing_rules tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: token_pricing_rules tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

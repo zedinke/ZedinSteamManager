@@ -81,6 +81,18 @@
                     </a>
                 </div>
             </div>
+            
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-tags"></i> Árazás
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/admin/pricing" class="nav-item nav-sub-item">
+                        <i class="fas fa-dollar-sign"></i> Árazás kezelése
+                    </a>
+                </div>
+            </div>
         {% endif %}
         
         {% if user_role == "server_admin" %}
