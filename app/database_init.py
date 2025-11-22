@@ -146,33 +146,42 @@ def init_db():
         # Frissítjük a létező táblák listáját
         existing_tables = inspector.get_table_names()
         
+        # Helper függvény a users.id típusának lekéréséhez
+        def get_users_id_type():
+            """Lekéri a users.id oszlop típusát"""
+            users_columns = inspector.get_columns('users')
+            for col in users_columns:
+                if col['name'] == 'id':
+                    col_type = col['type']
+                    # SQLAlchemy típusból MySQL típus
+                    type_str = str(col_type).upper()
+                    if 'UNSIGNED' in type_str or 'INT UNSIGNED' in type_str:
+                        return "INT(11) UNSIGNED"
+                    elif 'INT' in type_str or 'INTEGER' in type_str:
+                        return "INT(11)"
+                    else:
+                        # Próbáljuk meg közvetlenül lekérdezni az adatbázisból
+                        with engine.connect() as conn:
+                            result = conn.execute(text("""
+                                SELECT COLUMN_TYPE 
+                                FROM INFORMATION_SCHEMA.COLUMNS 
+                                WHERE TABLE_SCHEMA = DATABASE() 
+                                AND TABLE_NAME = 'users' 
+                                AND COLUMN_NAME = 'id'
+                            """))
+                            row = result.fetchone()
+                            if row:
+                                return row[0]
+            return "INT(11) UNSIGNED"  # Alapértelmezés
+        
+        id_type = get_users_id_type()
+        print(f"  users.id típusa: {id_type}")
+        
         # Tickets tábla
         if 'tickets' not in existing_tables:
             print("tickets tábla létrehozása...")
             try:
                 with engine.connect() as conn:
-                    # Először ellenőrizzük a users.id típusát
-                    users_columns = inspector.get_columns('users')
-                    users_id_type = None
-                    for col in users_columns:
-                        if col['name'] == 'id':
-                            users_id_type = col['type']
-                            break
-                    
-                    # Ha nem találtuk meg, használjuk az INT(11) UNSIGNED-t (MySQL alapértelmezés)
-                    if users_id_type is None:
-                        id_type = "INT(11) UNSIGNED"
-                    else:
-                        # Konvertáljuk a SQLAlchemy típust MySQL típusra
-                        id_type_str = str(users_id_type)
-                        if 'INT' in id_type_str.upper() or 'INTEGER' in id_type_str.upper():
-                            if 'UNSIGNED' in id_type_str.upper():
-                                id_type = "INT(11) UNSIGNED"
-                            else:
-                                id_type = "INT(11)"
-                        else:
-                            id_type = "INT(11)"
-                    
                     # Először a táblát foreign key nélkül
                     conn.execute(text(f"""
                         CREATE TABLE tickets (
@@ -194,19 +203,27 @@ def init_db():
                     conn.commit()
                     
                     # Foreign key-ek hozzáadása külön
-                    conn.execute(text("""
-                        ALTER TABLE tickets
-                        ADD CONSTRAINT fk_tickets_user_id
-                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                    """))
-                    conn.commit()
+                    try:
+                        conn.execute(text("""
+                            ALTER TABLE tickets
+                            ADD CONSTRAINT fk_tickets_user_id
+                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        """))
+                        conn.commit()
+                    except Exception as e:
+                        if "Duplicate foreign key" not in str(e) and "already exists" not in str(e).lower():
+                            print(f"    Figyelmeztetés: user_id foreign key: {e}")
                     
-                    conn.execute(text("""
-                        ALTER TABLE tickets
-                        ADD CONSTRAINT fk_tickets_closed_by_id
-                        FOREIGN KEY (closed_by_id) REFERENCES users(id) ON DELETE SET NULL
-                    """))
-                    conn.commit()
+                    try:
+                        conn.execute(text("""
+                            ALTER TABLE tickets
+                            ADD CONSTRAINT fk_tickets_closed_by_id
+                            FOREIGN KEY (closed_by_id) REFERENCES users(id) ON DELETE SET NULL
+                        """))
+                        conn.commit()
+                    except Exception as e:
+                        if "Duplicate foreign key" not in str(e) and "already exists" not in str(e).lower():
+                            print(f"    Figyelmeztetés: closed_by_id foreign key: {e}")
                 print("✓ tickets tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: tickets tábla: {e}")
@@ -243,26 +260,6 @@ def init_db():
             print("ticket_ratings tábla létrehozása...")
             try:
                 with engine.connect() as conn:
-                    # Ugyanazt az id_type-ot használjuk
-                    users_columns = inspector.get_columns('users')
-                    users_id_type = None
-                    for col in users_columns:
-                        if col['name'] == 'id':
-                            users_id_type = col['type']
-                            break
-                    
-                    if users_id_type is None:
-                        id_type = "INT(11) UNSIGNED"
-                    else:
-                        id_type_str = str(users_id_type)
-                        if 'INT' in id_type_str.upper() or 'INTEGER' in id_type_str.upper():
-                            if 'UNSIGNED' in id_type_str.upper():
-                                id_type = "INT(11) UNSIGNED"
-                            else:
-                                id_type = "INT(11)"
-                        else:
-                            id_type = "INT(11)"
-                    
                     conn.execute(text(f"""
                         CREATE TABLE ticket_ratings (
                             id {id_type} NOT NULL AUTO_INCREMENT,
@@ -312,26 +309,6 @@ def init_db():
             print("chat_messages tábla létrehozása...")
             try:
                 with engine.connect() as conn:
-                    # Ugyanazt az id_type-ot használjuk
-                    users_columns = inspector.get_columns('users')
-                    users_id_type = None
-                    for col in users_columns:
-                        if col['name'] == 'id':
-                            users_id_type = col['type']
-                            break
-                    
-                    if users_id_type is None:
-                        id_type = "INT(11) UNSIGNED"
-                    else:
-                        id_type_str = str(users_id_type)
-                        if 'INT' in id_type_str.upper() or 'INTEGER' in id_type_str.upper():
-                            if 'UNSIGNED' in id_type_str.upper():
-                                id_type = "INT(11) UNSIGNED"
-                            else:
-                                id_type = "INT(11)"
-                        else:
-                            id_type = "INT(11)"
-                    
                     conn.execute(text(f"""
                         CREATE TABLE chat_messages (
                             id {id_type} NOT NULL AUTO_INCREMENT,
