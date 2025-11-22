@@ -6,8 +6,9 @@ import os
 import shutil
 from pathlib import Path
 from typing import Optional
+from sqlalchemy.orm import Session
 from app.config import settings
-from app.database import ArkServerFiles, Session
+from app.database import ArkServerFiles, SessionLocal
 
 def get_server_path(server_id: Optional[int], cluster_id: Optional[str] = None) -> Path:
     """
@@ -50,7 +51,6 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         Path objektum a symlink útvonalához vagy None
     """
     if db is None:
-        from app.database import SessionLocal
         db = SessionLocal()
         should_close = True
     else:
