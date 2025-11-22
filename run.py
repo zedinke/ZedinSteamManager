@@ -20,9 +20,13 @@ import uvicorn
 from app.main import app
 
 if __name__ == "__main__":
+    # Production módban ne használjunk reload-ot (systemd service esetén)
+    import os
+    use_reload = os.getenv("UVICORN_RELOAD", "false").lower() == "true"
+    
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True
+        reload=use_reload
     )

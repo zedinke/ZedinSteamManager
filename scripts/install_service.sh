@@ -26,7 +26,7 @@ User=$CURRENT_USER
 Group=$CURRENT_GROUP
 WorkingDirectory=$PROJECT_DIR
 Environment="PATH=$PROJECT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=$PROJECT_DIR/venv/bin/python $PROJECT_DIR/run.py
+ExecStart=$PROJECT_DIR/venv/bin/python3 $PROJECT_DIR/run.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
