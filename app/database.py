@@ -187,9 +187,9 @@ class Ticket(Base):
     description = Column(Text, nullable=False)
     status = Column(EnumType(TicketStatus), default=TicketStatus.OPEN, nullable=False, index=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False, index=True)
     closed_at = Column(DateTime, nullable=True)
-    closed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    closed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     
     # Relationships
     user = relationship("User", foreign_keys=[user_id], back_populates="tickets")
