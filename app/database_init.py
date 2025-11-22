@@ -21,12 +21,29 @@ def init_db():
     """Adatbázis táblák létrehozása"""
     print("Adatbázis táblák létrehozása...")
     try:
-        Base.metadata.create_all(bind=engine)
-        print("✓ Táblák létrehozva")
-        
-        # Ellenőrzés és hiányzó oszlopok hozzáadása
         from sqlalchemy import inspect, text
         inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        
+        # Először csak a régi táblákat hozzuk létre (ha még nincsenek)
+        # Az új táblákat (tickets, chat) manuálisan hozzuk létre
+        old_tables = ['users', 'tokens', 'notifications', 'server_admin_admins', 'servers', 'admin_servers']
+        tables_to_create = [t for t in old_tables if t not in existing_tables]
+        
+        if tables_to_create:
+            # Csak a régi táblák modelljeit használjuk
+            from app.database import User, Token, Notification, ServerAdminAdmin, Server, AdminServer
+            Base.metadata.create_all(bind=engine, tables=[
+                User.__table__,
+                Token.__table__,
+                Notification.__table__,
+                ServerAdminAdmin.__table__,
+                Server.__table__,
+                AdminServer.__table__
+            ])
+            print("✓ Régi táblák létrehozva")
+        else:
+            print("✓ Régi táblák már léteznek")
         
         # Users tábla ellenőrzése
         if 'users' in inspector.get_table_names():
@@ -126,8 +143,7 @@ def init_db():
                 print("✓ generated_by_id oszlop hozzáadva")
         
         # Új táblák létrehozása (tickets, chat stb.) - külön kezelés foreign key problémák miatt
-        from sqlalchemy import inspect, text
-        inspector = inspect(engine)
+        # Frissítjük a létező táblák listáját
         existing_tables = inspector.get_table_names()
         
         # Tickets tábla
@@ -135,18 +151,40 @@ def init_db():
             print("tickets tábla létrehozása...")
             try:
                 with engine.connect() as conn:
+                    # Először ellenőrizzük a users.id típusát
+                    users_columns = inspector.get_columns('users')
+                    users_id_type = None
+                    for col in users_columns:
+                        if col['name'] == 'id':
+                            users_id_type = col['type']
+                            break
+                    
+                    # Ha nem találtuk meg, használjuk az INT(11) UNSIGNED-t (MySQL alapértelmezés)
+                    if users_id_type is None:
+                        id_type = "INT(11) UNSIGNED"
+                    else:
+                        # Konvertáljuk a SQLAlchemy típust MySQL típusra
+                        id_type_str = str(users_id_type)
+                        if 'INT' in id_type_str.upper() or 'INTEGER' in id_type_str.upper():
+                            if 'UNSIGNED' in id_type_str.upper():
+                                id_type = "INT(11) UNSIGNED"
+                            else:
+                                id_type = "INT(11)"
+                        else:
+                            id_type = "INT(11)"
+                    
                     # Először a táblát foreign key nélkül
-                    conn.execute(text("""
+                    conn.execute(text(f"""
                         CREATE TABLE tickets (
-                            id INTEGER NOT NULL AUTO_INCREMENT,
-                            user_id INTEGER NOT NULL,
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            user_id {id_type} NOT NULL,
                             title VARCHAR(255) NOT NULL,
                             description TEXT NOT NULL,
                             status VARCHAR(20) NOT NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                             closed_at DATETIME NULL,
-                            closed_by_id INTEGER NULL,
+                            closed_by_id {id_type} NULL,
                             PRIMARY KEY (id),
                             INDEX ix_tickets_user_id (user_id),
                             INDEX ix_tickets_status (status),
@@ -205,11 +243,31 @@ def init_db():
             print("ticket_ratings tábla létrehozása...")
             try:
                 with engine.connect() as conn:
-                    conn.execute(text("""
+                    # Ugyanazt az id_type-ot használjuk
+                    users_columns = inspector.get_columns('users')
+                    users_id_type = None
+                    for col in users_columns:
+                        if col['name'] == 'id':
+                            users_id_type = col['type']
+                            break
+                    
+                    if users_id_type is None:
+                        id_type = "INT(11) UNSIGNED"
+                    else:
+                        id_type_str = str(users_id_type)
+                        if 'INT' in id_type_str.upper() or 'INTEGER' in id_type_str.upper():
+                            if 'UNSIGNED' in id_type_str.upper():
+                                id_type = "INT(11) UNSIGNED"
+                            else:
+                                id_type = "INT(11)"
+                        else:
+                            id_type = "INT(11)"
+                    
+                    conn.execute(text(f"""
                         CREATE TABLE ticket_ratings (
-                            id INTEGER NOT NULL AUTO_INCREMENT,
-                            ticket_id INTEGER NOT NULL,
-                            user_id INTEGER NOT NULL,
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            ticket_id {id_type} NOT NULL,
+                            user_id {id_type} NOT NULL,
                             rating INTEGER NOT NULL,
                             comment TEXT NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -254,11 +312,31 @@ def init_db():
             print("chat_messages tábla létrehozása...")
             try:
                 with engine.connect() as conn:
-                    conn.execute(text("""
+                    # Ugyanazt az id_type-ot használjuk
+                    users_columns = inspector.get_columns('users')
+                    users_id_type = None
+                    for col in users_columns:
+                        if col['name'] == 'id':
+                            users_id_type = col['type']
+                            break
+                    
+                    if users_id_type is None:
+                        id_type = "INT(11) UNSIGNED"
+                    else:
+                        id_type_str = str(users_id_type)
+                        if 'INT' in id_type_str.upper() or 'INTEGER' in id_type_str.upper():
+                            if 'UNSIGNED' in id_type_str.upper():
+                                id_type = "INT(11) UNSIGNED"
+                            else:
+                                id_type = "INT(11)"
+                        else:
+                            id_type = "INT(11)"
+                    
+                    conn.execute(text(f"""
                         CREATE TABLE chat_messages (
-                            id INTEGER NOT NULL AUTO_INCREMENT,
-                            room_id INTEGER NOT NULL,
-                            user_id INTEGER NOT NULL,
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            room_id {id_type} NOT NULL,
+                            user_id {id_type} NOT NULL,
                             message TEXT NOT NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                             PRIMARY KEY (id),
