@@ -107,20 +107,21 @@ document.querySelectorAll('.save-server-admins').forEach(btn => {
         try {
             const response = await fetch(`/admin/users/${userId}/server-admins`, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                redirect: 'follow'
             });
             
-            if (response.status === 302 || response.ok) {
+            if (response.ok || response.status === 302) {
                 // Redirect vagy success
-                if (response.redirected) {
-                    window.location.href = response.url;
-                } else {
-                    alert('Server admin kapcsolatok sikeresen frissítve!');
-                    location.reload();
-                }
+                alert('Server admin kapcsolatok sikeresen frissítve!');
+                location.reload();
             } else {
-                const error = await response.json().catch(() => ({ detail: 'Ismeretlen hiba' }));
-                alert('Hiba: ' + (error.detail || 'Ismeretlen hiba'));
+                try {
+                    const error = await response.json();
+                    alert('Hiba: ' + (error.detail || 'Ismeretlen hiba'));
+                } catch {
+                    alert('Hiba történt a frissítés során.');
+                }
             }
         } catch (error) {
             alert('Hiba: ' + error.message);
