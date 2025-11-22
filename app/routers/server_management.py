@@ -209,7 +209,7 @@ async def update_steamcmd(
             output_queue.put("[DONE]\n")
             if process_id in active_processes:
                 del active_processes[process_id]
-            if process_outputs[process_id]:
+            if process_id in process_outputs:
                 del process_outputs[process_id]
     
     # Folyamat indítása háttérben
