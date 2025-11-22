@@ -48,15 +48,44 @@ def init_db():
             indexes = [idx['name'] for idx in inspector.get_indexes('tokens')]
             
             # generated_by_id oszlop hozzáadása ha hiányzik
-            if 'generated_by_id' not in columns:
+            # Először ellenőrizzük, hogy van-e generated_by (régi név)
+            has_generated_by = 'generated_by' in columns
+            has_generated_by_id = 'generated_by_id' in columns
+            
+            if not has_generated_by_id:
                 print("generated_by_id oszlop hozzáadása a tokens táblához...")
                 with engine.connect() as conn:
-                    # Először az oszlop
-                    conn.execute(text("""
-                        ALTER TABLE tokens 
-                        ADD COLUMN generated_by_id INT(11) UNSIGNED NOT NULL
-                    """))
-                    conn.commit()
+                    # Ha van generated_by oszlop, átnevezzük generated_by_id-re
+                    if has_generated_by:
+                        print("  generated_by oszlop átnevezése generated_by_id-re...")
+                        conn.execute(text("""
+                            ALTER TABLE tokens 
+                            CHANGE COLUMN generated_by generated_by_id INT(11) UNSIGNED NOT NULL
+                        """))
+                        conn.commit()
+                    else:
+                        # Ha nincs egyik sem, hozzáadjuk
+                        # Először NULL-ként adjuk hozzá, hogy ne legyen probléma ha vannak régi rekordok
+                        conn.execute(text("""
+                            ALTER TABLE tokens 
+                            ADD COLUMN generated_by_id INT(11) UNSIGNED NULL
+                        """))
+                        conn.commit()
+                        
+                        # Kitöltjük a meglévő rekordokat (ha vannak) az első Manager Admin ID-jával
+                        conn.execute(text("""
+                            UPDATE tokens 
+                            SET generated_by_id = (SELECT id FROM users WHERE role = 'manager_admin' LIMIT 1)
+                            WHERE generated_by_id IS NULL
+                        """))
+                        conn.commit()
+                        
+                        # Most már NOT NULL-ra állíthatjuk
+                        conn.execute(text("""
+                            ALTER TABLE tokens 
+                            MODIFY COLUMN generated_by_id INT(11) UNSIGNED NOT NULL
+                        """))
+                        conn.commit()
                     
                     # Foreign key hozzáadása
                     try:
