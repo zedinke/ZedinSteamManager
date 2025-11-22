@@ -561,19 +561,35 @@ function closeExtensionRequestModal() {
 
 // Token Igénylés Modal (server_admin felhasználóknak)
 function showTokenRequestModal() {
-    const modal = document.getElementById('tokenRequestModal');
-    if (modal) {
+    try {
+        const modal = document.getElementById('tokenRequestModal');
+        if (!modal) {
+            console.error('Token request modal not found');
+            alert('Hiba: A modal nem található. Kérlek frissítsd az oldalt.');
+            return;
+        }
+        
         // Form reset
         const form = document.getElementById('tokenRequestForm');
         if (form) {
             form.reset();
-            document.getElementById('tokenRequestQuantity').value = 1;
-            document.getElementById('requestType').value = 'cart';
-            toggleRequestType();
+            const quantityInput = document.getElementById('tokenRequestQuantity');
+            const requestTypeSelect = document.getElementById('requestType');
+            
+            if (quantityInput) {
+                quantityInput.value = 1;
+            }
+            if (requestTypeSelect) {
+                requestTypeSelect.value = 'cart';
+                toggleRequestType();
+            }
         }
+        
+        // Modal megjelenítése
         modal.style.display = 'block';
-    } else {
-        alert('A token generálásért kérjük lépj kapcsolatba a Manager Adminisztrátorral.');
+    } catch (error) {
+        console.error('Error showing token request modal:', error);
+        alert('Hiba történt a modal megnyitásakor. Kérlek próbáld újra.');
     }
 }
 
@@ -658,6 +674,34 @@ window.onclick = function(event) {
         closeTokenRequestModal();
     }
 }
+
+// Event listeners hozzáadása DOMContentLoaded után
+document.addEventListener('DOMContentLoaded', function() {
+    // Token igénylés gombok event listener hozzáadása (fallback)
+    const tokenRequestButtons = document.querySelectorAll('button[onclick*="showTokenRequestModal"], a[onclick*="showTokenRequestModal"]');
+    tokenRequestButtons.forEach(element => {
+        element.addEventListener('click', function(e) {
+            // Csak akkor fut le, ha az onclick nem működött
+            if (!window.showTokenRequestModal) {
+                console.error('showTokenRequestModal function not found');
+                return;
+            }
+            // Az onclick már lefut, de biztosítjuk, hogy működjön
+            try {
+                showTokenRequestModal();
+            } catch (error) {
+                console.error('Error calling showTokenRequestModal:', error);
+            }
+        });
+    });
+    
+    // Debug: ellenőrizzük, hogy a függvény elérhető-e
+    if (typeof showTokenRequestModal === 'undefined') {
+        console.error('showTokenRequestModal function is not defined!');
+    } else {
+        console.log('showTokenRequestModal function is available');
+    }
+});
 </script>
 
 <!-- Token Hosszabbítási Kérés Modal -->

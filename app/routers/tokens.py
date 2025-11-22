@@ -303,6 +303,126 @@ async def process_token_request(
     
     raise HTTPException(status_code=400, detail="Érvénytelen művelet")
 
+@router.get("/tokens/extension-requests", response_class=HTMLResponse)
+async def list_extension_requests(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Token hosszabbítási kérelmek listázása (Manager Admin)"""
+    current_user = require_manager_admin(request, db)
+    
+    # Összes pending token hosszabbítási kérés lekérése
+    extension_requests = db.query(TokenExtensionRequest).join(
+        User, TokenExtensionRequest.user_id == User.id
+    ).join(
+        Token, TokenExtensionRequest.token_id == Token.id
+    ).filter(
+        TokenExtensionRequest.status == "pending"
+    ).order_by(TokenExtensionRequest.created_at.desc()).all()
+    
+    # Új lejárat számítása minden kéréshez
+    for req in extension_requests:
+        if req.token.expires_at:
+            req.new_expires_at = req.token.expires_at + timedelta(days=req.requested_days)
+        else:
+            req.new_expires_at = datetime.now() + timedelta(days=req.requested_days)
+    
+    from app.main import get_templates
+    templates = get_templates()
+    return templates.TemplateResponse(
+        "tokens/extension_requests.html",
+        {"request": request, "extension_requests": extension_requests}
+    )
+
+@router.post("/tokens/extension-requests/{request_id}/process")
+async def process_extension_request(
+    request: Request,
+    request_id: int,
+    action: str = Form(...),  # "approve" vagy "reject"
+    notes: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Manager Admin: Token hosszabbítási kérés feldolgozása"""
+    current_user = require_manager_admin(request, db)
+    
+    extension_request = db.query(TokenExtensionRequest).filter(
+        TokenExtensionRequest.id == request_id
+    ).first()
+    
+    if not extension_request:
+        raise HTTPException(status_code=404, detail="Hosszabbítási kérés nem található")
+    
+    if action == "approve":
+        # Token hosszabbítás
+        token = db.query(Token).filter(Token.id == extension_request.token_id).first()
+        if not token:
+            raise HTTPException(status_code=404, detail="Token nem található")
+        
+        if token.expires_at and token.expires_at > datetime.now():
+            new_expires_at = token.expires_at + timedelta(days=extension_request.requested_days)
+        else:
+            new_expires_at = datetime.now() + timedelta(days=extension_request.requested_days)
+        
+        token.expires_at = new_expires_at
+        
+        # Ha a token használatban van szerverrel, akkor frissítsük a szerver token_expires_at mezőjét is
+        from app.database import ServerInstance
+        servers = db.query(ServerInstance).filter(
+            ServerInstance.token_used_id == token.id
+        ).all()
+        
+        for server in servers:
+            server.token_expires_at = new_expires_at
+            server.scheduled_deletion_date = new_expires_at + timedelta(days=30)
+        
+        # Hosszabbítási kérés státusz frissítése
+        extension_request.status = "approved"
+        extension_request.processed_at = datetime.now()
+        extension_request.processed_by_id = current_user.id
+        
+        db.commit()
+        
+        # Értesítés küldése
+        create_notification(
+            db,
+            extension_request.user_id,
+            "token_extension_approved",
+            "Token hosszabbítás jóváhagyva",
+            f"A token hosszabbítási kérelmed jóváhagyásra került.\n\nHosszabbítás: {extension_request.requested_days} nap\nÚj lejárat: {new_expires_at.strftime('%Y-%m-%d %H:%M')}"
+        )
+        
+        return RedirectResponse(
+            url="/tokens/extension-requests?success=Hosszabbítási+kérés+jóváhagyva+és+feldolgozva",
+            status_code=302
+        )
+    
+    elif action == "reject":
+        # Hosszabbítási kérés elutasítása
+        extension_request.status = "rejected"
+        extension_request.processed_at = datetime.now()
+        extension_request.processed_by_id = current_user.id
+        db.commit()
+        
+        # Értesítés küldése
+        rejection_message = "A token hosszabbítási kérelmed elutasításra került."
+        if notes:
+            rejection_message += f"\n\nMegjegyzés: {notes}"
+        
+        create_notification(
+            db,
+            extension_request.user_id,
+            "token_extension_rejected",
+            "Token hosszabbítás elutasítva",
+            rejection_message
+        )
+        
+        return RedirectResponse(
+            url="/tokens/extension-requests?success=Hosszabbítási+kérés+elutasítva",
+            status_code=302
+        )
+    
+    raise HTTPException(status_code=400, detail="Érvénytelen művelet")
+
 
 @router.post("/tokens/delete")
 async def delete_token(

@@ -6,25 +6,36 @@
 <div class="page">
     <div class="page-header">
         <h2><i class="fas fa-clock"></i> Token Hosszabbítási Kérelmek</h2>
-        <p>Manager Admin - pending kérelmek kezelése</p>
+        <p>Manager Adminisztrátor jóváhagyásra váró token hosszabbítási kérelmek</p>
     </div>
     
     {% if request.query_params.get("success") %}
-        <div class="alert alert-success">{{ request.query_params.get("success") }}</div>
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
     {% endif %}
     
-    <div class="card">
-        <div class="card-body">
-            {% if extension_requests %}
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    {% if extension_requests %}
+        <div class="card">
+            <div class="card-header">
+                <h3>Jóváhagyásra váró hosszabbítási kérelmek</h3>
+            </div>
+            <div class="card-body">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Felhasználó</th>
                             <th>Token</th>
                             <th>Jelenlegi lejárat</th>
-                            <th>Kért napok</th>
+                            <th>Kért hosszabbítás</th>
                             <th>Új lejárat</th>
-                            <th>Kérés dátuma</th>
+                            <th>Igénylés dátuma</th>
                             <th>Megjegyzés</th>
                             <th>Műveletek</th>
                         </tr>
@@ -33,36 +44,35 @@
                         {% for req in extension_requests %}
                             <tr>
                                 <td>
-                                    {% if req.user %}
-                                        {{ req.user.username }}<br>
-                                        <small class="text-muted">{{ req.user.email }}</small>
-                                    {% else %}
-                                        <span class="text-muted">Nincs</span>
-                                    {% endif %}
+                                    <strong>{{ req.user.username }}</strong><br>
+                                    <small>{{ req.user.email }}</small>
                                 </td>
                                 <td>
-                                    {% if req.token %}
-                                        <code>{{ req.token.token[:20] }}...</code>
-                                    {% else %}
-                                        <span class="text-muted">Nincs</span>
-                                    {% endif %}
+                                    <code>{{ req.token.token[:20] }}...</code><br>
+                                    <small>
+                                        {% if req.token.token_type.value == "server_admin" %}
+                                            <span class="badge badge-info">Szerver Admin</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">Felhasználó</span>
+                                        {% endif %}
+                                    </small>
                                 </td>
                                 <td>
-                                    {% if req.token and req.token.expires_at %}
+                                    {% if req.token.expires_at %}
                                         {{ req.token.expires_at.strftime("%Y-%m-%d %H:%M") }}
                                     {% else %}
-                                        <span class="text-muted">-</span>
+                                        <span class="text-muted">Nincs lejárat</span>
                                     {% endif %}
                                 </td>
-                                <td><strong>{{ req.requested_days }} nap</strong></td>
+                                <td><strong>{{ req.requested_days }}</strong> nap</td>
                                 <td>
-                                    {% if req.new_expiry %}
-                                        {{ req.new_expiry.strftime("%Y-%m-%d %H:%M") }}
+                                    {% if req.new_expires_at %}
+                                        <strong>{{ req.new_expires_at.strftime("%Y-%m-%d %H:%M") }}</strong>
                                     {% else %}
-                                        <span class="text-muted">-</span>
+                                        <span class="text-muted">Számítandó</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ req.created_at.strftime("%Y-%m-%d %H:%M") if req.created_at else "-" }}</td>
+                                <td>{{ req.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
                                 <td>
                                     {% if req.notes %}
                                         <small>{{ req.notes[:50] }}{% if req.notes|length > 50 %}...{% endif %}</small>
@@ -71,13 +81,14 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                        <form method="POST" action="/tokens/extension-requests/{{ req.id }}/approve" style="display: inline;">
-                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Biztosan jóváhagyod ezt a kérelmet?');">
+                                    <div style="display: flex; gap: 5px;">
+                                        <form method="POST" action="/tokens/extension-requests/{{ req.id }}/process" style="display: inline;">
+                                            <input type="hidden" name="action" value="approve">
+                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Biztosan jóváhagyod ezt a hosszabbítási kérelmet?')">
                                                 <i class="fas fa-check"></i> Jóváhagyás
                                             </button>
                                         </form>
-                                        <button class="btn btn-danger btn-sm" onclick="showRejectModal({{ req.id }})">
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="showRejectExtensionModal({{ req.id }})">
                                             <i class="fas fa-times"></i> Elutasítás
                                         </button>
                                     </div>
@@ -86,27 +97,33 @@
                         {% endfor %}
                     </tbody>
                 </table>
-            {% else %}
-                <p>Nincsenek pending hosszabbítási kérelmek.</p>
-            {% endif %}
+            </div>
         </div>
-    </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted">Nincsenek jóváhagyásra váró token hosszabbítási kérelmek.</p>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
 <!-- Elutasítás Modal -->
-<div id="rejectModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+<div id="rejectExtensionModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
     <div class="modal-content" style="background-color: white; margin: 15% auto; padding: 20px; border-radius: 10px; width: 500px; max-width: 90%;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3><i class="fas fa-times"></i> Kérés Elutasítása</h3>
-            <button onclick="closeRejectModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            <h3><i class="fas fa-times-circle"></i> Hosszabbítási Kérelem Elutasítása</h3>
+            <button onclick="closeRejectExtensionModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
         </div>
-        <form method="POST" action="" id="rejectForm">
+        <form method="POST" action="/tokens/extension-requests/0/process" id="rejectExtensionForm">
+            <input type="hidden" name="action" value="reject">
+            <input type="hidden" name="request_id" id="rejectExtensionRequestId">
             <div style="margin-bottom: 15px;">
-                <label for="rejectNotes" style="display: block; margin-bottom: 5px; font-weight: bold;">Megjegyzés (opcionális):</label>
-                <textarea id="rejectNotes" name="notes" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; resize: vertical;"></textarea>
+                <label for="rejectExtensionNotes" style="display: block; margin-bottom: 5px; font-weight: bold;">Megjegyzés (opcionális):</label>
+                <textarea id="rejectExtensionNotes" name="notes" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; resize: vertical;"></textarea>
             </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button type="button" onclick="closeRejectModal()" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Mégse</button>
+                <button type="button" onclick="closeRejectExtensionModal()" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Mégse</button>
                 <button type="submit" class="btn btn-danger" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">
                     <i class="fas fa-times"></i> Elutasítás
                 </button>
@@ -114,24 +131,28 @@
         </form>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
 <script>
-function showRejectModal(requestId) {
-    document.getElementById('rejectForm').action = `/tokens/extension-requests/${requestId}/reject`;
-    document.getElementById('rejectModal').style.display = 'block';
+function showRejectExtensionModal(requestId) {
+    document.getElementById('rejectExtensionRequestId').value = requestId;
+    const form = document.getElementById('rejectExtensionForm');
+    form.action = `/tokens/extension-requests/${requestId}/process`;
+    document.getElementById('rejectExtensionModal').style.display = 'block';
 }
 
-function closeRejectModal() {
-    document.getElementById('rejectModal').style.display = 'none';
+function closeRejectExtensionModal() {
+    document.getElementById('rejectExtensionModal').style.display = 'none';
+    document.getElementById('rejectExtensionNotes').value = '';
 }
 
 // Modal bezárása kattintásra a háttérre
 window.onclick = function(event) {
-    const modal = document.getElementById('rejectModal');
+    const modal = document.getElementById('rejectExtensionModal');
     if (event.target == modal) {
-        closeRejectModal();
+        closeRejectExtensionModal();
     }
 }
 </script>
 {% endblock %}
-
