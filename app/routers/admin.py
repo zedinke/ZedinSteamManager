@@ -39,7 +39,11 @@ async def list_admins(
         ).order_by(User.created_at.desc()).all()
     else:
         # Server Admin: csak az általa létrehozott adminokat
-        admins = db.query(User).join(ServerAdminAdmin).filter(
+        # Explicit onclause megadása, mert több foreign key van
+        admins = db.query(User).join(
+            ServerAdminAdmin, 
+            ServerAdminAdmin.admin_id == User.id
+        ).filter(
             ServerAdminAdmin.server_admin_id == current_user.id,
             User.role == "admin"
         ).order_by(User.created_at.desc()).all()
@@ -166,7 +170,11 @@ async def delete_admin(
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
     # Ellenőrzés: csak az általa létrehozott adminokat törölheti
-    admin = db.query(User).join(ServerAdminAdmin).filter(
+    # Explicit onclause megadása, mert több foreign key van
+    admin = db.query(User).join(
+        ServerAdminAdmin,
+        ServerAdminAdmin.admin_id == User.id
+    ).filter(
         ServerAdminAdmin.server_admin_id == current_user.id,
         ServerAdminAdmin.admin_id == admin_id,
         User.role == "admin"
