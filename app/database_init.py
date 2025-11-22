@@ -403,6 +403,97 @@ def init_db():
         elif 'chat_rooms' not in existing_tables:
             print("  Figyelmeztetés: chat_messages tábla nem hozható létre, mert a chat_rooms tábla nem létezik")
         
+        # Games tábla
+        if 'games' not in existing_tables:
+            print("games tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text(f"""
+                        CREATE TABLE games (
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            name VARCHAR(100) NOT NULL,
+                            steam_app_id VARCHAR(50) NULL,
+                            description TEXT NULL,
+                            is_active TINYINT(1) NOT NULL DEFAULT 1,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            UNIQUE KEY uq_games_name (name),
+                            INDEX ix_games_steam_app_id (steam_app_id),
+                            INDEX ix_games_is_active (is_active)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ games tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: games tábla: {e}")
+        
+        # Server instances tábla
+        if 'server_instances' not in existing_tables:
+            print("server_instances tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    # Ellenőrizzük a games.id típusát
+                    games_id_type = id_type
+                    if 'games' in inspector.get_table_names():
+                        result = conn.execute(text("""
+                            SELECT COLUMN_TYPE 
+                            FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                            AND TABLE_NAME = 'games' 
+                            AND COLUMN_NAME = 'id'
+                        """))
+                        row = result.fetchone()
+                        if row:
+                            games_id_type = row[0]
+                    
+                    # Ellenőrizzük a tokens.id típusát
+                    tokens_id_type = id_type
+                    if 'tokens' in inspector.get_table_names():
+                        result = conn.execute(text("""
+                            SELECT COLUMN_TYPE 
+                            FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                            AND TABLE_NAME = 'tokens' 
+                            AND COLUMN_NAME = 'id'
+                        """))
+                        row = result.fetchone()
+                        if row:
+                            tokens_id_type = row[0]
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE server_instances (
+                            id {id_type} NOT NULL AUTO_INCREMENT,
+                            game_id {games_id_type} NOT NULL,
+                            server_admin_id {id_type} NOT NULL,
+                            name VARCHAR(100) NOT NULL,
+                            port INT NULL,
+                            status VARCHAR(20) NOT NULL DEFAULT 'stopped',
+                            config JSON NULL,
+                            token_used_id {tokens_id_type} NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            started_at DATETIME NULL,
+                            stopped_at DATETIME NULL,
+                            PRIMARY KEY (id),
+                            INDEX ix_server_instances_game_id (game_id),
+                            INDEX ix_server_instances_server_admin_id (server_admin_id),
+                            INDEX ix_server_instances_status (status),
+                            INDEX ix_server_instances_token_used_id (token_used_id),
+                            INDEX ix_server_instances_created_at (created_at),
+                            CONSTRAINT fk_server_instances_game_id
+                                FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_server_instances_server_admin_id
+                                FOREIGN KEY (server_admin_id) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_server_instances_token_used_id
+                                FOREIGN KEY (token_used_id) REFERENCES tokens(id) ON DELETE SET NULL
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ server_instances tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: server_instances tábla: {e}")
+        
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
         raise
