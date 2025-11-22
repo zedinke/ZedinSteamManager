@@ -72,8 +72,8 @@ async def install_ark_server_files(
 @NoPromptForPassword 1
 force_install_dir {install_path.absolute()}
 login anonymous
-app_update {app_id} validate
-quit
++app_update {app_id} validate
++quit
 """
     
     log_lines = []
