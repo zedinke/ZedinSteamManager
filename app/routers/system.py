@@ -6,16 +6,30 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
-import psutil
 import platform
 import subprocess
 import time
+
+# Opcionális psutil import
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("[WARNING] psutil nincs telepítve. System monitoring nem lesz elérhető.")
+    print("[WARNING] Telepítés: pip install psutil>=5.9.0")
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
 @router.get("/stats")
 async def get_system_stats(request: Request, db: Session = get_db()):
     """Szerver kihasználtság lekérése"""
+    if not PSUTIL_AVAILABLE:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "psutil nincs telepítve. Telepítés: pip install psutil>=5.9.0"}
+        )
+    
     try:
         # CPU kihasználtság
         cpu_percent = psutil.cpu_percent(interval=0.1)
