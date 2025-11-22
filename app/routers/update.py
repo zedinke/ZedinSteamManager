@@ -14,8 +14,19 @@ import json
 
 router = APIRouter(prefix="/admin/update", tags=["update"])
 
+def require_manager_admin(request: Request, db: Session = Depends(get_db)) -> User:
+    """Manager Admin jogosultság ellenőrzése"""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=302, detail="Nincs bejelentkezve")
+    
+    current_user = db.query(User).filter(User.id == user_id).first()
+    if not current_user or current_user.role.value != "manager_admin":
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod")
+    return current_user
+
 @router.get("", response_class=HTMLResponse)
-async def update_page(request: Request, db: Session = get_db()):
+async def update_page(request: Request, db: Session = Depends(get_db)):
     """Update oldal megjelenítése"""
     # Manager Admin ellenőrzés
     user_id = request.session.get("user_id")
@@ -23,37 +34,35 @@ async def update_page(request: Request, db: Session = get_db()):
         return RedirectResponse(url="/login", status_code=302)
     
     try:
-        await require_manager_admin(request, db)
+        require_manager_admin(request, db)
     except HTTPException:
         return RedirectResponse(url="/dashboard", status_code=302)
     
-    from jinja2 import Template
-    
-    template_path = Path(__file__).parent.parent.parent / "templates" / "admin" / "update.html"
-    with open(template_path, "r", encoding="utf-8") as f:
-        template = Template(f.read())
+    from app.main import get_templates
+    templates = get_templates()
     
     # Git információk lekérése
     project_dir = Path(__file__).parent.parent.parent
     git_info = get_git_info(project_dir)
     
-    return HTMLResponse(content=template.render(
-        request=request,
-        git_info=git_info,
-        is_updating=is_update_in_progress()
-    ))
+    return templates.TemplateResponse(
+        "admin/update.html",
+        {
+            "request": request,
+            "git_info": git_info,
+            "is_updating": is_update_in_progress()
+        }
+    )
 
 @router.post("/check")
-async def check_update(request: Request, db: Session = get_db()):
+async def check_update(request: Request, db: Session = Depends(get_db)):
     """Git update ellenőrzése"""
     # Manager Admin ellenőrzés
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Nincs bejelentkezve")
-    
     try:
-        await require_manager_admin(request, db)
-    except HTTPException:
+        require_manager_admin(request, db)
+    except HTTPException as e:
+        if e.status_code == 302:
+            raise HTTPException(status_code=401, detail="Nincs bejelentkezve")
         raise HTTPException(status_code=403, detail="Nincs jogosultság")
     
     project_dir = Path(__file__).parent.parent.parent
@@ -92,16 +101,14 @@ async def check_update(request: Request, db: Session = get_db()):
         )
 
 @router.post("/execute")
-async def execute_update(request: Request, db: Session = get_db()):
+async def execute_update(request: Request, db: Session = Depends(get_db)):
     """Update végrehajtása"""
     # Manager Admin ellenőrzés
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Nincs bejelentkezve")
-    
     try:
-        await require_manager_admin(request, db)
-    except HTTPException:
+        require_manager_admin(request, db)
+    except HTTPException as e:
+        if e.status_code == 302:
+            raise HTTPException(status_code=401, detail="Nincs bejelentkezve")
         raise HTTPException(status_code=403, detail="Nincs jogosultság")
     
     # Update már folyamatban van?
