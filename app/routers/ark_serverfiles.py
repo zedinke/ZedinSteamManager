@@ -239,24 +239,33 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
             progress_callback
         )
         
-        # Státusz és log frissítése
-        serverfiles.installation_status = "completed" if success else "failed"
-        serverfiles.installation_log = log
+        # Státusz és log frissítése - új session használata a hosszú folyamat után
+        db.close()
+        db = next(get_db())
         
-        # Ha sikeres és nincs aktív verzió, akkor aktiváljuk
-        if success:
-            existing_active = db.query(ClusterServerFiles).filter(
-                and_(
-                    ClusterServerFiles.cluster_id == serverfiles.cluster_id,
-                    ClusterServerFiles.is_active == True,
-                    ClusterServerFiles.id != serverfiles.id
-                )
-            ).first()
+        # Újra lekérdezzük a rekordot
+        serverfiles = db.query(ClusterServerFiles).filter(
+            ClusterServerFiles.id == serverfiles_id
+        ).first()
+        
+        if serverfiles:
+            serverfiles.installation_status = "completed" if success else "failed"
+            serverfiles.installation_log = log
             
-            if not existing_active:
-                serverfiles.is_active = True
-        
-        db.commit()
+            # Ha sikeres és nincs aktív verzió, akkor aktiváljuk
+            if success:
+                existing_active = db.query(ClusterServerFiles).filter(
+                    and_(
+                        ClusterServerFiles.cluster_id == serverfiles.cluster_id,
+                        ClusterServerFiles.is_active == True,
+                        ClusterServerFiles.id != serverfiles.id
+                    )
+                ).first()
+                
+                if not existing_active:
+                    serverfiles.is_active = True
+            
+            db.commit()
         
         # Végleges üzenet
         await websocket.send_json({

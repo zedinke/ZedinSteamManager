@@ -64,17 +64,12 @@ async def install_ark_server_files(
     app_id = "2430930"
     
     # SteamCMD script
-    # Ha version == "latest", akkor nincs beta paraméter
-    if version.lower() == "latest":
-        steamcmd_script = f"""
-force_install_dir {install_path.absolute()}
-login anonymous
-app_update {app_id} validate
-quit
-"""
-    else:
-        # Ha konkrét verzió, akkor beta paraméterrel (ha szükséges)
-        steamcmd_script = f"""
+    # Ark Survival Ascended szerverfájlok telepítése
+    # Megjegyzés: Az Ark Survival Ascended szerverfájlok telepítéséhez
+    # először létre kell hozni a könyvtárat és a szükséges fájlokat
+    steamcmd_script = f"""
+@ShutdownOnFailedCommand 1
+@NoPromptForPassword 1
 force_install_dir {install_path.absolute()}
 login anonymous
 app_update {app_id} validate
