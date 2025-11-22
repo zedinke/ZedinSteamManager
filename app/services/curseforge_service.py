@@ -87,18 +87,24 @@ async def search_curseforge_web(query: str, limit: int = 20) -> List[Dict]:
     """
     try:
         # CurseForge web scraping
-        # Megjegyzés: Ez lehet, hogy nem működik jól, mert a CurseForge dinamikus
-        # Jobb lenne egy API-t használni
+        # Megjegyzés: A CurseForge dinamikus, ezért nehézkes lehet
+        # Alternatíva: Steam Workshop API használata
         
-        # Most egy mock adatot adunk vissza, amit később lehet cserélni valódi API-ra
-        # Vagy web scraping-re
+        # Most egy egyszerűbb megoldás: 
+        # A felhasználó manuálisan adja meg a mod ID-t és nevet
+        # A keresés csak egy placeholder, a valódi keresés később implementálható
         
-        # Alternatíva: használjuk a CurseForge API-t, ha van API key
-        # Vagy egy másik mod kereső API-t
+        # Ha a query egy szám, akkor lehet, hogy mod ID
+        if query.strip().isdigit():
+            return [{
+                "id": query.strip(),
+                "name": f"Mod {query.strip()}",
+                "icon_url": None,
+                "url": f"https://steamcommunity.com/sharedfiles/filedetails/?id={query.strip()}",
+                "description": "Add meg a mod nevét és ikonját manuálisan"
+            }]
         
-        # Most egy egyszerűbb megoldás: a felhasználó manuálisan adja meg a mod ID-t
-        # és a rendszer lekéri az adatokat
-        
+        # Egyébként üres lista (manuális hozzáadás ajánlott)
         return []
         
     except Exception as e:
