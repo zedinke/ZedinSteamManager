@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}SteamCMD Kezelés{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1><i class="fas fa-download"></i> SteamCMD Kezelés</h1>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>SteamCMD Állapot</h2>
+        </div>
+        <div class="card-body">
+            {% if is_installed %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> SteamCMD telepítve van
+                </div>
+                <p><strong>Telepítési útvonal:</strong> {{ steamcmd_path }}</p>
+                {% if steamcmd_version %}
+                    <p><strong>Verzió:</strong> {{ steamcmd_version }}</p>
+                {% endif %}
+            {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> SteamCMD nincs telepítve
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2>Műveletek</h2>
+        </div>
+        <div class="card-body">
+            {% if not is_installed %}
+                <button id="installBtn" class="btn btn-primary" onclick="installSteamCMD()">
+                    <i class="fas fa-download"></i> SteamCMD Telepítése
+                </button>
+            {% else %}
+                <button id="updateBtn" class="btn btn-success" onclick="updateSteamCMD()">
+                    <i class="fas fa-sync-alt"></i> SteamCMD Frissítése
+                </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card mt-4" id="terminalCard" style="display: none;">
+        <div class="card-header">
+            <h2>Terminál Kimenet</h2>
+        </div>
+        <div class="card-body">
+            <div id="terminal" class="terminal-output"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.terminal-output {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 15px;
+    border-radius: 5px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    max-height: 500px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.terminal-output::-webkit-scrollbar {
+    width: 10px;
+}
+
+.terminal-output::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.terminal-output::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 5px;
+}
+
+.terminal-output::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+</style>
+
+<script>
+let ws = null;
+let processId = null;
+
+function installSteamCMD() {
+    if (!confirm('Biztosan telepíteni szeretnéd a SteamCMD-t?')) {
+        return;
+    }
+    
+    document.getElementById('installBtn').disabled = true;
+    document.getElementById('terminalCard').style.display = 'block';
+    document.getElementById('terminal').innerHTML = '';
+    
+    fetch('/admin/server/steamcmd/install', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            processId = data.process_id;
+            connectWebSocket(processId);
+        } else {
+            alert('Hiba: ' + data.message);
+            document.getElementById('installBtn').disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hiba történt a telepítés során');
+        document.getElementById('installBtn').disabled = false;
+    });
+}
+
+function updateSteamCMD() {
+    if (!confirm('Biztosan frissíteni szeretnéd a SteamCMD-t?')) {
+        return;
+    }
+    
+    document.getElementById('updateBtn').disabled = true;
+    document.getElementById('terminalCard').style.display = 'block';
+    document.getElementById('terminal').innerHTML = '';
+    
+    fetch('/admin/server/steamcmd/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            processId = data.process_id;
+            connectWebSocket(processId);
+        } else {
+            alert('Hiba: ' + data.message);
+            document.getElementById('updateBtn').disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Hiba történt a frissítés során');
+        document.getElementById('updateBtn').disabled = false;
+    });
+}
+
+function connectWebSocket(procId) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/admin/server/steamcmd/output/${procId}`;
+    
+    ws = new WebSocket(wsUrl);
+    const terminal = document.getElementById('terminal');
+    
+    ws.onopen = function() {
+        terminal.innerHTML += '[INFO] Kapcsolat létrejött\n';
+        terminal.scrollTop = terminal.scrollHeight;
+    };
+    
+    ws.onmessage = function(event) {
+        if (event.data) {
+            terminal.innerHTML += event.data;
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            // Ha vége, újratöltjük az oldalt
+            if (event.data.includes('[DONE]')) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        }
+    };
+    
+    ws.onerror = function(error) {
+        terminal.innerHTML += '[ERROR] WebSocket hiba: ' + error + '\n';
+        terminal.scrollTop = terminal.scrollHeight;
+    };
+    
+    ws.onclose = function() {
+        terminal.innerHTML += '[INFO] Kapcsolat bezárva\n';
+        terminal.scrollTop = terminal.scrollHeight;
+    };
+}
+
+// Oldal bezárásakor WebSocket bezárása
+window.addEventListener('beforeunload', function() {
+    if (ws) {
+        ws.close();
+    }
+});
+</script>
+{% endblock %}
+
