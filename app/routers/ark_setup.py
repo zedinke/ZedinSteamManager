@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from app.database import get_db, User, Game
-from app.dependencies import require_manager_admin
+from app.routers.admin import require_manager_admin
 
 router = APIRouter(prefix="/admin/ark", tags=["ark_setup"])
 
