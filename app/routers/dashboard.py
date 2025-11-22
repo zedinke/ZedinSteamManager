@@ -7,7 +7,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db, User, Token, Server, ServerAdminAdmin
-from app.dependencies import require_login
 
 router = APIRouter()
 

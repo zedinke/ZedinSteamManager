@@ -10,7 +10,6 @@ from app.database import (
     get_db, User, ServerAdminAdmin, Server, AdminServer,
     UserRole
 )
-from app.dependencies import require_login
 from app.services.auth_service import create_user
 from app.services.email_service import send_verification_email
 from app.database import Token, User

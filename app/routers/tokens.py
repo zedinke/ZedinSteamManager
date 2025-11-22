@@ -5,9 +5,7 @@ Token router
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from app.database import get_db, User, TokenType
-from app.dependencies import require_login
-from app.database import UserRole
+from app.database import get_db, User, TokenType, UserRole
 from app.services.token_service import generate_token, activate_token, send_token_to_user
 from app.services.notification_service import create_notification
 from app.database import Token, User

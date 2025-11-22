@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.database import get_db, User
-from app.dependencies import require_login
 from app.services.notification_service import (
     get_user_notifications,
     get_unread_count,

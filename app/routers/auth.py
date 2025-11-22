@@ -16,11 +16,8 @@ from app.services.auth_service import (
 )
 from app.services.email_service import send_verification_email
 from app.config import settings
-from app.dependencies import require_login
-from sqlalchemy.orm import Session
-from app.database import get_db
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
