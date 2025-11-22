@@ -104,7 +104,7 @@ async def change_password(
         return RedirectResponse(url="/login", status_code=302)
     
     # Jelenlegi jelszó ellenőrzése
-    if not verify_password(current_password, current_user.password):
+    if not verify_password(current_password, current_user.password_hash):
         request.session["error"] = "Hibás jelenlegi jelszó!"
         return RedirectResponse(url="/settings/password", status_code=302)
     
@@ -118,7 +118,7 @@ async def change_password(
         return RedirectResponse(url="/settings/password", status_code=302)
     
     # Jelszó frissítése
-    current_user.password = get_password_hash(new_password)
+    current_user.password_hash = get_password_hash(new_password)
     db.commit()
     
     request.session["success"] = "Jelszó sikeresen megváltoztatva!"
