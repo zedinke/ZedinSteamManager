@@ -248,28 +248,44 @@ def init_db():
         if 'tickets' in existing_tables and 'ticket_messages' not in existing_tables:
             print("ticket_messages tábla létrehozása...")
             try:
+                # Először ellenőrizzük a tickets.id típusát
                 with engine.connect() as conn:
-                    conn.execute(text(f"""
-                        CREATE TABLE ticket_messages (
-                            id {id_type} NOT NULL AUTO_INCREMENT,
-                            ticket_id {id_type} NOT NULL,
-                            user_id {id_type} NOT NULL,
-                            message TEXT NOT NULL,
-                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            PRIMARY KEY (id),
-                            INDEX ix_ticket_messages_ticket_id (ticket_id),
-                            INDEX ix_ticket_messages_user_id (user_id),
-                            INDEX ix_ticket_messages_created_at (created_at),
-                            CONSTRAINT fk_ticket_messages_ticket_id
-                                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
-                            CONSTRAINT fk_ticket_messages_user_id
-                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'tickets' 
+                        AND COLUMN_NAME = 'id'
                     """))
-                    conn.commit()
-                print("✓ ticket_messages tábla létrehozva")
+                    row = result.fetchone()
+                    if row:
+                        tickets_id_type = row[0]
+                        # Használjuk a tickets.id típusát a ticket_id oszlophoz
+                        conn.execute(text(f"""
+                            CREATE TABLE ticket_messages (
+                                id {id_type} NOT NULL AUTO_INCREMENT,
+                                ticket_id {tickets_id_type} NOT NULL,
+                                user_id {id_type} NOT NULL,
+                                message TEXT NOT NULL,
+                                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                                PRIMARY KEY (id),
+                                INDEX ix_ticket_messages_ticket_id (ticket_id),
+                                INDEX ix_ticket_messages_user_id (user_id),
+                                INDEX ix_ticket_messages_created_at (created_at),
+                                CONSTRAINT fk_ticket_messages_ticket_id
+                                    FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE,
+                                CONSTRAINT fk_ticket_messages_user_id
+                                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                        """))
+                        conn.commit()
+                        print("✓ ticket_messages tábla létrehozva")
+                    else:
+                        print("  ✗ Hiba: tickets.id oszlop nem található")
             except Exception as e:
                 print(f"  Figyelmeztetés: ticket_messages tábla: {e}")
+                import traceback
+                traceback.print_exc()
         elif 'tickets' not in existing_tables:
             print("  Figyelmeztetés: ticket_messages tábla nem hozható létre, mert a tickets tábla nem létezik")
         
@@ -277,11 +293,12 @@ def init_db():
         if 'tickets' in existing_tables and 'ticket_ratings' not in existing_tables:
             print("ticket_ratings tábla létrehozása...")
             try:
+                tickets_id_type = get_tickets_id_type()
                 with engine.connect() as conn:
                     conn.execute(text(f"""
                         CREATE TABLE ticket_ratings (
                             id {id_type} NOT NULL AUTO_INCREMENT,
-                            ticket_id {id_type} NOT NULL,
+                            ticket_id {tickets_id_type} NOT NULL,
                             user_id {id_type} NOT NULL,
                             rating INTEGER NOT NULL,
                             comment TEXT NULL,
@@ -299,6 +316,8 @@ def init_db():
                 print("✓ ticket_ratings tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: ticket_ratings tábla: {e}")
+                import traceback
+                traceback.print_exc()
         elif 'tickets' not in existing_tables:
             print("  Figyelmeztetés: ticket_ratings tábla nem hozható létre, mert a tickets tábla nem létezik")
         
@@ -327,15 +346,35 @@ def init_db():
         # Frissítjük a létező táblák listáját
         existing_tables = inspector.get_table_names()
         
+        # Helper függvény a chat_rooms.id típusának lekéréséhez
+        def get_chat_rooms_id_type():
+            """Lekéri a chat_rooms.id oszlop típusát"""
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'chat_rooms' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    if row:
+                        return row[0]
+            except:
+                pass
+            return id_type  # Fallback
+        
         # Chat messages tábla - csak akkor hozzuk létre, ha a chat_rooms tábla létezik
         if 'chat_rooms' in existing_tables and 'chat_messages' not in existing_tables:
             print("chat_messages tábla létrehozása...")
             try:
+                chat_rooms_id_type = get_chat_rooms_id_type()
                 with engine.connect() as conn:
                     conn.execute(text(f"""
                         CREATE TABLE chat_messages (
                             id {id_type} NOT NULL AUTO_INCREMENT,
-                            room_id {id_type} NOT NULL,
+                            room_id {chat_rooms_id_type} NOT NULL,
                             user_id {id_type} NOT NULL,
                             message TEXT NOT NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -353,6 +392,8 @@ def init_db():
                 print("✓ chat_messages tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: chat_messages tábla: {e}")
+                import traceback
+                traceback.print_exc()
         elif 'chat_rooms' not in existing_tables:
             print("  Figyelmeztetés: chat_messages tábla nem hozható létre, mert a chat_rooms tábla nem létezik")
         
