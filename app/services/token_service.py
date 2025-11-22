@@ -68,7 +68,7 @@ async def send_token_to_user(db: Session, token: Token, user_id: int) -> bool:
         return False
     
     # Email küldése
-    await send_token_notification(
+    email_sent = await send_token_notification(
         user.email,
         user.username,
         token.token,
@@ -76,7 +76,7 @@ async def send_token_to_user(db: Session, token: Token, user_id: int) -> bool:
         token.expires_at.strftime("%Y-%m-%d %H:%M:%S")
     )
     
-    # Értesítés létrehozása a tokennel
+    # Értesítés létrehozása a tokennel (mindig létrejön, még ha az email nem sikerült)
     from app.services.notification_service import create_notification
     type_text = "Szerver Admin" if token.token_type == TokenType.SERVER_ADMIN else "Felhasználó"
     activation_link = f"{settings.base_url}/tokens/activate?token={token.token}"
@@ -88,7 +88,7 @@ async def send_token_to_user(db: Session, token: Token, user_id: int) -> bool:
         f"Ön számára egy új {type_text} token lett generálva.\n\nToken: {token.token}\nLejárat: {token.expires_at.strftime('%Y-%m-%d %H:%M:%S')}\n\nAktiválás: {activation_link}"
     )
     
-    return True
+    return email_sent
 
 async def check_expiring_tokens(db: Session) -> int:
     """Lejáró tokenek ellenőrzése és értesítés küldése"""

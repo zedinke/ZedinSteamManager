@@ -30,7 +30,6 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True, dom
         smtp_port = smtp_config.get('port') or settings.smtp_port
         smtp_user = smtp_config.get('user') or settings.smtp_user
         smtp_pass = smtp_config.get('pass') or settings.smtp_pass
-        use_tls = smtp_config.get('use_tls', False)
         
         # TLS beállítások
         # Port 465 = SSL/TLS (use_tls=True)
@@ -39,6 +38,17 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True, dom
         use_tls_param = (smtp_port == 465)
         start_tls_param = (smtp_port == 587)
         
+        # Debug információk
+        print(f"[EMAIL] Küldés: {to}")
+        print(f"[EMAIL] SMTP Host: {smtp_host}:{smtp_port}")
+        print(f"[EMAIL] SMTP User: {smtp_user if smtp_user else '(nincs)'}")
+        print(f"[EMAIL] TLS: {use_tls_param}, STARTTLS: {start_tls_param}")
+        
+        # Ha nincs SMTP host vagy user, akkor nem küldünk emailt
+        if not smtp_host or smtp_host == "localhost":
+            print(f"[EMAIL] Figyelmeztetés: SMTP host nincs beállítva vagy localhost. Email nem küldhető.")
+            return False
+        
         await aiosmtplib.send(
             message,
             hostname=smtp_host,
@@ -46,12 +56,16 @@ async def send_email(to: str, subject: str, body: str, is_html: bool = True, dom
             username=smtp_user if smtp_user else None,
             password=smtp_pass if smtp_pass else None,
             use_tls=use_tls_param,
-            start_tls=start_tls_param
+            start_tls=start_tls_param,
+            timeout=10
         )
         
+        print(f"[EMAIL] Sikeresen elküldve: {to}")
         return True
     except Exception as e:
-        print(f"Email sending error: {e}")
+        import traceback
+        print(f"[EMAIL] Hiba küldéskor: {e}")
+        print(f"[EMAIL] Traceback: {traceback.format_exc()}")
         return False
 
 def get_email_template(template_name: str, **kwargs) -> str:

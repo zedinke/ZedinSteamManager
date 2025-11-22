@@ -77,9 +77,10 @@ async def generate(
         generated_tokens.append(token)
     
     # Tokenek küldése (csak az elsőt küldjük email-ben, a többit csak értesítésben)
+    email_sent = False
     if generated_tokens:
         # Első token email-ben is
-        await send_token_to_user(db, generated_tokens[0], user_id)
+        email_sent = await send_token_to_user(db, generated_tokens[0], user_id)
         
         # További tokenek csak értesítésben
         if len(generated_tokens) > 1:
@@ -105,7 +106,12 @@ async def generate(
     
     success_msg = f"{len(generated_tokens)} token sikeresen generálva!"
     if len(generated_tokens) > 1:
-        success_msg += f" Az első token email-ben is elküldve, a többi értesítésben."
+        if email_sent:
+            success_msg += f" Az első token email-ben is elküldve, a többi értesítésben."
+        else:
+            success_msg += f" Az első token email küldése sikertelen volt, de az értesítésben megtalálod."
+    elif not email_sent:
+        success_msg += f" Figyelmeztetés: Az email küldése sikertelen volt, de az értesítésben megtalálod a tokent."
     
     return templates.TemplateResponse(
         "tokens/generate.html",
