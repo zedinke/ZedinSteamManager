@@ -2,7 +2,7 @@
 Adatbázis kapcsolat és modell
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, Text, ForeignKey, JSON
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, Text, ForeignKey, JSON, TypeDecorator
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
@@ -23,6 +23,37 @@ engine = create_engine(
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# Enum TypeDecorator - kezeli a string -> enum konverziót
+class EnumType(TypeDecorator):
+    impl = String(20)
+    cache_ok = True
+    
+    def __init__(self, enum_class, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.enum_class = enum_class
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, self.enum_class):
+            return value.value
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, self.enum_class):
+            return value
+        # String értékből enum-ot csinál
+        try:
+            return self.enum_class(value)
+        except ValueError:
+            # Ha nincs egyezés, próbáljuk meg a nagybetűs verziót
+            for enum_item in self.enum_class:
+                if enum_item.value.lower() == value.lower():
+                    return enum_item
+            raise
 
 # Enums
 class UserRole(str, enum.Enum):
@@ -48,7 +79,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole, native_enum=False, length=20), default=UserRole.USER, nullable=False, index=True)
+    role = Column(EnumType(UserRole), default=UserRole.USER, nullable=False, index=True)
     email_verified = Column(Boolean, default=False, nullable=False)
     email_verification_token = Column(String(100), nullable=True)
     email_verification_expires = Column(DateTime, nullable=True)
@@ -70,7 +101,7 @@ class Token(Base):
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String(100), unique=True, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    token_type = Column(Enum(TokenType, native_enum=False, length=20), nullable=False)
+    token_type = Column(EnumType(TokenType), nullable=False)
     generated_by_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     is_active = Column(Boolean, default=False, nullable=False)
     activated_at = Column(DateTime, nullable=True)
@@ -115,7 +146,7 @@ class Server(Base):
     server_admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(Enum(ServerStatus, native_enum=False, length=20), default=ServerStatus.STOPPED, nullable=False)
+    status = Column(EnumType(ServerStatus), default=ServerStatus.STOPPED, nullable=False)
     config = Column(JSON, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
