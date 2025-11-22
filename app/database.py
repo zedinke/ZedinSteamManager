@@ -298,13 +298,6 @@ class TokenExtensionRequest(Base):
     token = relationship("Token", foreign_keys=[token_id])
     user = relationship("User", foreign_keys=[user_id])
     processed_by = relationship("User", foreign_keys=[processed_by_id])
-    started_at = Column(DateTime, nullable=True)
-    stopped_at = Column(DateTime, nullable=True)
-    
-    # Relationships
-    game = relationship("Game", back_populates="server_instances")
-    server_admin = relationship("User", foreign_keys=[server_admin_id])
-    token_used = relationship("Token", foreign_keys=[token_used_id])
 
 # Dependency
 def get_db():
