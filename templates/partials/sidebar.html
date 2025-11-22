@@ -7,32 +7,106 @@
         </a>
         
         {% if user_role == "manager_admin" %}
-            <a href="/tokens/generate" class="nav-item">
-                <i class="fas fa-key"></i> Token generálás
-            </a>
-            <a href="/tokens/list" class="nav-item">
-                <i class="fas fa-list"></i> Tokenek kezelése
-            </a>
-            <a href="/admin/users" class="nav-item">
-                <i class="fas fa-users"></i> Összes felhasználó
-            </a>
-            <a href="/admin/notifications/create" class="nav-item">
-                <i class="fas fa-bell"></i> Értesítés írása
-            </a>
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-key"></i> Tokenek
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/tokens/generate" class="nav-item nav-sub-item">
+                        <i class="fas fa-plus-circle"></i> Token generálás
+                    </a>
+                    <a href="/tokens/list" class="nav-item nav-sub-item">
+                        <i class="fas fa-list"></i> Tokenek kezelése
+                    </a>
+                </div>
+            </div>
+            
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-users"></i> Felhasználók
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/admin/users" class="nav-item nav-sub-item">
+                        <i class="fas fa-users"></i> Összes felhasználó
+                    </a>
+                </div>
+            </div>
+            
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-bell"></i> Értesítések
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/admin/notifications/create" class="nav-item nav-sub-item">
+                        <i class="fas fa-edit"></i> Értesítés írása
+                    </a>
+                </div>
+            </div>
         {% endif %}
         
         {% if user_role in ["manager_admin", "server_admin"] %}
-            <a href="/admin/list" class="nav-item">
-                <i class="fas fa-user-shield"></i> Admin felhasználók
-            </a>
-            <a href="/admin/create" class="nav-item">
-                <i class="fas fa-user-plus"></i> Admin létrehozása
-            </a>
+            <div class="nav-category">
+                <div class="nav-category-header" onclick="toggleCategory(this)">
+                    <i class="fas fa-user-shield"></i> Admin kezelés
+                    <i class="fas fa-chevron-down nav-category-icon"></i>
+                </div>
+                <div class="nav-category-content">
+                    <a href="/admin/list" class="nav-item nav-sub-item">
+                        <i class="fas fa-list"></i> Admin felhasználók
+                    </a>
+                    <a href="/admin/create" class="nav-item nav-sub-item">
+                        <i class="fas fa-user-plus"></i> Admin létrehozása
+                    </a>
+                </div>
+            </div>
         {% endif %}
         
-        <a href="/tokens/activate" class="nav-item">
-            <i class="fas fa-check-circle"></i> Token aktiválás
-        </a>
+        <div class="nav-category">
+            <div class="nav-category-header" onclick="toggleCategory(this)">
+                <i class="fas fa-cog"></i> Beállítások
+                <i class="fas fa-chevron-down nav-category-icon"></i>
+            </div>
+            <div class="nav-category-content">
+                <a href="/tokens/activate" class="nav-item nav-sub-item">
+                    <i class="fas fa-check-circle"></i> Token aktiválás
+                </a>
+            </div>
+        </div>
     </nav>
 </aside>
+
+<script>
+function toggleCategory(header) {
+    const category = header.parentElement;
+    const content = category.querySelector('.nav-category-content');
+    const icon = header.querySelector('.nav-category-icon');
+    
+    if (content.style.display === 'none' || !content.style.display) {
+        content.style.display = 'block';
+        icon.style.transform = 'rotate(180deg)';
+        category.classList.add('active');
+    } else {
+        content.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+        category.classList.remove('active');
+    }
+}
+
+// Alapértelmezett: első kategória nyitva
+document.addEventListener('DOMContentLoaded', function() {
+    const firstCategory = document.querySelector('.nav-category');
+    if (firstCategory) {
+        const content = firstCategory.querySelector('.nav-category-content');
+        const icon = firstCategory.querySelector('.nav-category-icon');
+        if (content) {
+            content.style.display = 'block';
+            icon.style.transform = 'rotate(180deg)';
+            firstCategory.classList.add('active');
+        }
+    }
+});
+</script>
 
