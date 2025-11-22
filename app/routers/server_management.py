@@ -289,31 +289,87 @@ async def steamcmd_output(websocket: WebSocket, process_id: str):
     await websocket.accept()
     
     try:
-        while True:
+        done = False
+        empty_count = 0  # Számláló az üres iterációkhoz
+        max_empty_iterations = 50  # Maximum 5 másodperc várakozás (50 * 0.1s)
+        
+        while not done:
             if process_id in process_outputs:
                 output_queue = process_outputs[process_id]
                 
-                try:
-                    # Várunk egy kicsit, hogy legyen output
-                    line = output_queue.get(timeout=0.5)
-                    await websocket.send_text(line)
-                    
-                    # Ha vége, kilépünk
-                    if "[DONE]" in line:
+                # Összes elérhető üzenet küldése
+                messages_sent = False
+                while True:
+                    try:
+                        # Nem blokkoló get
+                        line = output_queue.get_nowait()
+                        await websocket.send_text(line)
+                        messages_sent = True
+                        empty_count = 0  # Reset számláló
+                        
+                        # Ha vége, várunk még egy kicsit, hogy minden üzenet kimenjen
+                        if "[DONE]" in line:
+                            # Várunk még egy kicsit, hátha van még output
+                            time.sleep(0.5)
+                            # Utolsó üzenetek küldése
+                            while True:
+                                try:
+                                    line = output_queue.get_nowait()
+                                    await websocket.send_text(line)
+                                except queue.Empty:
+                                    break
+                            done = True
+                            break
+                    except queue.Empty:
                         break
-                except queue.Empty:
-                    # Nincs új output, küldünk egy üres üzenetet, hogy a kapcsolat éljen maradjon
-                    await websocket.send_text("")
+                
+                # Ha nem volt üzenet, várunk egy kicsit
+                if not messages_sent and not done:
+                    empty_count += 1
+                    if empty_count >= max_empty_iterations:
+                        # Ha túl sokáig nincs üzenet, ellenőrizzük, hogy a process még fut-e
+                        if process_id not in active_processes:
+                            # Process befejeződött, de lehet, hogy még vannak üzenetek
+                            time.sleep(0.5)
+                            # Utolsó üzenetek küldése
+                            while True:
+                                try:
+                                    line = output_queue.get_nowait()
+                                    await websocket.send_text(line)
+                                    if "[DONE]" in line:
+                                        done = True
+                                        break
+                                except queue.Empty:
+                                    break
+                            if not done:
+                                done = True
+                    await websocket.send_text("")  # Keep-alive
                     time.sleep(0.1)
             else:
-                # Process nem található
-                await websocket.send_text("[ERROR] Process nem található\n")
-                break
+                # Process nem található - lehet, hogy már befejeződött
+                # Várunk egy kicsit, hátha még jön output
+                empty_count += 1
+                if empty_count >= max_empty_iterations:
+                    await websocket.send_text("[INFO] Process befejeződött\n")
+                    done = True
+                else:
+                    time.sleep(0.1)
+        
+        # Cleanup: töröljük a process_outputs-ot, ha még ott van
+        if process_id in process_outputs:
+            del process_outputs[process_id]
+            
     except WebSocketDisconnect:
+        # Cleanup ha a kliens lecsatlakozik
+        if process_id in process_outputs:
+            del process_outputs[process_id]
         pass
     except Exception as e:
         try:
-            await websocket.send_text(f"[ERROR] {str(e)}\n")
+            await websocket.send_text(f"[ERROR] WebSocket hiba: {str(e)}\n")
         except:
             pass
+        # Cleanup hiba esetén is
+        if process_id in process_outputs:
+            del process_outputs[process_id]
 
