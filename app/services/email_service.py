@@ -257,20 +257,15 @@ async def send_token_notification(email: str, username: str, token: str, token_t
                                         </div>
                                         
                                         <div style="text-align: center; margin-top: 30px;">
-                                            <a href="{activation_link}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
-                                                🚀 Token Aktiválása
-                                            </a>
+                                            <button onclick="navigator.clipboard.writeText('{token}'); alert('Token másolva a vágólapra!');" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); cursor: pointer;">
+                                                📋 Token Másolása Vágólapra
+                                            </button>
                                         </div>
-                                        
-                                        <p style="margin: 25px 0 0 0; color: #888; font-size: 13px; text-align: center;">
-                                            Vagy másold be ezt a linket: <br>
-                                            <a href="{activation_link}" style="color: #667eea; word-break: break-all;">{activation_link}</a>
-                                        </p>
                                     </div>
                                     
                                     <div style="background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; padding: 15px; border-radius: 6px; margin-top: 20px;">
                                         <p style="margin: 0; color: #b0b0b0; font-size: 13px; line-height: 1.6;">
-                                            <strong style="color: #667eea;">💡 Tipp:</strong> A token aktiválása után jogosultságod frissül, és hozzáférhetsz az új funkciókhoz!
+                                            <strong style="color: #667eea;">💡 Tipp:</strong> Másold ki a tokent és használd a weboldalon a token aktiválásához!
                                         </p>
                                     </div>
                                 </div>
