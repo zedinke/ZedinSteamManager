@@ -531,17 +531,6 @@ body {
     top: 2rem;
 }
 
-.dashboard-layout {
-    display: grid;
-    grid-template-columns: 1fr 350px;
-    gap: 2rem;
-    align-items: start;
-}
-
-.dashboard-main {
-    min-width: 0; /* Prevents grid overflow */
-}
-
 .dashboard-sidebar {
     position: sticky;
     top: 2rem;
