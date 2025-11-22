@@ -182,57 +182,67 @@ async function loadMods() {
 function moveToActive() {
     const availableSelect = document.getElementById('available_mods_select');
     const activeSelect = document.getElementById('active_mods_select');
-    const selected = Array.from(availableSelect.selectedOptions);
-    
-    selected.forEach(option => {
-        // Ellenőrizzük, hogy nincs-e már az aktív vagy passzív listában
-        const modId = option.value;
-        const existsInActive = Array.from(activeSelect.options).some(opt => opt.value === modId);
-        const existsInPassive = Array.from(document.getElementById('passive_mods_select').options).some(opt => opt.value === modId);
-        
-        if (!existsInActive && !existsInPassive) {
-            const newOption = document.createElement('option');
-            newOption.value = option.value;
-            newOption.textContent = option.textContent;
-            activeSelect.appendChild(newOption);
-            option.remove();
-        }
-    });
-}
-
-// Mod mozgatása passzív listába
-function moveToPassive() {
-    const availableSelect = document.getElementById('available_mods_select');
     const passiveSelect = document.getElementById('passive_mods_select');
     const selected = Array.from(availableSelect.selectedOptions);
     
     selected.forEach(option => {
         // Ellenőrizzük, hogy nincs-e már az aktív vagy passzív listában
         const modId = option.value;
-        const existsInActive = Array.from(document.getElementById('active_mods_select').options).some(opt => opt.value === modId);
+        const existsInActive = Array.from(activeSelect.options).some(opt => opt.value === modId);
         const existsInPassive = Array.from(passiveSelect.options).some(opt => opt.value === modId);
         
         if (!existsInActive && !existsInPassive) {
+            // Hozzáadás az aktív listához (de az elérhető listában marad)
+            const newOption = document.createElement('option');
+            newOption.value = option.value;
+            newOption.textContent = option.textContent;
+            activeSelect.appendChild(newOption);
+        } else {
+            // Duplikáció esetén figyelmeztetés
+            alert(`A "${option.textContent}" mod már szerepel az aktív vagy passzív modok között!`);
+        }
+    });
+    
+    // Kijelölés törlése
+    availableSelect.selectedIndex = -1;
+}
+
+// Mod mozgatása passzív listába
+function moveToPassive() {
+    const availableSelect = document.getElementById('available_mods_select');
+    const activeSelect = document.getElementById('active_mods_select');
+    const passiveSelect = document.getElementById('passive_mods_select');
+    const selected = Array.from(availableSelect.selectedOptions);
+    
+    selected.forEach(option => {
+        // Ellenőrizzük, hogy nincs-e már az aktív vagy passzív listában
+        const modId = option.value;
+        const existsInActive = Array.from(activeSelect.options).some(opt => opt.value === modId);
+        const existsInPassive = Array.from(passiveSelect.options).some(opt => opt.value === modId);
+        
+        if (!existsInActive && !existsInPassive) {
+            // Hozzáadás a passzív listához (de az elérhető listában marad)
             const newOption = document.createElement('option');
             newOption.value = option.value;
             newOption.textContent = option.textContent;
             passiveSelect.appendChild(newOption);
-            option.remove();
+        } else {
+            // Duplikáció esetén figyelmeztetés
+            alert(`A "${option.textContent}" mod már szerepel az aktív vagy passzív modok között!`);
         }
     });
+    
+    // Kijelölés törlése
+    availableSelect.selectedIndex = -1;
 }
 
 // Mod eltávolítása aktív listából
 function removeFromActive() {
     const activeSelect = document.getElementById('active_mods_select');
-    const availableSelect = document.getElementById('available_mods_select');
     const selected = Array.from(activeSelect.selectedOptions);
     
     selected.forEach(option => {
-        const newOption = document.createElement('option');
-        newOption.value = option.value;
-        newOption.textContent = option.textContent;
-        availableSelect.appendChild(newOption);
+        // Csak eltávolítjuk az aktív listából, az elérhető listában marad
         option.remove();
     });
 }
@@ -240,14 +250,10 @@ function removeFromActive() {
 // Mod eltávolítása passzív listából
 function removeFromPassive() {
     const passiveSelect = document.getElementById('passive_mods_select');
-    const availableSelect = document.getElementById('available_mods_select');
     const selected = Array.from(passiveSelect.selectedOptions);
     
     selected.forEach(option => {
-        const newOption = document.createElement('option');
-        newOption.value = option.value;
-        newOption.textContent = option.textContent;
-        availableSelect.appendChild(newOption);
+        // Csak eltávolítjuk a passzív listából, az elérhető listában marad
         option.remove();
     });
 }
