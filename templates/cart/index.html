@@ -65,12 +65,13 @@
                                 <td>
                                     {% if item.pricing %}
                                         <div>
-                                            <strong style="color: #667eea;">{{ "{:,}".format(item.pricing.final_price) }} Ft</strong>
                                             {% if item.pricing.discount_percent > 0 %}
-                                                <br><small style="text-decoration: line-through; color: #999;">{{ "{:,}".format(item.pricing.total_base_price) }} Ft</small>
+                                                <small style="text-decoration: line-through; color: #999;">{{ "{:,}".format(item.pricing.total_base_price) }} Ft</small><br>
+                                                <strong style="color: #667eea;">{{ "{:,}".format(item.pricing.final_price) }} Ft</strong>
                                             {% else %}
-                                                <br><small style="color: #999;">{{ "{:,}".format(item.pricing.base_price) }} Ft{{ "/db" if item.item_type == "token_request" else "/nap" }}</small>
+                                                <strong style="color: #667eea;">{{ "{:,}".format(item.pricing.total_base_price) }} Ft</strong>
                                             {% endif %}
+                                            <br><small style="color: #999;">{{ "{:,}".format(item.pricing.base_price) }} Ft{{ "/db" if item.item_type == "token_request" else "/nap" }}</small>
                                         </div>
                                     {% else %}
                                         <span class="text-muted">Számítás...</span>
