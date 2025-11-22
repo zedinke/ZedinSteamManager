@@ -471,6 +471,8 @@ def init_db():
                             status VARCHAR(20) NOT NULL DEFAULT 'stopped',
                             config JSON NULL,
                             token_used_id {tokens_id_type} NULL,
+                            token_expires_at DATETIME NULL,
+                            scheduled_deletion_date DATETIME NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                             started_at DATETIME NULL,
