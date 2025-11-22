@@ -57,7 +57,7 @@
                                 </td>
                                 <td>
                                     <div class="d-flex gap-2">
-                                        <button class="btn btn-primary btn-sm" onclick="showExtendModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d') if token.expires_at else '' }}')">
+                                        <button class="btn btn-primary btn-sm" onclick="showExtendModal({{ token.id }}, '{{ token.expires_at.strftime('%Y-%m-%d %H:%M') if token.expires_at else '' }}')">
                                             <i class="fas fa-clock"></i> Hosszabbítás
                                         </button>
                                         <form method="POST" action="/tokens/delete" style="display: inline;" onsubmit="return confirm('Biztosan törölni szeretnéd ezt a tokent?');">
