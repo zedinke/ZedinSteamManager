@@ -125,22 +125,40 @@ async def update_base_price(
         status_code=302
     )
 
+def parse_optional_int(value: Optional[str]) -> Optional[int]:
+    """Üres string vagy None konvertálása None-ra, egyébként int-re"""
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+def parse_optional_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Üres string vagy None konvertálása None-ra, egyébként datetime-re"""
+    if value is None or value == "":
+        return None
+    try:
+        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except (ValueError, TypeError):
+        return None
+
 @router.post("/admin/pricing/rule")
 async def create_pricing_rule(
     request: Request,
     name: str = Form(...),
     rule_type: str = Form(...),
     is_active: bool = Form(False),
-    discount_percent: Optional[int] = Form(None),
-    min_quantity: Optional[int] = Form(None),
-    quantity_discount_percent: Optional[int] = Form(None),
-    min_duration_days: Optional[int] = Form(None),
-    duration_discount_percent: Optional[int] = Form(None),
+    discount_percent: Optional[str] = Form(None),
+    min_quantity: Optional[str] = Form(None),
+    quantity_discount_percent: Optional[str] = Form(None),
+    min_duration_days: Optional[str] = Form(None),
+    duration_discount_percent: Optional[str] = Form(None),
     applies_to_token_type: Optional[str] = Form(None),
     applies_to_item_type: Optional[str] = Form(None),
     valid_from: Optional[str] = Form(None),
     valid_until: Optional[str] = Form(None),
-    priority: int = Form(0),
+    priority: str = Form("0"),
     notes: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -150,49 +168,51 @@ async def create_pricing_rule(
     if rule_type not in ["general_sale", "quantity_discount", "duration_discount"]:
         raise HTTPException(status_code=400, detail="Érvénytelen szabály típus")
     
+    # String értékek konvertálása
+    discount_percent_int = parse_optional_int(discount_percent)
+    min_quantity_int = parse_optional_int(min_quantity)
+    quantity_discount_percent_int = parse_optional_int(quantity_discount_percent)
+    min_duration_days_int = parse_optional_int(min_duration_days)
+    duration_discount_percent_int = parse_optional_int(duration_discount_percent)
+    priority_int = parse_optional_int(priority) or 0
+    
     # Validáció
-    if rule_type == "general_sale" and not discount_percent:
+    if rule_type == "general_sale" and not discount_percent_int:
         raise HTTPException(status_code=400, detail="Általános akcióhoz kedvezmény százalék szükséges")
-    if rule_type == "quantity_discount" and (not min_quantity or not quantity_discount_percent):
+    if rule_type == "quantity_discount" and (not min_quantity_int or not quantity_discount_percent_int):
         raise HTTPException(status_code=400, detail="Mennyiségi kedvezményhez minimum mennyiség és kedvezmény százalék szükséges")
-    if rule_type == "duration_discount" and (not min_duration_days or not duration_discount_percent):
+    if rule_type == "duration_discount" and (not min_duration_days_int or not duration_discount_percent_int):
         raise HTTPException(status_code=400, detail="Időtartam kedvezményhez minimum napok és kedvezmény százalék szükséges")
     
     token_type_enum = None
-    if applies_to_token_type:
+    if applies_to_token_type and applies_to_token_type != "":
         if applies_to_token_type not in ["server_admin", "user"]:
             raise HTTPException(status_code=400, detail="Érvénytelen token típus")
         token_type_enum = TokenType.SERVER_ADMIN if applies_to_token_type == "server_admin" else TokenType.USER
     
-    valid_from_dt = None
-    if valid_from:
-        try:
-            valid_from_dt = datetime.fromisoformat(valid_from.replace('Z', '+00:00'))
-        except:
-            raise HTTPException(status_code=400, detail="Érvénytelen valid_from dátum")
+    valid_from_dt = parse_optional_datetime(valid_from)
+    valid_until_dt = parse_optional_datetime(valid_until)
     
-    valid_until_dt = None
-    if valid_until:
-        try:
-            valid_until_dt = datetime.fromisoformat(valid_until.replace('Z', '+00:00'))
-        except:
-            raise HTTPException(status_code=400, detail="Érvénytelen valid_until dátum")
+    # Üres string kezelése applies_to_item_type esetén
+    applies_to_item_type_clean = None
+    if applies_to_item_type and applies_to_item_type != "":
+        applies_to_item_type_clean = applies_to_item_type
     
     rule = TokenPricingRule(
         name=name,
         rule_type=rule_type,
         is_active=is_active,
-        discount_percent=discount_percent,
-        min_quantity=min_quantity,
-        quantity_discount_percent=quantity_discount_percent,
-        min_duration_days=min_duration_days,
-        duration_discount_percent=duration_discount_percent,
+        discount_percent=discount_percent_int,
+        min_quantity=min_quantity_int,
+        quantity_discount_percent=quantity_discount_percent_int,
+        min_duration_days=min_duration_days_int,
+        duration_discount_percent=duration_discount_percent_int,
         applies_to_token_type=token_type_enum,
-        applies_to_item_type=applies_to_item_type,
+        applies_to_item_type=applies_to_item_type_clean,
         valid_from=valid_from_dt,
         valid_until=valid_until_dt,
-        priority=priority,
-        notes=notes
+        priority=priority_int,
+        notes=notes if notes and notes != "" else None
     )
     
     db.add(rule)
