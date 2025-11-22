@@ -2,7 +2,7 @@
 System monitoring router - szerver kihasználtság API
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -22,7 +22,7 @@ except ImportError:
 router = APIRouter(prefix="/api/system", tags=["system"])
 
 @router.get("/stats")
-async def get_system_stats(request: Request, db: Session = get_db()):
+async def get_system_stats(request: Request, db: Session = Depends(get_db)):
     """Szerver kihasználtság lekérése"""
     if not PSUTIL_AVAILABLE:
         return JSONResponse(
