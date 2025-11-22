@@ -12,6 +12,13 @@ config = {
     'email': {
         'from': 'noreply@example.com',
         'from_name': 'ZedinArkManager',
+        # SMTP beállítások (opcionális - ha nincs megadva, akkor az Exim konfigurációt használja)
+        'smtp': {
+            'host': 'mail.example.com',
+            'port': 587,  # 587 = STARTTLS, 465 = SSL/TLS, 25 = nincs titkosítás
+            'user': 'noreply@example.com',
+            'pass': 'your-smtp-password',
+        },
     },
     'secret_key': 'your-secret-key-here-generate-with-secrets-token-urlsafe-32',
     'token_expiry_days': 30,
