@@ -515,6 +515,108 @@ function addMessage(text, type) {
     
     return messageDiv;
 }
+
+// Token Hosszabbítási Kérés Modal
+function showExtensionRequestModal(tokenId, currentExpiry) {
+    document.getElementById('extensionRequestTokenId').value = tokenId;
+    document.getElementById('currentExpiryRequest').textContent = currentExpiry || 'Nincs lejárat';
+    
+    // Új lejárat számítása
+    const daysInput = document.getElementById('extensionRequestDays');
+    if (daysInput) {
+        daysInput.removeEventListener('input', updateNewExpiryRequest);
+        daysInput.addEventListener('input', updateNewExpiryRequest);
+        updateNewExpiryRequest();
+    }
+    
+    // Modal megjelenítése
+    document.getElementById('extensionRequestModal').style.display = 'block';
+}
+
+function closeExtensionRequestModal() {
+    document.getElementById('extensionRequestModal').style.display = 'none';
+}
+
+function updateNewExpiryRequest() {
+    const daysInput = document.getElementById('extensionRequestDays');
+    if (!daysInput) return;
+    
+    const days = parseInt(daysInput.value) || 0;
+    const currentExpiryText = document.getElementById('currentExpiryRequest').textContent;
+    
+    if (currentExpiryText && currentExpiryText !== 'Nincs lejárat') {
+        // Parse magyar dátum formátum: YYYY-MM-DD HH:MM
+        const parts = currentExpiryText.split(' ');
+        const dateParts = parts[0].split('-');
+        const timeParts = parts[1] ? parts[1].split(':') : [0, 0];
+        
+        const currentDate = new Date(
+            parseInt(dateParts[0]),
+            parseInt(dateParts[1]) - 1,
+            parseInt(dateParts[2]),
+            parseInt(timeParts[0]),
+            parseInt(timeParts[1])
+        );
+        
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + days);
+        
+        const formattedDate = newDate.toLocaleDateString('hu-HU') + ' ' + 
+                             newDate.toLocaleTimeString('hu-HU', {hour: '2-digit', minute: '2-digit'});
+        document.getElementById('newExpiryRequest').textContent = formattedDate;
+    } else {
+        const today = new Date();
+        const newDate = new Date(today);
+        newDate.setDate(newDate.getDate() + days);
+        
+        const formattedDate = newDate.toLocaleDateString('hu-HU') + ' ' + 
+                             newDate.toLocaleTimeString('hu-HU', {hour: '2-digit', minute: '2-digit'});
+        document.getElementById('newExpiryRequest').textContent = formattedDate;
+    }
+}
+
+// Extension Request Modal bezárása kattintásra a háttérre
+const originalOnClick = window.onclick;
+window.onclick = function(event) {
+    if (originalOnClick) originalOnClick(event);
+    
+    const extensionModal = document.getElementById('extensionRequestModal');
+    if (event.target == extensionModal) {
+        closeExtensionRequestModal();
+    }
+}
 </script>
+
+<!-- Token Hosszabbítási Kérés Modal -->
+<div id="extensionRequestModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content" style="background-color: white; margin: 15% auto; padding: 20px; border-radius: 10px; width: 500px; max-width: 90%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3><i class="fas fa-clock"></i> Token Hosszabbítási Kérés</h3>
+            <button onclick="closeExtensionRequestModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+        </div>
+        <form method="POST" action="/cart/add-extension-request" id="extensionRequestForm">
+            <input type="hidden" name="token_id" id="extensionRequestTokenId">
+            <div style="margin-bottom: 15px;">
+                <label for="extensionRequestDays" style="display: block; margin-bottom: 5px; font-weight: bold;">Hány napra szeretnéd meghosszabbítani?</label>
+                <input type="number" class="form-control" id="extensionRequestDays" name="requested_days" min="1" max="365" value="30" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                <small style="color: #666;">1-365 nap között lehet megadni</small>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="extensionRequestNotes" style="display: block; margin-bottom: 5px; font-weight: bold;">Megjegyzés (opcionális):</label>
+                <textarea id="extensionRequestNotes" name="notes" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; resize: vertical;"></textarea>
+            </div>
+            <div class="alert alert-info" style="background: #e7f3ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <strong>Jelenlegi lejárat:</strong> <span id="currentExpiryRequest"></span><br>
+                <strong>Kért új lejárat:</strong> <span id="newExpiryRequest" style="color: #667eea; font-weight: bold;"></span>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeExtensionRequestModal()" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Mégse</button>
+                <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    <i class="fas fa-shopping-cart"></i> Kosárba teszem
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
