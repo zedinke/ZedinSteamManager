@@ -782,3 +782,92 @@ code {
     }
 }
 
+/* System Monitoring */
+.system-monitoring {
+    margin-top: 3rem;
+}
+
+.monitoring-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.monitoring-card {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.3s, box-shadow 0.3s;
+    overflow: hidden;
+}
+
+.monitoring-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+}
+
+.monitoring-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--light);
+}
+
+.monitoring-header h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.monitoring-header h3 i {
+    color: var(--primary);
+}
+
+.monitoring-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+}
+
+.monitoring-chart {
+    height: 150px;
+    margin: 1rem 0;
+    position: relative;
+}
+
+.monitoring-info {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--light);
+    color: var(--gray);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+/* CPU specific */
+#cpuChart {
+    border-color: #667eea;
+}
+
+/* RAM specific */
+#ramChart {
+    border-color: #764ba2;
+}
+
+/* HDD specific */
+#hddChart {
+    border-color: #f093fb;
+}
+
+/* PING specific */
+#pingChart {
+    border-color: #4facfe;
+}
+

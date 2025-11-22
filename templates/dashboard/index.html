@@ -118,6 +118,241 @@
             </div>
         </div>
     {% endif %}
+    
+    <!-- Szerver Kihasználtság -->
+    <div class="system-monitoring">
+        <div class="page-header">
+            <h2><i class="fas fa-server"></i> Szerver Kihasználtság</h2>
+            <p>Valós idejű rendszer információk</p>
+        </div>
+        
+        <div class="monitoring-grid">
+            <!-- CPU -->
+            <div class="monitoring-card">
+                <div class="monitoring-header">
+                    <h3><i class="fas fa-microchip"></i> CPU</h3>
+                    <span class="monitoring-value" id="cpuPercent">0%</span>
+                </div>
+                <div class="monitoring-chart">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+                <div class="monitoring-info">
+                    <span id="cpuInfo">Magok: 0</span>
+                </div>
+            </div>
+            
+            <!-- RAM -->
+            <div class="monitoring-card">
+                <div class="monitoring-header">
+                    <h3><i class="fas fa-memory"></i> RAM</h3>
+                    <span class="monitoring-value" id="ramPercent">0%</span>
+                </div>
+                <div class="monitoring-chart">
+                    <canvas id="ramChart"></canvas>
+                </div>
+                <div class="monitoring-info">
+                    <span id="ramInfo">0 GB / 0 GB</span>
+                </div>
+            </div>
+            
+            <!-- HDD -->
+            <div class="monitoring-card">
+                <div class="monitoring-header">
+                    <h3><i class="fas fa-hdd"></i> HDD</h3>
+                    <span class="monitoring-value" id="hddPercent">0%</span>
+                </div>
+                <div class="monitoring-chart">
+                    <canvas id="hddChart"></canvas>
+                </div>
+                <div class="monitoring-info">
+                    <span id="hddInfo">0 GB / 0 GB</span>
+                </div>
+            </div>
+            
+            <!-- PING -->
+            <div class="monitoring-card">
+                <div class="monitoring-header">
+                    <h3><i class="fas fa-network-wired"></i> PING</h3>
+                    <span class="monitoring-value" id="pingMs">0 ms</span>
+                </div>
+                <div class="monitoring-chart">
+                    <canvas id="pingChart"></canvas>
+                </div>
+                <div class="monitoring-info">
+                    <span id="pingInfo">Hálózati késleltetés</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Chart konfigurációk
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            display: false
+        },
+        tooltip: {
+            enabled: false
+        }
+    },
+    scales: {
+        y: {
+            beginAtZero: true,
+            max: 100,
+            display: false
+        },
+        x: {
+            display: false
+        }
+    },
+    elements: {
+        point: {
+            radius: 0
+        }
+    }
+};
+
+// CPU Chart
+const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+const cpuChart = new Chart(cpuCtx, {
+    type: 'line',
+    data: {
+        labels: Array(20).fill(''),
+        datasets: [{
+            label: 'CPU %',
+            data: Array(20).fill(0),
+            borderColor: '#667eea',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: chartOptions
+});
+
+// RAM Chart
+const ramCtx = document.getElementById('ramChart').getContext('2d');
+const ramChart = new Chart(ramCtx, {
+    type: 'line',
+    data: {
+        labels: Array(20).fill(''),
+        datasets: [{
+            label: 'RAM %',
+            data: Array(20).fill(0),
+            borderColor: '#764ba2',
+            backgroundColor: 'rgba(118, 75, 162, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: chartOptions
+});
+
+// HDD Chart
+const hddCtx = document.getElementById('hddChart').getContext('2d');
+const hddChart = new Chart(hddCtx, {
+    type: 'line',
+    data: {
+        labels: Array(20).fill(''),
+        datasets: [{
+            label: 'HDD %',
+            data: Array(20).fill(0),
+            borderColor: '#f093fb',
+            backgroundColor: 'rgba(240, 147, 251, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: chartOptions
+});
+
+// PING Chart
+const pingCtx = document.getElementById('pingChart').getContext('2d');
+const pingChart = new Chart(pingCtx, {
+    type: 'line',
+    data: {
+        labels: Array(20).fill(''),
+        datasets: [{
+            label: 'PING ms',
+            data: Array(20).fill(0),
+            borderColor: '#4facfe',
+            backgroundColor: 'rgba(79, 172, 254, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        ...chartOptions,
+        scales: {
+            ...chartOptions.scales,
+            y: {
+                beginAtZero: true,
+                max: 100,
+                display: false
+            }
+        }
+    }
+});
+
+// Adatok frissítése
+function updateSystemStats() {
+    fetch('/api/system/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('System stats error:', data.error);
+                return;
+            }
+            
+            // CPU
+            const cpuPercent = Math.round(data.cpu.percent);
+            document.getElementById('cpuPercent').textContent = cpuPercent + '%';
+            document.getElementById('cpuInfo').textContent = `Magok: ${data.cpu.count} (${data.cpu.cores} fizikai)`;
+            updateChart(cpuChart, cpuPercent);
+            
+            // RAM
+            const ramPercent = Math.round(data.ram.percent);
+            document.getElementById('ramPercent').textContent = ramPercent + '%';
+            document.getElementById('ramInfo').textContent = `${data.ram.used_gb} GB / ${data.ram.total_gb} GB`;
+            updateChart(ramChart, ramPercent);
+            
+            // HDD
+            const hddPercent = Math.round(data.hdd.percent);
+            document.getElementById('hddPercent').textContent = hddPercent + '%';
+            document.getElementById('hddInfo').textContent = `${data.hdd.used_gb} GB / ${data.hdd.total_gb} GB`;
+            updateChart(hddChart, hddPercent);
+            
+            // PING
+            const pingMs = data.ping.ms !== null ? Math.round(data.ping.ms) : 0;
+            document.getElementById('pingMs').textContent = pingMs + ' ms';
+            document.getElementById('pingInfo').textContent = pingMs < 10 ? 'Kiváló' : pingMs < 50 ? 'Jó' : 'Közepes';
+            updateChart(pingChart, pingMs);
+        })
+        .catch(error => {
+            console.error('System stats fetch error:', error);
+        });
+}
+
+// Chart frissítése
+function updateChart(chart, newValue) {
+    chart.data.datasets[0].data.shift();
+    chart.data.datasets[0].data.push(newValue);
+    chart.update('none');
+}
+
+// 2 másodpercenként frissítés
+setInterval(updateSystemStats, 2000);
+updateSystemStats(); // Azonnali frissítés
+</script>
 {% endblock %}
 
