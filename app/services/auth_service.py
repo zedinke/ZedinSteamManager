@@ -9,7 +9,16 @@ from datetime import datetime, timedelta
 from app.database import User, UserRole
 from app.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Bcrypt context inicializálás explicit backend-del
+try:
+    pwd_context = CryptContext(
+        schemes=["bcrypt"],
+        deprecated="auto",
+        bcrypt__ident="2b"  # Explicit bcrypt ident
+    )
+except Exception:
+    # Ha nem sikerül, próbáljuk meg egyszerűbben
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Jelszó ellenőrzése"""
