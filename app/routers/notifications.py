@@ -47,24 +47,26 @@ async def get_notifications(
 @router.post("/api/notifications/mark-read")
 async def mark_notification_read(
     request: Request,
-    notification_id: int = None,
-    current_user: User = Depends(require_login),
     db: Session = Depends(get_db)
 ):
     """Értesítés olvasottnak jelölése"""
-    # GET paraméterből vagy POST body-ből
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse({"success": False, "error": "Not logged in"})
+    
+    notification_id = request.query_params.get("notification_id")
     if not notification_id:
         try:
-            body = await request.json()
-            notification_id = body.get("notification_id")
+            form = await request.form()
+            notification_id = form.get("notification_id")
         except:
-            from fastapi import Query
-            notification_id = request.query_params.get("notification_id")
+            pass
     
     if not notification_id:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="notification_id szükséges")
-    mark_as_read(db, int(notification_id), current_user.id)
+    
+    mark_as_read(db, int(notification_id), user_id)
     return JSONResponse({"success": True})
 
 @router.post("/api/notifications/mark-all-read")
