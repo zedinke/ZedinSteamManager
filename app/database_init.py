@@ -2,6 +2,13 @@
 Adatbázis inicializálás
 """
 
+import sys
+from pathlib import Path
+
+# Projekt gyökér hozzáadása a Python path-hoz
+BASE_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
 from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
