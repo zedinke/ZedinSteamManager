@@ -34,17 +34,32 @@ def get_active_pricing_rules(db: Session, token_type: TokenType, item_type: str,
     """Aktív árazási szabályok lekérése"""
     now = datetime.now()
     
-    rules = db.query(TokenPricingRule).filter(
-        TokenPricingRule.is_active == True,
-        (TokenPricingRule.valid_from.is_(None)) | (TokenPricingRule.valid_from <= now),
-        (TokenPricingRule.valid_until.is_(None)) | (TokenPricingRule.valid_until >= now),
-        (TokenPricingRule.applies_to_token_type.is_(None)) | (TokenPricingRule.applies_to_token_type == token_type),
-        (TokenPricingRule.applies_to_item_type.is_(None)) | (TokenPricingRule.applies_to_item_type == item_type)
-    ).order_by(TokenPricingRule.priority.desc()).all()
+    # Összes aktív szabály lekérése dátum szerint
+    all_rules = db.query(TokenPricingRule).filter(
+        TokenPricingRule.is_active == True
+    ).all()
+    
+    # Dátum ellenőrzés
+    rules = []
+    for rule in all_rules:
+        # Ha van valid_from, akkor ellenőrizzük
+        if rule.valid_from and rule.valid_from > now:
+            continue
+        # Ha van valid_until, akkor ellenőrizzük
+        if rule.valid_until and rule.valid_until < now:
+            continue
+        rules.append(rule)
     
     # Szűrés a feltételek alapján
     applicable_rules = []
     for rule in rules:
+        # Token típus ellenőrzés
+        if rule.applies_to_token_type and rule.applies_to_token_type != token_type:
+            continue
+        # Item típus ellenőrzés
+        if rule.applies_to_item_type and rule.applies_to_item_type != item_type:
+            continue
+        
         if rule.rule_type == "general_sale":
             # Általános akció - mindig alkalmazható
             applicable_rules.append(rule)
@@ -56,6 +71,9 @@ def get_active_pricing_rules(db: Session, token_type: TokenType, item_type: str,
             # Időtartam kedvezmény
             if rule.min_duration_days and days and days >= rule.min_duration_days:
                 applicable_rules.append(rule)
+    
+    # Prioritás szerint rendezés
+    applicable_rules.sort(key=lambda x: x.priority, reverse=True)
     
     return applicable_rules
 
@@ -73,9 +91,10 @@ def calculate_price(
     # Aktív szabályok lekérése
     rules = get_active_pricing_rules(db, token_type, item_type, quantity, days)
     
-    # Kedvezmények alkalmazása (prioritás szerint)
+    # Kedvezmények alkalmazása (prioritás szerint - csak a legnagyobb kedvezményt alkalmazzuk)
     total_discount_percent = 0
     applied_rules = []
+    best_rule = None
     
     for rule in rules:
         discount = 0
@@ -88,11 +107,15 @@ def calculate_price(
         
         if discount > total_discount_percent:
             total_discount_percent = discount
-            applied_rules.append({
-                "name": rule.name,
-                "type": rule.rule_type,
-                "discount": discount
-            })
+            best_rule = rule
+    
+    # Csak a legjobb kedvezményt alkalmazzuk
+    if best_rule:
+        applied_rules.append({
+            "name": best_rule.name,
+            "type": best_rule.rule_type,
+            "discount": total_discount_percent
+        })
     
     # Végleges ár számítása
     discount_amount = int(total_base_price * total_discount_percent / 100)

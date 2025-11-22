@@ -26,8 +26,10 @@
                             <th>Típus</th>
                             <th>Leírás</th>
                             <th>Mennyiség/Napok</th>
+                            <th>Ár</th>
+                            <th>Kedvezmény</th>
+                            <th>Végösszeg</th>
                             <th>Megjegyzés</th>
-                            <th>Dátum</th>
                             <th>Műveletek</th>
                         </tr>
                     </thead>
@@ -61,13 +63,50 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if item.pricing %}
+                                        <div>
+                                            <strong style="color: #667eea;">{{ "{:,}".format(item.pricing.final_price) }} Ft</strong>
+                                            {% if item.pricing.discount_percent > 0 %}
+                                                <br><small style="text-decoration: line-through; color: #999;">{{ "{:,}".format(item.pricing.total_base_price) }} Ft</small>
+                                            {% else %}
+                                                <br><small style="color: #999;">{{ "{:,}".format(item.pricing.base_price) }} Ft{{ "/db" if item.item_type == "token_request" else "/nap" }}</small>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Számítás...</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.pricing and item.pricing.discount_percent > 0 %}
+                                        <div>
+                                            <span class="badge badge-success">-{{ item.pricing.discount_percent }}%</span>
+                                            <br><small style="color: #28a745;">-{{ "{:,}".format(item.pricing.discount_amount) }} Ft</small>
+                                            {% if item.pricing.applied_rules %}
+                                                <br><small style="color: #666;">
+                                                    {% for rule in item.pricing.applied_rules %}
+                                                        <i class="fas fa-tag"></i> {{ rule.name }}{% if not loop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.pricing %}
+                                        <strong style="font-size: 16px; color: #667eea;">{{ "{:,}".format(item.pricing.final_price) }} Ft</strong>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     {% if item.notes %}
                                         <small>{{ item.notes[:50] }}{% if item.notes|length > 50 %}...{% endif %}</small>
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "-" }}</td>
                                 <td>
                                     <form method="POST" action="/cart/remove/{{ item.id }}" style="display: inline;" onsubmit="return confirm('Biztosan eltávolítod ezt az elemet a kosárból?');">
                                         <button type="submit" class="btn btn-danger btn-sm">
@@ -78,7 +117,38 @@
                             </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot>
+                        <tr style="background-color: #f8f9fa; font-weight: bold;">
+                            <td colspan="3" style="text-align: right;">
+                                <strong>Összesen:</strong>
+                            </td>
+                            <td>
+                                {% if total_discount > 0 %}
+                                    <span style="text-decoration: line-through; color: #999;">{{ "{:,}".format(total_base_price) }} Ft</span>
+                                {% else %}
+                                    <span>{{ "{:,}".format(total_base_price) }} Ft</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if total_discount > 0 %}
+                                    <span class="badge badge-success">-{{ "{:,}".format(total_discount) }} Ft</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong style="font-size: 18px; color: #667eea;">{{ "{:,}".format(total_final_price) }} Ft</strong>
+                            </td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
                 </table>
+                
+                <div style="margin-top: 20px; text-align: right;">
+                    <button class="btn btn-primary btn-lg" disabled>
+                        <i class="fas fa-credit-card"></i> Fizetés (Hamarosan)
+                    </button>
+                </div>
             {% else %}
                 <p>A kosarad üres. <a href="/dashboard">Vissza a dashboard-ra</a></p>
             {% endif %}

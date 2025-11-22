@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from app.database import get_db, User, CartItem, TokenType, Token
+from app.services.pricing_service import calculate_price
 from datetime import datetime
 
 router = APIRouter()
@@ -34,11 +35,56 @@ async def show_cart(
         CartItem.user_id == current_user.id
     ).order_by(CartItem.created_at.desc()).all()
     
+    # Árak számítása minden itemhez
+    cart_items_with_pricing = []
+    total_base_price = 0
+    total_discount = 0
+    total_final_price = 0
+    
+    for item in cart_items:
+        if item.item_type == "token_request":
+            # Token igénylés ár számítása
+            pricing = calculate_price(
+                db,
+                item.token_type,
+                "token_request",
+                quantity=item.quantity,
+                days=None
+            )
+            item.pricing = pricing
+            total_base_price += pricing["total_base_price"]
+            total_discount += pricing["discount_amount"]
+            total_final_price += pricing["final_price"]
+        elif item.item_type == "token_extension":
+            # Token hosszabbítás ár számítása
+            if item.token:
+                pricing = calculate_price(
+                    db,
+                    item.token.token_type,
+                    "token_extension",
+                    quantity=1,
+                    days=item.requested_days
+                )
+                item.pricing = pricing
+                total_base_price += pricing["total_base_price"]
+                total_discount += pricing["discount_amount"]
+                total_final_price += pricing["final_price"]
+            else:
+                item.pricing = None
+        
+        cart_items_with_pricing.append(item)
+    
     from app.main import get_templates
     templates = get_templates()
     return templates.TemplateResponse(
         "cart/index.html",
-        {"request": request, "cart_items": cart_items}
+        {
+            "request": request,
+            "cart_items": cart_items_with_pricing,
+            "total_base_price": total_base_price,
+            "total_discount": total_discount,
+            "total_final_price": total_final_price
+        }
     )
 
 @router.post("/cart/add-token-request")
