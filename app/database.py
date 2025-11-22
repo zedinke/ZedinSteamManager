@@ -290,7 +290,8 @@ class ServerInstance(Base):
     cluster_id = Column(Integer, ForeignKey("clusters.id", ondelete="SET NULL"), nullable=True, index=True)  # Ark cluster (opcionális)
     name = Column(String(100), nullable=False)  # Szerver neve
     port = Column(Integer, nullable=True)  # Port szám
-    query_port = Column(Integer, nullable=True)  # Query port (Ark esetén port + 1)
+    query_port = Column(Integer, nullable=True)  # Query port (Ark esetén port + 2)
+    rcon_port = Column(Integer, nullable=True)  # RCON port (Ark esetén port + 1)
     max_players = Column(Integer, default=40, nullable=False)  # Max játékosok száma
     status = Column(EnumType(ServerStatus), default=ServerStatus.STOPPED, nullable=False, index=True)
     config = Column(JSON, nullable=True)  # Szerver konfiguráció

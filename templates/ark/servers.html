@@ -43,6 +43,7 @@
                             <th>Cluster</th>
                             <th>Port</th>
                             <th>Query Port</th>
+                            <th>RCON Port</th>
                             <th>Max Játékosok</th>
                             <th>Státusz</th>
                             <th>Token információk</th>
@@ -64,6 +65,7 @@
                                 </td>
                                 <td>{{ server.port or '-' }}</td>
                                 <td>{{ server.query_port or '-' }}</td>
+                                <td>{{ server.rcon_port or '-' }}</td>
                                 <td>{{ server.max_players }}</td>
                                 <td>
                                     {% if server.status.value == 'running' %}

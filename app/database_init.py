@@ -898,6 +898,7 @@ def init_db():
             new_columns = {
                 'max_players': 'INT NOT NULL DEFAULT 40',
                 'query_port': 'INT NULL',
+                'rcon_port': 'INT NULL',
                 'active_mods': 'JSON NULL',
                 'passive_mods': 'JSON NULL',
                 'server_path': 'VARCHAR(500) NULL'

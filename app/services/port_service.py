@@ -159,3 +159,44 @@ def get_query_port(game_port: int, db: Session = None) -> int:
     
     return query_port
 
+def get_rcon_port(game_port: int, db: Session = None) -> int:
+    """
+    RCON port számítása a game port alapján
+    Ark Survival Ascended esetén általában game_port + 1
+    """
+    # Ark Survival Ascended: RCON port = game_port + 1
+    rcon_port = game_port + 1
+    
+    # Ellenőrizzük, hogy elérhető-e
+    if not check_port_available(rcon_port):
+        # Ha nem elérhető, keressünk egy szabad portot az adatbázisból
+        if db:
+            # Lekérjük az összes használt RCON portot
+            used_rcon_ports = []
+            try:
+                from app.database import ServerInstance
+                servers = db.query(ServerInstance.rcon_port).filter(
+                    ServerInstance.rcon_port.isnot(None)
+                ).all()
+                used_rcon_ports = [s.rcon_port for s in servers if s.rcon_port]
+            except Exception:
+                pass
+            
+            # Keressünk egy szabad portot (game_port + 1, +3, +4, stb., de ne legyen query_port)
+            query_port = game_port + 2  # Query port
+            for offset in [1, 3, 4, 5, 6, 7, 8, 9, 10]:
+                candidate_port = game_port + offset
+                if candidate_port != query_port and candidate_port not in used_rcon_ports and check_port_available(candidate_port):
+                    rcon_port = candidate_port
+                    break
+        else:
+            # Ha nincs db session, próbáljuk meg a game_port + 3, +4, stb. (de ne legyen query_port)
+            query_port = game_port + 2
+            for offset in [3, 4, 5, 6, 7, 8, 9, 10]:
+                candidate_port = game_port + offset
+                if candidate_port != query_port and check_port_available(candidate_port):
+                    rcon_port = candidate_port
+                    break
+    
+    return rcon_port
+

@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, asc
 from app.database import get_db, User, Game, ServerInstance, ServerStatus, Token, TokenType, Cluster
-from app.services.port_service import find_available_port, get_query_port
+from app.services.port_service import find_available_port, get_query_port, get_rcon_port
 from app.services.symlink_service import create_server_symlink, remove_server_symlink
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -300,6 +300,7 @@ async def create_server(
         )
     
     query_port = get_query_port(game_port, db)
+    rcon_port = get_rcon_port(game_port, db)
     
     # Modok feldolgozása
     active_mods_list = None
@@ -334,6 +335,7 @@ async def create_server(
         name=name,
         port=game_port,
         query_port=query_port,
+        rcon_port=rcon_port,
         max_players=max_players,
         status=ServerStatus.STOPPED,
         active_mods=active_mods_list,
