@@ -299,7 +299,7 @@ async def create_server(
             detail="Nem sikerült elérhető portot találni"
         )
     
-    query_port = get_query_port(game_port)
+    query_port = get_query_port(game_port, db)
     
     # Modok feldolgozása
     active_mods_list = None

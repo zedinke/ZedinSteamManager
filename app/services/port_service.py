@@ -120,25 +120,42 @@ def find_available_port(start_port: int = None, max_attempts: int = 100, db: Ses
     
     return None
 
-def get_query_port(game_port: int) -> int:
+def get_query_port(game_port: int, db: Session = None) -> int:
     """
     Query port számítása a game port alapján
-    Ark esetén általában game_port + 1, de ellenőrizzük, hogy elérhető-e
+    Ark Survival Ascended esetén általában game_port + 2
     """
-    query_port = game_port + 1
+    # Ark Survival Ascended: query port = game_port + 2
+    query_port = game_port + 2
     
-    # Ha nem elérhető, keressünk egy másikat
+    # Ellenőrizzük, hogy elérhető-e
     if not check_port_available(query_port):
-        # Próbáljuk meg a game_port + 2-t
-        query_port = game_port + 2
-        if not check_port_available(query_port):
-            # Ha ez sem elérhető, keressünk egy szabad portot
-            available = find_available_port(game_port + 1)
-            if available:
-                query_port = available
-            else:
-                # Végül visszaadjuk az eredeti + 1-et, a rendszer majd kezeli
-                query_port = game_port + 1
+        # Ha nem elérhető, keressünk egy szabad portot az adatbázisból
+        if db:
+            # Lekérjük az összes használt query portot
+            used_query_ports = []
+            try:
+                from app.database import ServerInstance
+                servers = db.query(ServerInstance.query_port).filter(
+                    ServerInstance.query_port.isnot(None)
+                ).all()
+                used_query_ports = [s.query_port for s in servers if s.query_port]
+            except Exception:
+                pass
+            
+            # Keressünk egy szabad portot (game_port + 2, +3, +4, stb.)
+            for offset in range(2, 20):
+                candidate_port = game_port + offset
+                if candidate_port not in used_query_ports and check_port_available(candidate_port):
+                    query_port = candidate_port
+                    break
+        else:
+            # Ha nincs db session, próbáljuk meg a game_port + 3, +4, stb.
+            for offset in range(3, 20):
+                candidate_port = game_port + offset
+                if check_port_available(candidate_port):
+                    query_port = candidate_port
+                    break
     
     return query_port
 
