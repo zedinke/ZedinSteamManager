@@ -45,10 +45,37 @@ def get_server_path(server_id: Optional[int], cluster_id: Optional[str] = None) 
     return server_path
 
 def get_active_ark_files(db: Session) -> Optional[ArkServerFiles]:
-    """Aktív Ark szerverfájlok lekérése"""
+    """Aktív Ark szerverfájlok lekérése (Manager Admin)"""
     return db.query(ArkServerFiles).filter(
         ArkServerFiles.is_active == True
     ).first()
+
+def get_active_cluster_serverfiles(db: Session, cluster_id: int) -> Optional[Path]:
+    """
+    Aktív cluster szerverfájlok útvonala
+    
+    Args:
+        db: Adatbázis session
+        cluster_id: Cluster ID
+    
+    Returns:
+        Path objektum az aktív szerverfájlok útvonalához vagy None
+    """
+    from app.database import ClusterServerFiles
+    serverfiles = db.query(ClusterServerFiles).filter(
+        and_(
+            ClusterServerFiles.cluster_id == cluster_id,
+            ClusterServerFiles.is_active == True,
+            ClusterServerFiles.installation_status == "completed"
+        )
+    ).first()
+    
+    if serverfiles:
+        install_path = Path(serverfiles.install_path)
+        if install_path.exists():
+            return install_path
+    
+    return None
 
 def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = None, db: Session = None) -> Optional[Path]:
     """
@@ -72,14 +99,16 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         should_close = False
     
     try:
-        # Aktív Ark fájlok lekérése
-        ark_files = get_active_ark_files(db)
-        if not ark_files:
-            return None
-        
-        install_path = Path(ark_files.install_path)
-        if not install_path.exists():
-            return None
+        # Aktív cluster szerverfájlok lekérése
+        install_path = get_active_cluster_serverfiles(db, cluster_id)
+        if not install_path:
+            # Fallback: Manager Admin szerverfájlok
+            ark_files = get_active_ark_files(db)
+            if not ark_files:
+                return None
+            install_path = Path(ark_files.install_path)
+            if not install_path.exists():
+                return None
         
         # Szerver útvonal (cluster serverfiles mappában)
         if server_id is None:

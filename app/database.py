@@ -327,6 +327,25 @@ class ArkServerFiles(Base):
     # Relationships
     installed_by = relationship("User", foreign_keys=[installed_by_id])
 
+class ClusterServerFiles(Base):
+    """Cluster-hez tartozó szerverfájlok (Server Admin telepíti)"""
+    __tablename__ = "cluster_server_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    cluster_id = Column(Integer, ForeignKey("clusters.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(String(50), nullable=False)  # Verzió (pl. "1.0.0")
+    install_path = Column(String(500), nullable=False)  # Telepítési útvonal (cluster serverfiles mappában)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # Aktuálisan használt verzió
+    installed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    installed_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    installation_status = Column(String(20), default="pending", nullable=False)  # pending, installing, completed, failed
+    installation_log = Column(Text, nullable=True)  # Telepítési log
+    notes = Column(Text, nullable=True)
+    
+    # Relationships
+    cluster = relationship("Cluster", foreign_keys=[cluster_id])
+    installed_by = relationship("User", foreign_keys=[installed_by_id])
+
 class UserMod(Base):
     """Felhasználó mod csomagjai (Server Admin)"""
     __tablename__ = "user_mods"

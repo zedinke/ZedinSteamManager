@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Szerverfájlok Telepítése - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-download"></i> Szerverfájlok Telepítése</h2>
+        <p>Ark Survival Ascended szerverfájlok telepítése SteamCMD-vel</p>
+    </div>
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-info-circle"></i> Telepítési Információ</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Fontos:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li>A telepítés SteamCMD-vel történik</li>
+                    <li>A szerverfájlok a cluster serverfiles mappájába kerülnek</li>
+                    <li>A telepítés folyamata élőben követhető a terminálban</li>
+                    <li>A telepítés hosszabb időt vehet igénybe (több GB letöltés)</li>
+                </ul>
+            </div>
+            
+            <form id="installForm" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label for="cluster_id">
+                        <i class="fas fa-network-wired"></i> Cluster <span style="color: red;">*</span>
+                    </label>
+                    <select id="cluster_id" name="cluster_id" required 
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        {% if selected_cluster %}
+                            <option value="{{ selected_cluster.id }}" selected>{{ selected_cluster.name }} ({{ selected_cluster.cluster_id }})</option>
+                        {% else %}
+                            <option value="">-- Válassz cluster-t --</option>
+                            {% for cluster in clusters %}
+                                <option value="{{ cluster.id }}">{{ cluster.name }} ({{ cluster.cluster_id }})</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <small style="color: #666;">Válassz egy cluster-t. Ha nincs, <a href="/ark/clusters/create">hozz létre egyet</a>!</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="version">
+                        <i class="fas fa-tag"></i> Verzió <span style="color: red;">*</span>
+                    </label>
+                    <input type="text" id="version" name="version" required 
+                           placeholder="pl. 1.0.0 vagy latest" 
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <small style="color: #666;">A szerverfájlok verziója (pl. 1.0.0) vagy "latest" a legújabb verzióhoz</small>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary" id="installBtn">
+                        <i class="fas fa-download"></i> Telepítés Indítása
+                    </button>
+                    <a href="/ark/serverfiles" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Telepítési terminál -->
+    <div class="card" id="terminalCard" style="display: none; margin-top: 20px;">
+        <div class="card-header">
+            <h3><i class="fas fa-terminal"></i> Telepítési Folyamat</h3>
+        </div>
+        <div class="card-body">
+            <div id="terminal" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 14px; max-height: 500px; overflow-y: auto; min-height: 300px;">
+                <div style="color: #4ec9b0;">Telepítés inicializálása...</div>
+            </div>
+            <div style="margin-top: 10px;">
+                <button type="button" class="btn btn-secondary" id="closeTerminalBtn" style="display: none;">
+                    <i class="fas fa-times"></i> Bezárás
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+let websocket = null;
+let serverfilesId = null;
+
+document.getElementById('installForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const clusterId = document.getElementById('cluster_id').value;
+    const version = document.getElementById('version').value;
+    const installBtn = document.getElementById('installBtn');
+    const terminalCard = document.getElementById('terminalCard');
+    const terminal = document.getElementById('terminal');
+    
+    if (!clusterId || !version) {
+        alert('Kérlek, töltsd ki az összes mezőt!');
+        return;
+    }
+    
+    // Gomb letiltása
+    installBtn.disabled = true;
+    installBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Indítás...';
+    
+    // Terminál megjelenítése
+    terminalCard.style.display = 'block';
+    terminal.innerHTML = '<div style="color: #4ec9b0;">Telepítés indítása...</div>';
+    
+    try {
+        // Telepítés indítása
+        const formData = new FormData();
+        formData.append('cluster_id', clusterId);
+        formData.append('version', version);
+        
+        const response = await fetch('/ark/serverfiles/install', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            serverfilesId = data.serverfiles_id;
+            
+            // WebSocket kapcsolat létrehozása
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ark/serverfiles/install/${serverfilesId}/stream`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                
+                if (message.type === 'progress') {
+                    const line = document.createElement('div');
+                    line.textContent = message.message;
+                    terminal.appendChild(line);
+                    terminal.scrollTop = terminal.scrollHeight;
+                } else if (message.type === 'complete') {
+                    const line = document.createElement('div');
+                    line.style.color = message.success ? '#4ec9b0' : '#f48771';
+                    line.textContent = message.message;
+                    terminal.appendChild(line);
+                    terminal.scrollTop = terminal.scrollHeight;
+                    
+                    if (message.success) {
+                        setTimeout(() => {
+                            window.location.href = `/ark/serverfiles?cluster_id=${clusterId}&success=Telepítés+sikeres`;
+                        }, 2000);
+                    } else {
+                        installBtn.disabled = false;
+                        installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+                        document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+                    }
+                } else if (message.type === 'error') {
+                    const line = document.createElement('div');
+                    line.style.color = '#f48771';
+                    line.textContent = `Hiba: ${message.message}`;
+                    terminal.appendChild(line);
+                    terminal.scrollTop = terminal.scrollHeight;
+                    
+                    installBtn.disabled = false;
+                    installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+                    document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+                }
+            };
+            
+            websocket.onerror = function(error) {
+                terminal.innerHTML += '<div style="color: #f48771;">WebSocket hiba történt</div>';
+                installBtn.disabled = false;
+                installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+            };
+            
+            websocket.onclose = function() {
+                console.log('WebSocket kapcsolat bezárva');
+            };
+        } else {
+            alert('Hiba: ' + (data.detail || 'Ismeretlen hiba'));
+            installBtn.disabled = false;
+            installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+        }
+    } catch (error) {
+        console.error('Hiba:', error);
+        alert('Hiba történt a telepítés indításakor.');
+        installBtn.disabled = false;
+        installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+    }
+});
+
+document.getElementById('closeTerminalBtn').addEventListener('click', function() {
+    if (websocket) {
+        websocket.close();
+    }
+    document.getElementById('terminalCard').style.display = 'none';
+});
+</script>
+{% endblock %}
+{% endblock %}
+

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Cluster Szerverfájlok - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-folder-open"></i> Cluster Szerverfájlok</h2>
+        <p>Szerverfájlok kezelése cluster-enként</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h3><i class="fas fa-filter"></i> Cluster Kiválasztása</h3>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/ark/serverfiles" style="display: flex; gap: 10px; align-items: end;">
+                <div style="flex: 1;">
+                    <label for="cluster_id">Cluster</label>
+                    <select id="cluster_id" name="cluster_id" required 
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        <option value="">-- Válassz cluster-t --</option>
+                        {% for cluster in clusters %}
+                            <option value="{{ cluster.id }}" {% if selected_cluster and selected_cluster.id == cluster.id %}selected{% endif %}>
+                                {{ cluster.name }} ({{ cluster.cluster_id }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> Keresés
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    {% if selected_cluster %}
+        <div style="margin-bottom: 20px;">
+            <a href="/ark/serverfiles/install?cluster_id={{ selected_cluster.id }}" class="btn btn-primary">
+                <i class="fas fa-download"></i> Új Verzió Telepítése
+            </a>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-list"></i> Telepített Verziók - {{ selected_cluster.name }}</h3>
+            </div>
+            <div class="card-body">
+                {% if serverfiles %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Verzió</th>
+                                <th>Telepítési Útvonal</th>
+                                <th>Státusz</th>
+                                <th>Telepítve</th>
+                                <th>Telepítette</th>
+                                <th>Műveletek</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sf in serverfiles %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ sf.version }}</strong>
+                                        {% if sf.is_active %}
+                                            <span class="badge badge-success">Aktív</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><code style="font-size: 0.9rem;">{{ sf.install_path }}</code></td>
+                                    <td>
+                                        {% if sf.installation_status == 'completed' %}
+                                            <span class="badge badge-success">Kész</span>
+                                        {% elif sf.installation_status == 'installing' %}
+                                            <span class="badge badge-warning">Telepítés alatt</span>
+                                        {% elif sf.installation_status == 'failed' %}
+                                            <span class="badge badge-danger">Sikertelen</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">Függőben</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ sf.installed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        {% if sf.installed_by %}
+                                            {{ sf.installed_by.username }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if sf.installation_status == 'completed' and not sf.is_active %}
+                                            <form method="POST" action="/ark/serverfiles/{{ sf.id }}/activate" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    <i class="fas fa-check"></i> Aktiválás
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        {% if not sf.is_active %}
+                                            <form method="POST" action="/ark/serverfiles/{{ sf.id }}/delete" 
+                                                  style="display: inline; margin-left: 5px;"
+                                                  onsubmit="return confirm('Biztosan törlöd ezt a verziót?');">
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="fas fa-trash"></i> Törlés
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Még nincs telepített verzió ehhez a cluster-hez. 
+                        <a href="/ark/serverfiles/install?cluster_id={{ selected_cluster.id }}">Telepíts egyet most!</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Válassz ki egy cluster-t a fenti formból a szerverfájlok megtekintéséhez.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+

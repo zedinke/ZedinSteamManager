@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, asc
-from app.database import get_db, User, Game, ServerInstance, ServerStatus, Token, TokenType, Cluster
+from app.database import get_db, User, Game, ServerInstance, ServerStatus, Token, TokenType, Cluster, ClusterServerFiles
 from app.services.port_service import find_available_port, get_query_port, get_rcon_port
 from app.services.symlink_service import create_server_symlink, remove_server_symlink
 from fastapi.templating import Jinja2Templates
@@ -432,10 +432,27 @@ async def create_server(
     db.refresh(server_instance)
     
     # Most már frissíthetjük a server_path-et
-    server_path = create_server_symlink(server_instance.id, cluster.cluster_id, db)
-    if server_path:
-        server_instance.server_path = str(server_path)
-        db.commit()
+    # Ellenőrizzük, hogy van-e aktív cluster szerverfájl
+    active_cluster_files = db.query(ClusterServerFiles).filter(
+        and_(
+            ClusterServerFiles.cluster_id == cluster.id,
+            ClusterServerFiles.is_active == True,
+            ClusterServerFiles.installation_status == "completed"
+        )
+    ).first()
+    
+    if active_cluster_files:
+        # Cluster szerverfájlok használata
+        server_path = create_server_symlink(server_instance.id, cluster.cluster_id, db)
+        if server_path:
+            server_instance.server_path = str(server_path)
+            db.commit()
+    else:
+        # Fallback: Manager Admin szerverfájlok
+        server_path = create_server_symlink(server_instance.id, cluster.cluster_id, db)
+        if server_path:
+            server_instance.server_path = str(server_path)
+            db.commit()
     
     return RedirectResponse(
         url="/ark/servers?success=Szerver+létrehozva",
