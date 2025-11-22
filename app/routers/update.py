@@ -2,11 +2,10 @@
 Update router - Manager Admin funkciók
 """
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.dependencies import require_manager_admin
+from app.database import get_db, User
 from pathlib import Path
 import subprocess
 import os
