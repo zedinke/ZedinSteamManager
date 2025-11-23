@@ -285,6 +285,8 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         f'{port}:{port}/udp',
                         f'{rcon_port}:{rcon_port}/tcp',
                     ],
+                    # Megjegyzés: A Docker image belső struktúrája fix (/home/pok/arkserver)
+                    # Ha saját Docker image-t használsz, módosíthatod ezeket az útvonalakat
                     'volumes': [
                         f'{real_server_path}:/home/pok/arkserver',
                         f'{saved_path}:/home/pok/arkserver/ShooterGame/Saved',
