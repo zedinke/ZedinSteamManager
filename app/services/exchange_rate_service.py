@@ -36,13 +36,15 @@ def get_huf_eur_exchange_rate() -> Optional[float]:
         # Dokumentáció: https://www.mnb.hu/letoltes/mnbapi-arfolyamok.pdf
         
         # Aktuális dátum
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now().strftime("%Y.%m.%d")
         
-        # API hívás
-        url = f"https://api.mnb.hu/arfolyamok.asmx/GetCurrentExchangeRates"
+        # API hívás - GetExchangeRates metódus használata
+        # Formátum: https://api.mnb.hu/arfolyamok.asmx/GetExchangeRates?startDate=2024.01.01&endDate=2024.01.01&currencyNames=EUR
+        url = "https://api.mnb.hu/arfolyamok.asmx/GetExchangeRates"
         params = {
             "startDate": today,
-            "endDate": today
+            "endDate": today,
+            "currencyNames": "EUR"
         }
         
         response = requests.get(url, params=params, timeout=10)
@@ -53,7 +55,7 @@ def get_huf_eur_exchange_rate() -> Optional[float]:
         root = ET.fromstring(response.text)
         
         # EUR árfolyam keresése
-        # A válasz formátuma: <Day><Rate currency="EUR">400.50</Rate></Day>
+        # A válasz formátuma: <Day date="2024.01.01"><Rate unit="1" curr="EUR">400.50</Rate></Day>
         for day in root.findall('.//Day'):
             for rate in day.findall('.//Rate'):
                 if rate.get('curr') == 'EUR':
@@ -61,7 +63,7 @@ def get_huf_eur_exchange_rate() -> Optional[float]:
                     # Cache mentése
                     _exchange_rate_cache = rate_value
                     _exchange_rate_cache_time = datetime.now()
-                    logger.info(f"HUF/EUR árfolyam lekérve: {rate_value}")
+                    logger.info(f"HUF/EUR árfolyam lekérve (MNB API): {rate_value}")
                     return rate_value
         
         # Ha nem találjuk az XML-ben, próbáljuk meg egy másik módszert
