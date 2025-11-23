@@ -435,14 +435,16 @@ async def list_servers(
         )
     ).order_by(desc(ServerInstance.created_at)).all()
     
-    # Token információk
+    # Token információk és indítási parancsok
     now = datetime.now()
+    from app.services.server_control_service import get_start_command_string
     servers_data = []
     for server in servers:
         server_dict = {
             "server": server,
             "token_days_left": None,
-            "token_expired": False
+            "token_expired": False,
+            "start_command": get_start_command_string(server, db)
         }
         
         if server.token_used_id and server.token_expires_at:
@@ -772,4 +774,103 @@ async def edit_server(
         url=f"/ark/servers?success=Szerver+módosítva",
         status_code=302
     )
+
+@router.post("/servers/{server_id}/start")
+async def start_server_endpoint(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Ark szerver indítása"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    from app.services.server_control_service import start_server
+    result = start_server(server, db)
+    
+    if result["success"]:
+        return RedirectResponse(
+            url=f"/ark/servers?success={result['message']}",
+            status_code=302
+        )
+    else:
+        return RedirectResponse(
+            url=f"/ark/servers?error={result['message']}",
+            status_code=302
+        )
+
+@router.post("/servers/{server_id}/stop")
+async def stop_server_endpoint(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Ark szerver leállítása"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    from app.services.server_control_service import stop_server
+    result = stop_server(server, db)
+    
+    if result["success"]:
+        return RedirectResponse(
+            url=f"/ark/servers?success={result['message']}",
+            status_code=302
+        )
+    else:
+        return RedirectResponse(
+            url=f"/ark/servers?error={result['message']}",
+            status_code=302
+        )
+
+@router.post("/servers/{server_id}/restart")
+async def restart_server_endpoint(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Ark szerver újraindítása"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    from app.services.server_control_service import restart_server
+    result = restart_server(server, db)
+    
+    if result["success"]:
+        return RedirectResponse(
+            url=f"/ark/servers?success={result['message']}",
+            status_code=302
+        )
+    else:
+        return RedirectResponse(
+            url=f"/ark/servers?error={result['message']}",
+            status_code=302
+        )
 

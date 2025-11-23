@@ -95,18 +95,51 @@
                                 </td>
                                 <td>{{ server.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
-                                    <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-edit"></i> Szerkesztés
-                                    </a>
-                                    <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
-                                          style="display: inline; margin-left: 5px;"
-                                          onsubmit="return confirm('Biztosan törlöd ezt a szervert? Ez a művelet nem visszavonható!');">
-                                        <button type="submit" class="btn btn-sm btn-danger">
-                                            <i class="fas fa-trash"></i> Törlés
-                                        </button>
-                                    </form>
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        {% if server.status.value == 'running' %}
+                                            <form method="POST" action="/ark/servers/{{ server.id }}/stop" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-warning" title="Szerver leállítása">
+                                                    <i class="fas fa-stop"></i> Leállítás
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-info" title="Szerver újraindítása">
+                                                    <i class="fas fa-redo"></i> Újraindítás
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <form method="POST" action="/ark/servers/{{ server.id }}/start" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Szerver indítása">
+                                                    <i class="fas fa-play"></i> Indítás
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary" title="Szerver szerkesztése">
+                                            <i class="fas fa-edit"></i> Szerkesztés
+                                        </a>
+                                        <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
+                                              style="display: inline;"
+                                              onsubmit="return confirm('Biztosan törlöd ezt a szervert? Ez a művelet nem visszavonható!');">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Szerver törlése">
+                                                <i class="fas fa-trash"></i> Törlés
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
+                            {% if item.start_command %}
+                            <tr class="command-row" style="background-color: #f8f9fa;">
+                                <td colspan="10" style="padding: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <strong style="min-width: 120px;">Indítási parancs:</strong>
+                                        <code style="flex: 1; background: #1e1e1e; color: #d4d4d4; padding: 8px 12px; border-radius: 4px; font-size: 12px; word-break: break-all; white-space: pre-wrap;">{{ item.start_command }}</code>
+                                        <button type="button" class="btn btn-sm btn-secondary" onclick="copyCommand(this)" title="Parancs másolása">
+                                            <i class="fas fa-copy"></i> Másolás
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endif %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -119,5 +152,57 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyCommand(button) {
+    const codeElement = button.closest('td').querySelector('code');
+    const text = codeElement.textContent;
+    
+    // Clipboard API használata
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i> Másolva!';
+            button.classList.add('btn-success');
+            button.classList.remove('btn-secondary');
+            
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('btn-success');
+                button.classList.add('btn-secondary');
+            }, 2000);
+        }).catch(err => {
+            console.error('Hiba a másolás során:', err);
+            alert('Nem sikerült a másolás');
+        });
+    } else {
+        // Fallback: régi módszer
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i> Másolva!';
+            button.classList.add('btn-success');
+            button.classList.remove('btn-secondary');
+            
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('btn-success');
+                button.classList.add('btn-secondary');
+            }, 2000);
+        } catch (err) {
+            alert('Nem sikerült a másolás');
+        }
+        document.body.removeChild(textarea);
+    }
+}
+</script>
 {% endblock %}
 
