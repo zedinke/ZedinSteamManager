@@ -13,7 +13,7 @@ from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
     ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest,
-    TokenPricingRule, TokenBasePrice, Cluster, ArkServerFiles, UserMod, UserServerFiles
+    TokenPricingRule, TokenBasePrice, TokenPeriodPrice, Cluster, ArkServerFiles, UserMod, UserServerFiles
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -645,6 +645,20 @@ def init_db():
                     print("✓ expires_in_days oszlop hozzáadva")
                 except Exception as e:
                     print(f"  Figyelmeztetés: expires_in_days oszlop: {e}")
+            
+            # period_months oszlop hozzáadása, ha nincs
+            if 'period_months' not in existing_columns:
+                print("period_months oszlop hozzáadása a cart_items táblához...")
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("""
+                            ALTER TABLE cart_items 
+                            ADD COLUMN period_months INT NULL
+                        """))
+                        conn.commit()
+                    print("✓ period_months oszlop hozzáadva")
+                except Exception as e:
+                    print(f"  Figyelmeztetés: period_months oszlop: {e}")
         
         # Token requests tábla létrehozása
         existing_tables = inspector.get_table_names()
@@ -998,6 +1012,41 @@ def init_db():
                 print("✓ user_server_files tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: user_server_files tábla: {e}")
+        
+        # Token period prices tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'token_period_prices' not in existing_tables:
+            print("token_period_prices tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE token_period_prices (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            token_type VARCHAR(20) NOT NULL,
+                            period_months INT NOT NULL,
+                            price_eur INT NOT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            UNIQUE KEY uq_token_period (token_type, period_months),
+                            INDEX ix_token_period_prices_token_type (token_type),
+                            INDEX ix_token_period_prices_period_months (period_months)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ token_period_prices tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: token_period_prices tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")
