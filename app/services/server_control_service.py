@@ -606,7 +606,7 @@ def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
 
 def update_start_command_file(server: ServerInstance, compose_file: Path, compose_data: dict) -> None:
     """
-    Indítási parancs fájl létrehozása/frissítése, ami tartalmazza az összes argumentumot
+    Indítási parancs fájl létrehozása/frissítése, ami tartalmazza a tényleges ARK szerver indítási parancsot
     Ez a fájl csak akkor változik, ha a beállítások változnak
     
     Args:
@@ -618,45 +618,99 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         instance_dir = get_instance_dir(server)
         command_file = instance_dir / "start_command.txt"
         
-        docker_compose_cmd = get_docker_compose_cmd() or "docker compose"
-        
-        # Environment változók összegyűjtése
+        # Environment változók összegyűjtése és értelmezése
         env_vars = compose_data.get('services', {}).get('asaserver', {}).get('environment', [])
+        env_dict = {}
+        for env_var in env_vars:
+            if '=' in env_var:
+                key, value = env_var.split('=', 1)
+                env_dict[key] = value
         
-        # Teljes indítási parancs összeállítása
+        # Szerver beállítások kiolvasása
+        map_name = env_dict.get('MAP_NAME', 'TheIsland')
+        session_name = env_dict.get('SESSION_NAME', server.name)
+        asa_port = env_dict.get('ASA_PORT', str(server.port or 7777))
+        query_port = env_dict.get('QUERY_PORT', str(server.query_port or int(asa_port) + 2))
+        rcon_port = env_dict.get('RCON_PORT', str(server.rcon_port or 27015))
+        max_players = env_dict.get('MAX_PLAYERS', str(server.max_players or 70))
+        rcon_enabled = env_dict.get('RCON_ENABLED', 'True')
+        server_admin_password = env_dict.get('SERVER_ADMIN_PASSWORD', '')
+        server_password = env_dict.get('SERVER_PASSWORD', '')
+        battleeye = env_dict.get('BATTLEEYE', 'False')
+        mod_ids = env_dict.get('MOD_IDS', '')
+        custom_server_args = env_dict.get('CUSTOM_SERVER_ARGS', '')
+        
+        # Cluster ID lekérése
+        cluster_id = ''
+        if server.cluster:
+            cluster_id = server.cluster.cluster_id
+        
+        # ARK szerver indítási parancs összeállítása (hasonló a képen láthatóhoz)
+        # Formátum: ArkAscendedServer.exe MapName ?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -ActiveMods=...
+        
+        # ?listen?SessionName="..."?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
+        query_params = []
+        query_params.append('listen')
+        query_params.append(f'SessionName="{session_name}"')
+        
+        if rcon_enabled == 'True':
+            query_params.append('RCONEnabled=True')
+            query_params.append(f'RCONPort={rcon_port}')
+            if server_admin_password:
+                query_params.append(f'ServerAdminPassword={server_admin_password}')
+        
+        if server_password:
+            query_params.append(f'ServerPassword={server_password}')
+        
+        # Query string összeállítása
+        query_string = '?' + '?'.join(query_params)
+        
+        # Teljes parancs összeállítása (hosszú sor, mint a képen)
+        command_parts = []
+        
+        # Első rész: ArkAscendedServer.exe MapName ?listen?SessionName=...?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
+        first_part = f'ArkAscendedServer.exe {map_name}{query_string}'
+        command_parts.append(first_part)
+        
+        # Második rész: -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=...
+        second_part_parts = []
+        second_part_parts.append(f'-Port={asa_port}')
+        second_part_parts.append(f'-QueryPort={query_port}')
+        second_part_parts.append(f'-WinLiveMaxPlayers={max_players}')
+        
+        if cluster_id:
+            second_part_parts.append(f'-clusterid={cluster_id}')
+        
+        second_part = ' '.join(second_part_parts)
+        command_parts.append(second_part)
+        
+        # Harmadik rész: -UseBattlEye -ActiveMods=... custom args
+        third_part_parts = []
+        
+        if battleeye == 'True':
+            third_part_parts.append('-UseBattlEye')
+        
+        if mod_ids:
+            third_part_parts.append(f'-ActiveMods={mod_ids}')
+        
+        if custom_server_args:
+            third_part_parts.append(custom_server_args)
+        
+        if third_part_parts:
+            third_part = ' '.join(third_part_parts)
+            command_parts.append(third_part)
+        
+        # Teljes parancs összeállítása (egy hosszú sor, mint a képen)
+        full_command = ' '.join(command_parts)
+        
+        # Parancs fájl írása
         command_lines = [
-            f"# Szerver indítási parancs - Szerver ID: {server.id}",
+            f"# ARK Survival Ascended Server Indítási Parancs",
+            f"# Szerver ID: {server.id}",
             f"# Ez a parancs csak akkor változik, ha a beállítások változnak",
             "",
-            f"{docker_compose_cmd} -f {compose_file} up -d",
-            "",
-            "# Environment változók:",
+            full_command,
         ]
-        
-        for env_var in env_vars:
-            command_lines.append(f"#   {env_var}")
-        
-        # Portok
-        ports = compose_data.get('services', {}).get('asaserver', {}).get('ports', [])
-        if ports:
-            command_lines.append("")
-            command_lines.append("# Portok:")
-            for port in ports:
-                command_lines.append(f"#   {port}")
-        
-        # Volumes
-        volumes = compose_data.get('services', {}).get('asaserver', {}).get('volumes', [])
-        if volumes:
-            command_lines.append("")
-            command_lines.append("# Volumes:")
-            for volume in volumes:
-                command_lines.append(f"#   {volume}")
-        
-        # Memória limit
-        mem_limit = compose_data.get('services', {}).get('asaserver', {}).get('mem_limit')
-        if mem_limit:
-            command_lines.append("")
-            command_lines.append(f"# Memória limit: {mem_limit}")
         
         # Fájl írása
         with open(command_file, 'w', encoding='utf-8') as f:
@@ -665,6 +719,8 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         logger.info(f"Indítási parancs fájl frissítve: {command_file}")
     except Exception as e:
         logger.warning(f"Hiba az indítási parancs fájl létrehozásakor: {e}")
+        import traceback
+        traceback.print_exc()
 
 def get_start_command_string(server: ServerInstance, db: Session) -> Optional[str]:
     """
