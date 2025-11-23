@@ -63,18 +63,16 @@ async def install_ark_server_files(
     # Ark Survival Ascended App ID: 2430930
     app_id = "2430930"
     
-    # SteamCMD script
+    # SteamCMD parancsok argumentumként
     # Ark Survival Ascended szerverfájlok telepítése
-    # Megjegyzés: Az Ark Survival Ascended szerverfájlok telepítéséhez
-    # először létre kell hozni a könyvtárat és a szükséges fájlokat
-    steamcmd_script = f"""
-@ShutdownOnFailedCommand 1
-@NoPromptForPassword 1
-force_install_dir {install_path.absolute()}
-login anonymous
-+app_update {app_id} validate
-+quit
-"""
+    # A parancsokat közvetlenül argumentumként adjuk át, nem script fájlként
+    steamcmd_args = [
+        str(steamcmd_path),
+        "+login", "anonymous",
+        "+force_install_dir", str(install_path.absolute()),
+        "+app_update", app_id, "validate",
+        "+quit"
+    ]
     
     log_lines = []
     
@@ -91,21 +89,14 @@ login anonymous
     await log(f"App ID: {app_id}")
     
     try:
-        # SteamCMD futtatása
+        # SteamCMD futtatása parancsokkal argumentumként
         process = await asyncio.create_subprocess_exec(
-            str(steamcmd_path),
-            "+runscript", "-",
-            stdin=asyncio.subprocess.PIPE,
+            *steamcmd_args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=str(install_path.parent),
             bufsize=0  # Unbuffered output
         )
-        
-        # Script küldése
-        process.stdin.write(steamcmd_script.encode())
-        await process.stdin.drain()
-        process.stdin.close()
         
         # Kimenet feldolgozása (real-time)
         # Valós idejű kimenet olvasása
