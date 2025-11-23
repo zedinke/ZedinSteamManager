@@ -513,6 +513,21 @@ class RamPurchase(Base):
     server = relationship("ServerInstance", back_populates="ram_purchases")
     user = relationship("User", foreign_keys=[user_id])
 
+class SystemSettings(Base):
+    """Rendszer beállítások (Manager Admin által beállítható)"""
+    __tablename__ = "system_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), nullable=False, unique=True, index=True)  # Beállítás kulcsa (pl. "default_ram_limit_gb")
+    value = Column(Text, nullable=False)  # Beállítás értéke (JSON vagy string)
+    description = Column(Text, nullable=True)  # Leírás
+    updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    updated_by = relationship("User", foreign_keys=[updated_by_id])
+
 # Dependency
 def get_db():
     """Database session dependency"""
