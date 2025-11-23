@@ -10,19 +10,19 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import ArkServerFiles, SessionLocal
 
-def get_cluster_serverfiles_path(cluster_id: str) -> Path:
+def get_user_serverfiles_path(user_id: int) -> Path:
     """
-    Cluster serverfiles mappa útvonala
+    Felhasználó serverfiles mappa útvonala
     
     Args:
-        cluster_id: Cluster ID
+        user_id: User ID (Server Admin)
     
     Returns:
-        Path objektum a cluster serverfiles mappájához
+        Path objektum a felhasználó serverfiles mappájához
     """
     base_path = Path(settings.ark_serverfiles_base)
-    cluster_serverfiles_path = base_path / cluster_id
-    return cluster_serverfiles_path
+    user_serverfiles_path = base_path / f"user_{user_id}"
+    return user_serverfiles_path
 
 def get_server_path(server_id: Optional[int], cluster_id: Optional[str] = None) -> Path:
     """
@@ -50,23 +50,23 @@ def get_active_ark_files(db: Session) -> Optional[ArkServerFiles]:
         ArkServerFiles.is_active == True
     ).first()
 
-def get_active_cluster_serverfiles(db: Session, cluster_id: int) -> Optional[Path]:
+def get_active_user_serverfiles(db: Session, user_id: int) -> Optional[Path]:
     """
-    Aktív cluster szerverfájlok útvonala
+    Aktív felhasználó szerverfájlok útvonala
     
     Args:
         db: Adatbázis session
-        cluster_id: Cluster ID
+        user_id: User ID (Server Admin)
     
     Returns:
         Path objektum az aktív szerverfájlok útvonalához vagy None
     """
-    from app.database import ClusterServerFiles
-    serverfiles = db.query(ClusterServerFiles).filter(
+    from app.database import UserServerFiles
+    serverfiles = db.query(UserServerFiles).filter(
         and_(
-            ClusterServerFiles.cluster_id == cluster_id,
-            ClusterServerFiles.is_active == True,
-            ClusterServerFiles.installation_status == "completed"
+            UserServerFiles.user_id == user_id,
+            UserServerFiles.is_active == True,
+            UserServerFiles.installation_status == "completed"
         )
     ).first()
     
@@ -99,8 +99,17 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         should_close = False
     
     try:
-        # Aktív cluster szerverfájlok lekérése
-        install_path = get_active_cluster_serverfiles(db, cluster_id)
+        # Server instance lekérése a user_id-hoz
+        from app.database import ServerInstance
+        server_instance = db.query(ServerInstance).filter(
+            ServerInstance.id == server_id
+        ).first()
+        
+        if not server_instance:
+            return None
+        
+        # Aktív felhasználó szerverfájlok lekérése
+        install_path = get_active_user_serverfiles(db, server_instance.server_admin_id)
         if not install_path:
             # Fallback: Manager Admin szerverfájlok
             ark_files = get_active_ark_files(db)
@@ -114,9 +123,18 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         if server_id is None:
             return None
         
-        # Cluster serverfiles mappa létrehozása
-        cluster_serverfiles = get_cluster_serverfiles_path(cluster_id)
-        cluster_serverfiles.mkdir(parents=True, exist_ok=True)
+        # Server instance lekérése a user_id-hoz
+        from app.database import ServerInstance
+        server_instance = db.query(ServerInstance).filter(
+            ServerInstance.id == server_id
+        ).first()
+        
+        if not server_instance:
+            return None
+        
+        # Felhasználó serverfiles mappa létrehozása
+        user_serverfiles = get_user_serverfiles_path(server_instance.server_admin_id)
+        user_serverfiles.mkdir(parents=True, exist_ok=True)
         
         server_path = get_server_path(server_id, cluster_id)
         

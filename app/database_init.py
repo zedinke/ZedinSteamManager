@@ -13,7 +13,7 @@ from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
     ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest,
-    TokenPricingRule, TokenBasePrice, Cluster, ArkServerFiles, UserMod, ClusterServerFiles
+    TokenPricingRule, TokenBasePrice, Cluster, ArkServerFiles, UserMod, UserServerFiles
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -957,9 +957,9 @@ def init_db():
             except Exception as e:
                 print(f"  Figyelmeztetés: user_mods tábla: {e}")
         
-        # Cluster server files tábla létrehozása
-        if 'cluster_server_files' not in existing_tables:
-            print("cluster_server_files tábla létrehozása...")
+        # User server files tábla létrehozása
+        if 'user_server_files' not in existing_tables:
+            print("user_server_files tábla létrehozása...")
             try:
                 with engine.connect() as conn:
                     result = conn.execute(text("""
@@ -972,21 +972,10 @@ def init_db():
                     row = result.fetchone()
                     users_id_type = row[0] if row else id_type
                     
-                    # Cluster ID típus lekérése
-                    result2 = conn.execute(text("""
-                        SELECT COLUMN_TYPE 
-                        FROM INFORMATION_SCHEMA.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = 'clusters' 
-                        AND COLUMN_NAME = 'id'
-                    """))
-                    row2 = result2.fetchone()
-                    cluster_id_type = row2[0] if row2 else id_type
-                    
                     conn.execute(text(f"""
-                        CREATE TABLE cluster_server_files (
+                        CREATE TABLE user_server_files (
                             id {users_id_type} NOT NULL AUTO_INCREMENT,
-                            cluster_id {cluster_id_type} NOT NULL,
+                            user_id {users_id_type} NOT NULL,
                             version VARCHAR(50) NOT NULL,
                             install_path VARCHAR(500) NOT NULL,
                             is_active TINYINT(1) NOT NULL DEFAULT 0,
@@ -996,19 +985,19 @@ def init_db():
                             installation_log TEXT NULL,
                             notes TEXT NULL,
                             PRIMARY KEY (id),
-                            INDEX ix_cluster_server_files_cluster_id (cluster_id),
-                            INDEX ix_cluster_server_files_is_active (is_active),
-                            INDEX ix_cluster_server_files_installed_at (installed_at),
-                            CONSTRAINT fk_cluster_server_files_cluster_id
-                                FOREIGN KEY (cluster_id) REFERENCES clusters(id) ON DELETE CASCADE,
-                            CONSTRAINT fk_cluster_server_files_installed_by_id
+                            INDEX ix_user_server_files_user_id (user_id),
+                            INDEX ix_user_server_files_is_active (is_active),
+                            INDEX ix_user_server_files_installed_at (installed_at),
+                            CONSTRAINT fk_user_server_files_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_user_server_files_installed_by_id
                                 FOREIGN KEY (installed_by_id) REFERENCES users(id) ON DELETE SET NULL
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                     """))
                     conn.commit()
-                print("✓ cluster_server_files tábla létrehozva")
+                print("✓ user_server_files tábla létrehozva")
             except Exception as e:
-                print(f"  Figyelmeztetés: cluster_server_files tábla: {e}")
+                print(f"  Figyelmeztetés: user_server_files tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

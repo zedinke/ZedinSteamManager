@@ -6,9 +6,9 @@ from fastapi import APIRouter, Request, Form, HTTPException, Depends, WebSocket,
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
-from app.database import get_db, User, Cluster, ClusterServerFiles
+from app.database import get_db, User, UserServerFiles
 from app.services.ark_install_service import install_ark_server_files, delete_ark_server_files
-from app.services.symlink_service import get_cluster_serverfiles_path
+from app.services.symlink_service import get_user_serverfiles_path
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from datetime import datetime
@@ -46,119 +46,65 @@ def require_server_admin(request: Request, db: Session = Depends(get_db)) -> Use
 @router.get("", response_class=HTMLResponse)
 async def list_serverfiles(
     request: Request,
-    cluster_id: int = None,
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Cluster szerverfájlok listája"""
+    """Server Admin: Szerverfájlok listája"""
     current_user = require_server_admin(request, db)
     
-    # Cluster-ek lekérése
-    clusters = db.query(Cluster).filter(
-        Cluster.server_admin_id == current_user.id
-    ).order_by(Cluster.name).all()
-    
-    selected_cluster = None
-    serverfiles = []
-    
-    if cluster_id:
-        # Kiválasztott cluster ellenőrzése
-        selected_cluster = db.query(Cluster).filter(
-            and_(
-                Cluster.id == cluster_id,
-                Cluster.server_admin_id == current_user.id
-            )
-        ).first()
-        
-        if selected_cluster:
-            serverfiles = db.query(ClusterServerFiles).filter(
-                ClusterServerFiles.cluster_id == cluster_id
-            ).order_by(desc(ClusterServerFiles.installed_at)).all()
+    # Felhasználó szerverfájljainak lekérése
+    serverfiles = db.query(UserServerFiles).filter(
+        UserServerFiles.user_id == current_user.id
+    ).order_by(desc(UserServerFiles.installed_at)).all()
     
     return templates.TemplateResponse("ark/serverfiles/list.html", {
         "request": request,
         "current_user": current_user,
-        "clusters": clusters,
-        "selected_cluster": selected_cluster,
         "serverfiles": serverfiles
     })
 
 @router.get("/install", response_class=HTMLResponse)
 async def show_install_form(
     request: Request,
-    cluster_id: int = None,
     db: Session = Depends(get_db)
 ):
     """Server Admin: Szerverfájlok telepítési form"""
     current_user = require_server_admin(request, db)
     
-    # Cluster-ek lekérése
-    clusters = db.query(Cluster).filter(
-        Cluster.server_admin_id == current_user.id
-    ).order_by(Cluster.name).all()
-    
-    selected_cluster = None
-    if cluster_id:
-        selected_cluster = db.query(Cluster).filter(
-            and_(
-                Cluster.id == cluster_id,
-                Cluster.server_admin_id == current_user.id
-            )
-        ).first()
-    
-    if not clusters:
-        return RedirectResponse(
-            url="/ark/clusters/create?error=Először+hozz+létre+egy+Cluster-t!",
-            status_code=302
-        )
-    
     return templates.TemplateResponse("ark/serverfiles/install.html", {
         "request": request,
-        "current_user": current_user,
-        "clusters": clusters,
-        "selected_cluster": selected_cluster
+        "current_user": current_user
     })
 
 @router.post("/install")
 async def start_install(
     request: Request,
-    cluster_id: int = Form(...),
     version: str = Form(...),
     db: Session = Depends(get_db)
 ):
     """Server Admin: Szerverfájlok telepítés indítása"""
     current_user = require_server_admin(request, db)
     
-    # Cluster ellenőrzése
-    cluster = db.query(Cluster).filter(
-        and_(
-            Cluster.id == cluster_id,
-            Cluster.server_admin_id == current_user.id
-        )
-    ).first()
-    if not cluster:
-        raise HTTPException(status_code=404, detail="Cluster nem található")
-    
     # Telepítési útvonal
-    cluster_serverfiles = get_cluster_serverfiles_path(cluster.cluster_id)
-    install_path = cluster_serverfiles / version
+    user_serverfiles = get_user_serverfiles_path(current_user.id)
+    install_path = user_serverfiles / version
     
     # Ellenőrizzük, hogy létezik-e már
-    existing = db.query(ClusterServerFiles).filter(
+    existing = db.query(UserServerFiles).filter(
         and_(
-            ClusterServerFiles.cluster_id == cluster_id,
-            ClusterServerFiles.version == version
+            UserServerFiles.user_id == current_user.id,
+            UserServerFiles.version == version
         )
     ).first()
     
     if existing:
         raise HTTPException(
             status_code=400,
-            detail=f"Ez a verzió ({version}) már telepítve van ehhez a cluster-hez"
+            detail=f"Ez a verzió ({version}) már telepítve van"
         )
     
     # Új rekord létrehozása
-    serverfiles = ClusterServerFiles(
-        cluster_id=cluster.id,
+    serverfiles = UserServerFiles(
+        user_id=current_user.id,
         version=version,
         install_path=str(install_path.absolute()),
         is_active=False,
@@ -190,8 +136,8 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
     
     try:
         # Szerverfájlok rekord lekérése
-        serverfiles = db.query(ClusterServerFiles).filter(
-            ClusterServerFiles.id == serverfiles_id
+        serverfiles = db.query(UserServerFiles).filter(
+            UserServerFiles.id == serverfiles_id
         ).first()
         
         if not serverfiles:
@@ -199,10 +145,10 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
             await websocket.close()
             return
         
-        # Cluster ellenőrzése
-        cluster = db.query(Cluster).filter(Cluster.id == serverfiles.cluster_id).first()
-        if not cluster:
-            await websocket.send_json({"error": "Cluster nem található"})
+        # Felhasználó ellenőrzése
+        user = db.query(User).filter(User.id == serverfiles.user_id).first()
+        if not user:
+            await websocket.send_json({"error": "Felhasználó nem található"})
             await websocket.close()
             return
         
@@ -233,7 +179,7 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
         })
         
         success, log = await install_ark_server_files(
-            cluster.cluster_id,
+            str(user.id),  # user_id stringként
             serverfiles.version,
             install_path,
             progress_callback
@@ -244,8 +190,8 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
         db = next(get_db())
         
         # Újra lekérdezzük a rekordot
-        serverfiles = db.query(ClusterServerFiles).filter(
-            ClusterServerFiles.id == serverfiles_id
+        serverfiles = db.query(UserServerFiles).filter(
+            UserServerFiles.id == serverfiles_id
         ).first()
         
         if serverfiles:
@@ -254,11 +200,11 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
             
             # Ha sikeres és nincs aktív verzió, akkor aktiváljuk
             if success:
-                existing_active = db.query(ClusterServerFiles).filter(
+                existing_active = db.query(UserServerFiles).filter(
                     and_(
-                        ClusterServerFiles.cluster_id == serverfiles.cluster_id,
-                        ClusterServerFiles.is_active == True,
-                        ClusterServerFiles.id != serverfiles.id
+                        UserServerFiles.user_id == serverfiles.user_id,
+                        UserServerFiles.is_active == True,
+                        UserServerFiles.id != serverfiles.id
                     )
                 ).first()
                 
@@ -282,9 +228,15 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
         
         # Státusz frissítése
         if serverfiles:
-            serverfiles.installation_status = "failed"
-            serverfiles.installation_log = f"Hiba: {str(e)}"
-            db.commit()
+            db.close()
+            db = next(get_db())
+            serverfiles = db.query(UserServerFiles).filter(
+                UserServerFiles.id == serverfiles_id
+            ).first()
+            if serverfiles:
+                serverfiles.installation_status = "failed"
+                serverfiles.installation_log = f"Hiba: {str(e)}"
+                db.commit()
     
     finally:
         db.close()
@@ -299,21 +251,20 @@ async def delete_serverfiles(
     """Server Admin: Szerverfájlok törlése"""
     current_user = require_server_admin(request, db)
     
-    serverfiles = db.query(ClusterServerFiles).filter(
-        ClusterServerFiles.id == serverfiles_id
+    serverfiles = db.query(UserServerFiles).filter(
+        UserServerFiles.id == serverfiles_id
     ).first()
     
     if not serverfiles:
         raise HTTPException(status_code=404, detail="Szerverfájlok nem találhatók")
     
-    # Cluster ellenőrzése
-    cluster = db.query(Cluster).filter(Cluster.id == serverfiles.cluster_id).first()
-    if not cluster or cluster.server_admin_id != current_user.id:
+    # Felhasználó ellenőrzése
+    if serverfiles.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
     if serverfiles.is_active:
         return RedirectResponse(
-            url=f"/ark/serverfiles?cluster_id={cluster.id}&error=Az+aktív+verzió+nem+törölhető.+Először+aktiválj+egy+másik+verziót!",
+            url=f"/ark/serverfiles?error=Az+aktív+verzió+nem+törölhető.+Először+aktiválj+egy+másik+verziót!",
             status_code=302
         )
     
@@ -323,12 +274,11 @@ async def delete_serverfiles(
         delete_ark_server_files(install_path)
     
     # Rekord törlése
-    cluster_id = serverfiles.cluster_id
     db.delete(serverfiles)
     db.commit()
     
     return RedirectResponse(
-        url=f"/ark/serverfiles?cluster_id={cluster_id}&success=Szerverfájlok+sikeresen+törölve",
+        url=f"/ark/serverfiles?success=Szerverfájlok+sikeresen+törölve",
         status_code=302
     )
 
@@ -341,16 +291,15 @@ async def activate_serverfiles(
     """Server Admin: Szerverfájlok aktiválása"""
     current_user = require_server_admin(request, db)
     
-    serverfiles = db.query(ClusterServerFiles).filter(
-        ClusterServerFiles.id == serverfiles_id
+    serverfiles = db.query(UserServerFiles).filter(
+        UserServerFiles.id == serverfiles_id
     ).first()
     
     if not serverfiles:
         raise HTTPException(status_code=404, detail="Szerverfájlok nem találhatók")
     
-    # Cluster ellenőrzése
-    cluster = db.query(Cluster).filter(Cluster.id == serverfiles.cluster_id).first()
-    if not cluster or cluster.server_admin_id != current_user.id:
+    # Felhasználó ellenőrzése
+    if serverfiles.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
     if serverfiles.installation_status != "completed":
@@ -359,11 +308,11 @@ async def activate_serverfiles(
             detail="Csak a sikeresen telepített verziók aktiválhatók"
         )
     
-    # Összes aktív deaktiválása ugyanahhoz a cluster-hez
-    db.query(ClusterServerFiles).filter(
+    # Összes aktív deaktiválása ugyanahhoz a felhasználóhoz
+    db.query(UserServerFiles).filter(
         and_(
-            ClusterServerFiles.cluster_id == serverfiles.cluster_id,
-            ClusterServerFiles.is_active == True
+            UserServerFiles.user_id == current_user.id,
+            UserServerFiles.is_active == True
         )
     ).update({"is_active": False})
     

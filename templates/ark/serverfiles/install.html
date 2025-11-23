@@ -24,31 +24,13 @@
                 <strong><i class="fas fa-info-circle"></i> Fontos:</strong>
                 <ul style="margin: 10px 0 0 20px;">
                     <li>A telepítés SteamCMD-vel történik</li>
-                    <li>A szerverfájlok a cluster serverfiles mappájába kerülnek</li>
+                    <li>A szerverfájlok a felhasználó serverfiles mappájába kerülnek</li>
                     <li>A telepítés folyamata élőben követhető a terminálban</li>
                     <li>A telepítés hosszabb időt vehet igénybe (több GB letöltés)</li>
                 </ul>
             </div>
             
             <form id="installForm" style="margin-top: 20px;">
-                <div class="form-group">
-                    <label for="cluster_id">
-                        <i class="fas fa-network-wired"></i> Cluster <span style="color: red;">*</span>
-                    </label>
-                    <select id="cluster_id" name="cluster_id" required 
-                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                        {% if selected_cluster %}
-                            <option value="{{ selected_cluster.id }}" selected>{{ selected_cluster.name }} ({{ selected_cluster.cluster_id }})</option>
-                        {% else %}
-                            <option value="">-- Válassz cluster-t --</option>
-                            {% for cluster in clusters %}
-                                <option value="{{ cluster.id }}">{{ cluster.name }} ({{ cluster.cluster_id }})</option>
-                            {% endfor %}
-                        {% endif %}
-                    </select>
-                    <small style="color: #666;">Válassz egy cluster-t. Ha nincs, <a href="/ark/clusters/create">hozz létre egyet</a>!</small>
-                </div>
-                
                 <div class="form-group">
                     <label for="version">
                         <i class="fas fa-tag"></i> Verzió <span style="color: red;">*</span>
@@ -97,14 +79,13 @@ let serverfilesId = null;
 document.getElementById('installForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const clusterId = document.getElementById('cluster_id').value;
     const version = document.getElementById('version').value;
     const installBtn = document.getElementById('installBtn');
     const terminalCard = document.getElementById('terminalCard');
     const terminal = document.getElementById('terminal');
     
-    if (!clusterId || !version) {
-        alert('Kérlek, töltsd ki az összes mezőt!');
+    if (!version) {
+        alert('Kérlek, add meg a verziót!');
         return;
     }
     
@@ -119,7 +100,6 @@ document.getElementById('installForm').addEventListener('submit', async function
     try {
         // Telepítés indítása
         const formData = new FormData();
-        formData.append('cluster_id', clusterId);
         formData.append('version', version);
         
         const response = await fetch('/ark/serverfiles/install', {
@@ -155,7 +135,7 @@ document.getElementById('installForm').addEventListener('submit', async function
                     
                     if (message.success) {
                         setTimeout(() => {
-                            window.location.href = `/ark/serverfiles?cluster_id=${clusterId}&success=Telepítés+sikeres`;
+                            window.location.href = `/ark/serverfiles?success=Telepítés+sikeres`;
                         }, 2000);
                     } else {
                         installBtn.disabled = false;
@@ -206,4 +186,3 @@ document.getElementById('closeTerminalBtn').addEventListener('click', function()
 </script>
 {% endblock %}
 {% endblock %}
-

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # Ark Server
     ark_base_path: str = "/opt/ark_servers"  # Alap útvonal az Ark szerverekhez
     ark_install_path: str = "/opt/ark_server_files"  # Telepített szerverfájlok útvonala
-    ark_serverfiles_base: str = "/home/ai_developer/ZedinSteamManager/Server/ArkAscended/ServerFiles"  # Cluster-alapú serverfiles mappák alap útvonala
+    ark_serverfiles_base: str = "/home/ai_developer/ZedinSteamManager/Server/ArkAscended/ServerFiles"  # Felhasználó-alapú serverfiles mappák alap útvonala
     ark_default_port: int = 7777  # Alapértelmezett port
     ark_default_query_port: int = 27015  # Alapértelmezett query port
     
