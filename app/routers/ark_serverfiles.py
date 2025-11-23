@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, Form, HTTPException, Depends, WebSocket,
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
-from app.database import get_db, User, UserServerFiles
+from app.database import get_db, User, UserServerFiles, SessionLocal
 from app.services.ark_install_service import install_ark_server_files, delete_ark_server_files, check_for_updates
 from app.services.symlink_service import get_user_serverfiles_path
 from fastapi.templating import Jinja2Templates
@@ -229,32 +229,49 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
         )
         
         # Státusz és log frissítése - új session használata a hosszú folyamat után
-        db.close()
-        db = next(get_db())
-        
-        # Újra lekérdezzük a rekordot
-        serverfiles = db.query(UserServerFiles).filter(
-            UserServerFiles.id == serverfiles_id
-        ).first()
-        
-        if serverfiles:
-            serverfiles.installation_status = "completed" if success else "failed"
-            serverfiles.installation_log = log
-            
-            # Ha sikeres és nincs aktív verzió, akkor aktiváljuk
-            if success:
-                existing_active = db.query(UserServerFiles).filter(
-                    and_(
-                        UserServerFiles.user_id == serverfiles.user_id,
-                        UserServerFiles.is_active == True,
-                        UserServerFiles.id != serverfiles.id
-                    )
-                ).first()
-                
-                if not existing_active:
-                    serverfiles.is_active = True
-            
+        try:
             db.commit()
+        except:
+            pass
+        
+        db.close()
+        
+        # Új session létrehozása
+        from app.database import SessionLocal
+        new_db = SessionLocal()
+        
+        try:
+            # Újra lekérdezzük a rekordot
+            serverfiles = new_db.query(UserServerFiles).filter(
+                UserServerFiles.id == serverfiles_id
+            ).first()
+            
+            if serverfiles:
+                serverfiles.installation_status = "completed" if success else "failed"
+                serverfiles.installation_log = log
+                
+                # Ha sikeres és nincs aktív verzió, akkor aktiváljuk
+                if success:
+                    existing_active = new_db.query(UserServerFiles).filter(
+                        and_(
+                            UserServerFiles.user_id == serverfiles.user_id,
+                            UserServerFiles.is_active == True,
+                            UserServerFiles.id != serverfiles.id
+                        )
+                    ).first()
+                    
+                    if not existing_active:
+                        serverfiles.is_active = True
+                
+                new_db.commit()
+        except Exception as e:
+            new_db.rollback()
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Adatbázis hiba a státusz frissítésekor: {str(e)}"
+            })
+        finally:
+            new_db.close()
         
         # Végleges üzenet
         await websocket.send_json({
@@ -271,15 +288,27 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
         
         # Státusz frissítése
         if serverfiles:
-            db.close()
-            db = next(get_db())
-            serverfiles = db.query(UserServerFiles).filter(
-                UserServerFiles.id == serverfiles_id
-            ).first()
-            if serverfiles:
-                serverfiles.installation_status = "failed"
-                serverfiles.installation_log = f"Hiba: {str(e)}"
+            try:
                 db.commit()
+            except:
+                pass
+            db.close()
+            
+            # Új session létrehozása
+            from app.database import SessionLocal
+            new_db = SessionLocal()
+            try:
+                serverfiles = new_db.query(UserServerFiles).filter(
+                    UserServerFiles.id == serverfiles_id
+                ).first()
+                if serverfiles:
+                    serverfiles.installation_status = "failed"
+                    serverfiles.installation_log = f"Hiba: {str(e)}"
+                    new_db.commit()
+            except:
+                new_db.rollback()
+            finally:
+                new_db.close()
     
     finally:
         db.close()
