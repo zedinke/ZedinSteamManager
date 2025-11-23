@@ -151,32 +151,80 @@ async def install_ark_server_files(
         if not binaries.exists():
             # Hiányos telepítés - töröljük a ShooterGame mappát, hogy újratelepítsük
             import shutil
+            import stat
             await log("⚠️ Hiányos telepítés észlelve (nincs Binaries mappa). Régi telepítés törlése...")
-            try:
-                # Próbáljuk meg törölni, de ha nincs jogosultság, akkor csak figyelmeztetünk
-                # A SteamCMD telepítés felülírja a fájlokat úgyis
-                shutil.rmtree(shooter_game)
-                await log("✓ Régi telepítés törölve")
-            except PermissionError as e:
-                await log(f"⚠️ Nincs jogosultság a régi telepítés törléséhez: {e}")
-                await log("ℹ️ A SteamCMD telepítés felülírja a fájlokat, ezért a törlés nem szükséges.")
-                # Próbáljuk meg a jogosultságok javítását (ha lehetséges)
+            
+            # Először próbáljuk meg a Saved mappát külön törölni (ez okozza a problémát)
+            saved_dir = shooter_game / "Saved"
+            if saved_dir.exists():
+                await log("Saved mappa törlése (ez okozhatja a 0x602 hibát)...")
                 try:
-                    import stat
-                    # Jogosultságok javítása
+                    # Jogosultságok javítása először
+                    try:
+                        for root, dirs, files in os.walk(saved_dir):
+                            for d in dirs:
+                                try:
+                                    dir_path = os.path.join(root, d)
+                                    os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                                    if os.name != 'nt':
+                                        os.chown(dir_path, os.getuid(), os.getgid())
+                                except (PermissionError, OSError):
+                                    pass
+                            for f in files:
+                                try:
+                                    file_path = os.path.join(root, f)
+                                    os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                                    if os.name != 'nt':
+                                        os.chown(file_path, os.getuid(), os.getgid())
+                                except (PermissionError, OSError):
+                                    pass
+                    except Exception:
+                        pass
+                    
+                    # Most próbáljuk meg törölni
+                    shutil.rmtree(saved_dir)
+                    await log("✓ Saved mappa törölve")
+                except Exception as e:
+                    await log(f"⚠️ Saved mappa törlése sikertelen: {e}")
+                    # Próbáljuk meg átnevezni (ha törölni nem lehet)
+                    try:
+                        saved_backup = shooter_game / "Saved.backup"
+                        if saved_backup.exists():
+                            shutil.rmtree(saved_backup)
+                        saved_dir.rename(saved_backup)
+                        await log("✓ Saved mappa átnevezve (Saved.backup)")
+                    except Exception:
+                        pass
+            
+            # Most próbáljuk meg törölni az egész ShooterGame mappát
+            try:
+                # Először javítjuk a jogosultságokat
+                try:
                     for root, dirs, files in os.walk(shooter_game):
                         for d in dirs:
-                            os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                            try:
+                                dir_path = os.path.join(root, d)
+                                os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                                if os.name != 'nt':
+                                    os.chown(dir_path, os.getuid(), os.getgid())
+                            except (PermissionError, OSError):
+                                pass
                         for f in files:
-                            os.chmod(os.path.join(root, f), stat.S_IRUSR | stat.S_IWUSR)
-                    # Most próbáljuk meg újra törölni
-                    shutil.rmtree(shooter_game)
-                    await log("✓ Régi telepítés törölve (jogosultságok javítása után)")
-                except Exception as e2:
-                    await log(f"⚠️ Jogosultságok javítása sem sikerült: {e2}")
-                    await log("ℹ️ Folytatjuk a telepítést - a SteamCMD felülírja a fájlokat.")
+                            try:
+                                file_path = os.path.join(root, f)
+                                os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                                if os.name != 'nt':
+                                    os.chown(file_path, os.getuid(), os.getgid())
+                            except (PermissionError, OSError):
+                                pass
+                except Exception:
+                    pass
+                
+                # Most töröljük
+                shutil.rmtree(shooter_game)
+                await log("✓ Régi telepítés törölve")
             except Exception as e:
-                await log(f"⚠️ Nem sikerült törölni a régi telepítést: {e}")
+                await log(f"⚠️ Régi telepítés törlése sikertelen: {e}")
                 await log("ℹ️ Folytatjuk a telepítést - a SteamCMD felülírja a fájlokat.")
     
     # SteamCMD parancs összeállítása

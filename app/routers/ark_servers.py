@@ -694,57 +694,77 @@ async def delete_server(
     
     print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés után: {remaining_servers_after}")
     
-    # Ha nincs már más szerver, töröljük a ServerFiles/user_{user_id} mappát is
-    if remaining_servers_after == 0:
-        try:
-            from app.services.symlink_service import get_user_serverfiles_path
-            import shutil
-            import logging
-            logger = logging.getLogger(__name__)
+    # MINDENKÉPPEN töröljük a ServerFiles/user_{user_id} mappát (függetlenül attól, hogy van-e más szerver)
+    try:
+        from app.services.symlink_service import get_user_serverfiles_path
+        import shutil
+        import logging
+        import stat
+        import os
+        logger = logging.getLogger(__name__)
+        
+        user_serverfiles_path = get_user_serverfiles_path(user_id)
+        print(f"DEBUG: ServerFiles mappa útvonal: {user_serverfiles_path}")
+        print(f"DEBUG: ServerFiles mappa létezik: {user_serverfiles_path.exists()}")
+        
+        if user_serverfiles_path.exists():
+            # Először javítjuk a jogosultságokat (ha szükséges)
+            try:
+                current_uid = os.getuid()
+                current_gid = os.getgid()
+                # Jogosultságok javítása rekurzívan
+                for root, dirs, files in os.walk(user_serverfiles_path):
+                    for d in dirs:
+                        try:
+                            dir_path = os.path.join(root, d)
+                            os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                            if os.name != 'nt':
+                                os.chown(dir_path, current_uid, current_gid)
+                        except (PermissionError, OSError):
+                            pass
+                    for f in files:
+                        try:
+                            file_path = os.path.join(root, f)
+                            os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                            if os.name != 'nt':
+                                os.chown(file_path, current_uid, current_gid)
+                        except (PermissionError, OSError):
+                            pass
+            except Exception as perm_e:
+                print(f"Figyelmeztetés: Jogosultságok javítása sikertelen: {perm_e}")
             
-            user_serverfiles_path = get_user_serverfiles_path(user_id)
-            print(f"DEBUG: ServerFiles mappa útvonal: {user_serverfiles_path}")
-            print(f"DEBUG: ServerFiles mappa létezik: {user_serverfiles_path.exists()}")
-            
-            if user_serverfiles_path.exists():
-                # Próbáljuk meg törölni
+            # Most próbáljuk meg törölni
+            try:
+                shutil.rmtree(user_serverfiles_path)
+                print(f"✓ ServerFiles/user_{user_id} mappa sikeresen törölve: {user_serverfiles_path}")
+                logger.info(f"ServerFiles/user_{user_id} mappa törölve: {user_serverfiles_path}")
+            except PermissionError as pe:
+                print(f"✗ Jogosultsági hiba a ServerFiles/user_{user_id} mappa törlésekor: {pe}")
+                logger.error(f"Jogosultsági hiba a ServerFiles/user_{user_id} mappa törlésekor: {pe}")
+                # Próbáljuk meg fájlonként törölni (ha a teljes mappa nem törölhető)
                 try:
-                    shutil.rmtree(user_serverfiles_path)
-                    print(f"✓ ServerFiles/user_{user_id} mappa sikeresen törölve: {user_serverfiles_path}")
-                    logger.info(f"ServerFiles/user_{user_id} mappa törölve: {user_serverfiles_path}")
-                except PermissionError as pe:
-                    print(f"✗ Jogosultsági hiba a ServerFiles/user_{user_id} mappa törlésekor: {pe}")
-                    logger.error(f"Jogosultsági hiba a ServerFiles/user_{user_id} mappa törlésekor: {pe}")
-                    # Próbáljuk meg sudo-val (ha lehetséges)
-                    try:
-                        import subprocess
-                        result = subprocess.run(
-                            ["sudo", "rm", "-rf", str(user_serverfiles_path)],
-                            capture_output=True,
-                            text=True,
-                            timeout=30
-                        )
-                        if result.returncode == 0:
-                            print(f"✓ ServerFiles/user_{user_id} mappa törölve sudo-val: {user_serverfiles_path}")
-                            logger.info(f"ServerFiles/user_{user_id} mappa törölve sudo-val: {user_serverfiles_path}")
-                        else:
-                            print(f"✗ ServerFiles/user_{user_id} mappa törlése sudo-val sikertelen: {result.stderr}")
-                            logger.error(f"ServerFiles/user_{user_id} mappa törlése sudo-val sikertelen: {result.stderr}")
-                    except Exception as sudo_e:
-                        print(f"✗ Sudo törlés sikertelen: {sudo_e}")
-                        logger.error(f"Sudo törlés sikertelen: {sudo_e}")
-                except Exception as e:
-                    print(f"✗ ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
-                    logger.error(f"ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
-                    import traceback
-                    traceback.print_exc()
-            else:
-                print(f"INFO: ServerFiles/user_{user_id} mappa nem létezik: {user_serverfiles_path}")
-        except Exception as e:
-            # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
-            print(f"✗ Figyelmeztetés: ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
-            import traceback
-            traceback.print_exc()
+                    # Próbáljuk meg átnevezni (ha törölni nem lehet)
+                    backup_path = user_serverfiles_path.parent / f"user_{user_id}.deleted"
+                    if backup_path.exists():
+                        shutil.rmtree(backup_path)
+                    user_serverfiles_path.rename(backup_path)
+                    print(f"✓ ServerFiles/user_{user_id} mappa átnevezve (törlés helyett): {backup_path}")
+                    logger.info(f"ServerFiles/user_{user_id} mappa átnevezve: {backup_path}")
+                except Exception as rename_e:
+                    print(f"✗ ServerFiles/user_{user_id} mappa átnevezése is sikertelen: {rename_e}")
+                    logger.error(f"ServerFiles/user_{user_id} mappa átnevezése sikertelen: {rename_e}")
+            except Exception as e:
+                print(f"✗ ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
+                logger.error(f"ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"INFO: ServerFiles/user_{user_id} mappa nem létezik: {user_serverfiles_path}")
+    except Exception as e:
+        # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
+        print(f"✗ Figyelmeztetés: ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
+        import traceback
+        traceback.print_exc()
     else:
         print(f"INFO: Még van {remaining_servers_after} szerver a felhasználónak, ServerFiles mappa megtartva")
     
