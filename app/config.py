@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     ark_serverfiles_base: str = "/home/ai_developer/ZedinSteamManager/Server/ArkAscended/ServerFiles"  # Felhasználó-alapú serverfiles mappák alap útvonala
     ark_default_port: int = 7777  # Alapértelmezett port
     ark_default_query_port: int = 27015  # Alapértelmezett query port
+    ark_default_rcon_port: int = 27015  # Alapértelmezett RCON port
+    
+    # Backup korlátok
+    backup_max_per_server: int = 20  # Maximum backup száma szerverenként
+    backup_max_total_size_gb: int = 20  # Maximum összes backup méret GB-ban
     
     class Config:
         env_file = BASE_DIR / ".env"

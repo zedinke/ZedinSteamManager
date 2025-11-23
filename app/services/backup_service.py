@@ -11,6 +11,7 @@ from typing import Optional, List, Dict
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.services.symlink_service import get_server_saved_path, get_server_dedicated_saved_path
+from app.config import settings
 
 def get_server_backup_path(server_path: Path) -> Path:
     """
@@ -63,6 +64,10 @@ def create_backup(server_path: Path, backup_name: Optional[str] = None) -> Optio
             tar.add(saved_path, arcname="Saved")
         
         print(f"Backup létrehozva: {backup_file}")
+        
+        # Backup korlátok betartatása
+        enforce_backup_limits(server_path)
+        
         return backup_file
     except Exception as e:
         print(f"Hiba a backup készítésekor: {e}")
@@ -266,6 +271,197 @@ def delete_backup(server_path: Path, backup_name: str) -> bool:
         traceback.print_exc()
         return False
 
+def get_total_backup_size() -> int:
+    """
+    Összes backup fájl teljes méretének számítása (bájtokban)
+    
+    Returns:
+        Összes backup méret bájtokban
+    """
+    try:
+        from app.database import ServerInstance, SessionLocal
+        from app.database import Cluster
+        
+        db = SessionLocal()
+        total_size = 0
+        
+        try:
+            # Összes szerver lekérése
+            servers = db.query(ServerInstance).all()
+            
+            for server in servers:
+                # Szerver útvonal meghatározása
+                if server.server_path:
+                    server_path = Path(server.server_path)
+                else:
+                    cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
+                    if not cluster:
+                        continue
+                    from app.services.symlink_service import get_server_path
+                    server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
+                
+                if not server_path or not server_path.exists():
+                    continue
+                
+                # Backup mappa
+                backup_dir = get_server_backup_path(server_path)
+                if not backup_dir.exists():
+                    continue
+                
+                # Backup fájlok méretének összegzése
+                allowed_extensions = ['.tar.gz', '.tar', '.zip']
+                for backup_file in backup_dir.iterdir():
+                    if backup_file.is_file():
+                        file_name_lower = backup_file.name.lower()
+                        is_valid_backup = any(file_name_lower.endswith(ext) for ext in allowed_extensions)
+                        
+                        if is_valid_backup:
+                            total_size += backup_file.stat().st_size
+        finally:
+            db.close()
+        
+        return total_size
+    except Exception as e:
+        print(f"Hiba az összes backup méretének számításakor: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
+
+def delete_oldest_backup(server_path: Optional[Path] = None) -> bool:
+    """
+    Legrégebbi backup törlése
+    
+    Args:
+        server_path: Ha megadva, csak ezen a szerveren belül keresi a legrégebbit,
+                     ha None, akkor az összes szerver között keresi a legrégebbit
+    
+    Returns:
+        True ha sikeres, False egyébként
+    """
+    try:
+        from app.database import ServerInstance, SessionLocal
+        from app.database import Cluster
+        
+        db = SessionLocal()
+        oldest_backup = None
+        oldest_date = None
+        
+        try:
+            if server_path:
+                # Csak egy szerver backup-jai között keresünk
+                backup_dir = get_server_backup_path(server_path)
+                if backup_dir.exists():
+                    allowed_extensions = ['.tar.gz', '.tar', '.zip']
+                    for backup_file in backup_dir.iterdir():
+                        if backup_file.is_file():
+                            file_name_lower = backup_file.name.lower()
+                            is_valid_backup = any(file_name_lower.endswith(ext) for ext in allowed_extensions)
+                            
+                            if is_valid_backup:
+                                backup_date = datetime.fromtimestamp(backup_file.stat().st_mtime)
+                                if oldest_date is None or backup_date < oldest_date:
+                                    oldest_date = backup_date
+                                    oldest_backup = backup_file
+            else:
+                # Összes szerver backup-jai között keresünk
+                servers = db.query(ServerInstance).all()
+                
+                for server in servers:
+                    # Szerver útvonal meghatározása
+                    if server.server_path:
+                        current_server_path = Path(server.server_path)
+                    else:
+                        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
+                        if not cluster:
+                            continue
+                        from app.services.symlink_service import get_server_path
+                        current_server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
+                    
+                    if not current_server_path or not current_server_path.exists():
+                        continue
+                    
+                    # Backup mappa
+                    backup_dir = get_server_backup_path(current_server_path)
+                    if not backup_dir.exists():
+                        continue
+                    
+                    # Backup fájlok keresése
+                    allowed_extensions = ['.tar.gz', '.tar', '.zip']
+                    for backup_file in backup_dir.iterdir():
+                        if backup_file.is_file():
+                            file_name_lower = backup_file.name.lower()
+                            is_valid_backup = any(file_name_lower.endswith(ext) for ext in allowed_extensions)
+                            
+                            if is_valid_backup:
+                                backup_date = datetime.fromtimestamp(backup_file.stat().st_mtime)
+                                if oldest_date is None or backup_date < oldest_date:
+                                    oldest_date = backup_date
+                                    oldest_backup = backup_file
+        finally:
+            db.close()
+        
+        # Legrégebbi backup törlése
+        if oldest_backup and oldest_backup.exists():
+            oldest_backup.unlink()
+            print(f"Legrégebbi backup törölve: {oldest_backup}")
+            return True
+        
+        return False
+    except Exception as e:
+        print(f"Hiba a legrégebbi backup törlésekor: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def enforce_backup_limits(server_path: Path) -> None:
+    """
+    Backup korlátok betartatása - törli a legrégebbi backup-okat, ha szükséges
+    
+    Args:
+        server_path: Szerver útvonal
+    """
+    try:
+        # 1. Ellenőrizzük a szerver-specifikus korlátot (max 20 db)
+        backups = list_backups(server_path)
+        max_per_server = settings.backup_max_per_server
+        
+        # Töröljük a legrégebbieket, amíg a korlát alatt vagyunk
+        while len(backups) >= max_per_server:
+            # Legrégebbi backup keresése ezen a szerveren
+            if backups:
+                # Rendezzük dátum szerint (legrégebbi először)
+                backups_sorted = sorted(backups, key=lambda x: x["created"])
+                oldest = backups_sorted[0]
+                
+                # Törlés
+                if delete_backup(server_path, oldest["name"]):
+                    backups.remove(oldest)
+                    print(f"Backup törölve korlát miatt (szerver-specifikus): {oldest['name']}")
+                else:
+                    break
+            else:
+                break
+        
+        # 2. Ellenőrizzük az összes backup méretét (max 20GB)
+        max_total_size_bytes = settings.backup_max_total_size_gb * 1024 * 1024 * 1024
+        total_size = get_total_backup_size()
+        
+        # Töröljük a legrégebbieket, amíg a korlát alatt vagyunk
+        while total_size >= max_total_size_bytes:
+            # Legrégebbi backup keresése (összes szerver között)
+            if delete_oldest_backup():
+                # Újraszámoljuk a méretet
+                total_size = get_total_backup_size()
+                print(f"Backup törölve korlát miatt (összes méret): {total_size / (1024*1024*1024):.2f} GB")
+            else:
+                # Ha nem sikerült törölni, kilépünk
+                break
+                
+    except Exception as e:
+        print(f"Hiba a backup korlátok betartatásakor: {e}")
+        import traceback
+        traceback.print_exc()
+
 def upload_backup(server_path: Path, uploaded_file, filename: str) -> Optional[Path]:
     """
     Backup fájl feltöltése
@@ -292,6 +488,10 @@ def upload_backup(server_path: Path, uploaded_file, filename: str) -> Optional[P
             shutil.copyfileobj(uploaded_file, f)
         
         print(f"Backup feltöltve: {backup_file}")
+        
+        # Backup korlátok betartatása
+        enforce_backup_limits(server_path)
+        
         return backup_file
     except Exception as e:
         print(f"Hiba a backup feltöltésekor: {e}")
