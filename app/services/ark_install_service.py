@@ -105,22 +105,38 @@ async def install_ark_server_files(
             target_uid = current_uid
             target_gid = current_gid
         
-        # FONTOS: Először javítjuk a szülő mappák jogosultságait, hogy ne root jogosultságokkal jöjjön létre!
-        # Végigmegyünk a szülő mappákon és beállítjuk a jogosultságokat
-        parent_path = install_path.parent
-        while parent_path.exists() and parent_path != parent_path.parent:
-            try:
-                # Jogosultságok: 755 (rwxr-xr-x)
-                os.chmod(parent_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-                # Tulajdonjog: megfelelő felhasználó
-                if os.name != 'nt':
-                    os.chown(parent_path, target_uid, target_gid)
-            except (PermissionError, OSError):
-                pass  # Ha nincs jogosultság, folytatjuk
-            parent_path = parent_path.parent
+        # FONTOS: Lépésenként hozzuk létre a mappákat, hogy minden lépés után beállíthassuk a jogosultságokat!
+        # Így elkerüljük, hogy root jogosultságokkal jöjjenek létre
+        current_path = install_path
+        parts = []
+        while current_path != current_path.parent:
+            parts.append(current_path)
+            current_path = current_path.parent
         
-        # Most hozzuk létre a mappát (a szülő mappák már megfelelő jogosultságokkal vannak)
-        install_path.mkdir(parents=True, exist_ok=True)
+        # Visszafelé haladunk (a legfelső mappától a legalsóig)
+        parts.reverse()
+        
+        # Először javítjuk a már létező mappák jogosultságait
+        for path in parts:
+            if path.exists():
+                try:
+                    os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                    if os.name != 'nt':
+                        os.chown(path, target_uid, target_gid)
+                except (PermissionError, OSError):
+                    pass
+        
+        # Most lépésenként hozzuk létre a mappákat
+        for path in parts:
+            if not path.exists():
+                path.mkdir(exist_ok=True)
+                # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+                try:
+                    os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                    if os.name != 'nt':
+                        os.chown(path, target_uid, target_gid)
+                except (PermissionError, OSError) as e:
+                    await log(f"⚠️ Jogosultságok beállítása sikertelen {path}: {e}")
         
         # AZONNAL beállítjuk a jogosultságokat (0x602 hiba elkerülésére)
         # FONTOS: A mappa létrehozása után azonnal kell beállítani!
