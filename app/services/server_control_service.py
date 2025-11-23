@@ -589,33 +589,48 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 }
         
         # Státusz frissítése - újrapróbálás kapcsolat hiba esetén
-        try:
-            server.status = ServerStatus.RUNNING
-            from datetime import datetime
-            server.started_at = datetime.now()
-            db.commit()
-        except Exception as db_error:
-            # Ha a kapcsolat megszakadt, újrapróbáljuk új session-nel
-            logger.warning(f"Adatbázis kapcsolat hiba a szerver indításakor: {db_error}, újrapróbálás...")
+        max_retries = 3
+        retry_count = 0
+        status_updated = False
+        server_id = server.id  # Mentsük el az ID-t, mert a server objektum változhat
+        
+        while retry_count < max_retries and not status_updated:
             try:
-                db.rollback()
-                # Új session létrehozása
-                from app.database import SessionLocal
-                new_db = SessionLocal()
-                try:
-                    # Szerver újratöltése az új session-ből
-                    server = new_db.query(ServerInstance).filter(ServerInstance.id == server.id).first()
-                    if server:
-                        server.status = ServerStatus.RUNNING
-                        from datetime import datetime
-                        server.started_at = datetime.now()
-                        new_db.commit()
-                        logger.info(f"Szerver {server.id} státusza frissítve új session-nel")
-                finally:
-                    new_db.close()
-            except Exception as retry_error:
-                logger.error(f"Adatbázis frissítés sikertelen újrapróbálás után is: {retry_error}")
-                # Folytatjuk, mert a Docker indítás sikeres volt
+                if retry_count > 0:
+                    # Új session létrehozása retry esetén
+                    try:
+                        db.rollback()
+                    except:
+                        pass
+                    from app.database import SessionLocal
+                    db = SessionLocal()
+                    server = db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+                    if not server:
+                        break
+                
+                server.status = ServerStatus.RUNNING
+                from datetime import datetime
+                server.started_at = datetime.now()
+                db.commit()
+                status_updated = True
+                logger.info(f"Szerver {server_id} státusza frissítve (próbálkozás: {retry_count + 1})")
+            except Exception as db_error:
+                retry_count += 1
+                error_msg = str(db_error)
+                if "MySQL server has gone away" in error_msg or "2006" in error_msg or "Connection reset" in error_msg:
+                    logger.warning(f"Adatbázis kapcsolat hiba a szerver indításakor (próbálkozás {retry_count}/{max_retries}): {db_error}")
+                    if retry_count < max_retries:
+                        import time
+                        time.sleep(0.5 * retry_count)  # Exponenciális backoff
+                        continue
+                else:
+                    # Más típusú hiba, nem próbáljuk újra
+                    logger.error(f"Adatbázis hiba (nem kapcsolati): {db_error}")
+                    break
+        
+        if not status_updated:
+            logger.error(f"Adatbázis frissítés sikertelen {max_retries} próbálkozás után is")
+            # Folytatjuk, mert a Docker indítás sikeres volt
         
         logger.info(f"Szerver {server.id} indítva Docker-rel")
         
@@ -690,31 +705,47 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         )
         
         # Státusz frissítése - újrapróbálás kapcsolat hiba esetén
-        try:
-            server.status = ServerStatus.STOPPED
-            server.started_at = None
-            db.commit()
-        except Exception as db_error:
-            # Ha a kapcsolat megszakadt, újrapróbáljuk új session-nel
-            logger.warning(f"Adatbázis kapcsolat hiba a szerver leállításakor: {db_error}, újrapróbálás...")
+        max_retries = 3
+        retry_count = 0
+        status_updated = False
+        server_id = server.id  # Mentsük el az ID-t, mert a server objektum változhat
+        
+        while retry_count < max_retries and not status_updated:
             try:
-                db.rollback()
-                # Új session létrehozása
-                from app.database import SessionLocal
-                new_db = SessionLocal()
-                try:
-                    # Szerver újratöltése az új session-ből
-                    server = new_db.query(ServerInstance).filter(ServerInstance.id == server.id).first()
-                    if server:
-                        server.status = ServerStatus.STOPPED
-                        server.started_at = None
-                        new_db.commit()
-                        logger.info(f"Szerver {server.id} státusza frissítve új session-nel")
-                finally:
-                    new_db.close()
-            except Exception as retry_error:
-                logger.error(f"Adatbázis frissítés sikertelen újrapróbálás után is: {retry_error}")
-                # Folytatjuk, mert a Docker leállítás sikeres volt
+                if retry_count > 0:
+                    # Új session létrehozása retry esetén
+                    try:
+                        db.rollback()
+                    except:
+                        pass
+                    from app.database import SessionLocal
+                    db = SessionLocal()
+                    server = db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+                    if not server:
+                        break
+                
+                server.status = ServerStatus.STOPPED
+                server.started_at = None
+                db.commit()
+                status_updated = True
+                logger.info(f"Szerver {server_id} státusza frissítve (próbálkozás: {retry_count + 1})")
+            except Exception as db_error:
+                retry_count += 1
+                error_msg = str(db_error)
+                if "MySQL server has gone away" in error_msg or "2006" in error_msg or "Connection reset" in error_msg:
+                    logger.warning(f"Adatbázis kapcsolat hiba a szerver leállításakor (próbálkozás {retry_count}/{max_retries}): {db_error}")
+                    if retry_count < max_retries:
+                        import time
+                        time.sleep(0.5 * retry_count)  # Exponenciális backoff
+                        continue
+                else:
+                    # Más típusú hiba, nem próbáljuk újra
+                    logger.error(f"Adatbázis hiba (nem kapcsolati): {db_error}")
+                    break
+        
+        if not status_updated:
+            logger.error(f"Adatbázis frissítés sikertelen {max_retries} próbálkozás után is")
+            # Folytatjuk, mert a Docker leállítás sikeres volt
         
         logger.info(f"Szerver {server.id} leállítva Docker-rel")
         
