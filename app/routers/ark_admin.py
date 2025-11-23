@@ -131,16 +131,29 @@ async def delete_ark_files(
         raise HTTPException(status_code=404, detail="Ark szerverfájlok nem találhatók")
     
     if ark_files.is_active:
-        raise HTTPException(
-            status_code=400,
-            detail="Az aktív verzió nem törölhető. Először aktiválj egy másik verziót!"
+        return RedirectResponse(
+            url=f"/admin/ark/files?error=Az+aktív+verzió+nem+törölhető.+Először+aktiválj+egy+másik+verziót!",
+            status_code=302
         )
     
+    # Fájlok törlése
+    install_path = Path(ark_files.install_path)
+    if install_path.exists():
+        try:
+            import shutil
+            shutil.rmtree(install_path)
+        except Exception as e:
+            # Ha a fájlok törlése sikertelen, csak logoljuk, de folytatjuk a rekord törlését
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Szerverfájlok törlése sikertelen: {e}")
+    
+    # Rekord törlése
     db.delete(ark_files)
     db.commit()
     
-    return JSONResponse({
-        "success": True,
-        "message": "Ark szerverfájlok törölve"
-    })
+    return RedirectResponse(
+        url=f"/admin/ark/files?success=Ark+szerverfájlok+sikeresen+törölve",
+        status_code=302
+    )
 

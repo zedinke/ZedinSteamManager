@@ -73,20 +73,26 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if not file.is_active %}
-                                        <form method="POST" action="/admin/ark/files/{{ file.id }}/activate" style="display: inline;" onsubmit="return confirm('Biztosan aktiválod ezt a verziót?');">
-                                            <button type="submit" class="btn btn-success btn-sm">
-                                                <i class="fas fa-check"></i> Aktiválás
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                    {% if not file.is_active %}
-                                        <form method="POST" action="/admin/ark/files/{{ file.id }}/delete" style="display: inline; margin-left: 5px;" onsubmit="return confirm('Biztosan törlöd ezt a verziót?');">
-                                            <button type="submit" class="btn btn-danger btn-sm">
-                                                <i class="fas fa-trash"></i> Törlés
-                                            </button>
-                                        </form>
-                                    {% endif %}
+                                    <div style="display: flex; gap: 5px; align-items: center;">
+                                        {% if not file.is_active %}
+                                            <form method="POST" action="/admin/ark/files/{{ file.id }}/activate" style="display: inline;" onsubmit="return confirm('Biztosan aktiválod ezt a verziót?');">
+                                                <button type="submit" class="btn btn-success btn-sm">
+                                                    <i class="fas fa-check"></i> Aktiválás
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        {% if not file.is_active %}
+                                            <form method="POST" action="/admin/ark/files/{{ file.id }}/delete" style="display: inline;" onsubmit="return confirm('Biztosan törlöd ezt a verziót? A szerverfájlok is törlődnek!');">
+                                                <button type="submit" class="btn btn-danger btn-sm">
+                                                    <i class="fas fa-trash"></i> Törlés
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <span class="text-muted" style="font-size: 0.9rem;">
+                                                <i class="fas fa-info-circle"></i> Aktív verzió
+                                            </span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                         {% endfor %}
