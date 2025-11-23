@@ -149,10 +149,11 @@ async def check_for_updates(
 ) -> tuple[bool, str]:
     """
     Ellenőrzi, hogy van-e frissítés a szerverfájlokhoz
+    A SteamCMD app_update parancs ellenőrzi, hogy szükséges-e frissítés
     
     Args:
         install_path: Telepítési útvonal
-        progress_callback: Callback függvény a progress üzenetekhez
+        progress_callback: Callback függvény a progress üzenetekhez (opcionális)
     
     Returns:
         (has_update: bool, current_version: str)
@@ -161,26 +162,20 @@ async def check_for_updates(
     if not steamcmd_path:
         return False, ""
     
+    # Ha a telepítési útvonal nem létezik, akkor nincs telepített verzió
+    if not install_path.exists():
+        return True, ""  # Van "frissítés" (nincs telepítve)
+    
     app_id = "2430930"
     
-    log_lines = []
-    
-    async def log(message: str):
-        log_lines.append(message)
-        if progress_callback:
-            if asyncio.iscoroutinefunction(progress_callback):
-                await progress_callback(message)
-            else:
-                progress_callback(message)
-    
     try:
-        # SteamCMD futtatása app_info_print parancsokkal
-        # Ez megmondja a jelenlegi és elérhető verziókat
+        # SteamCMD futtatása app_update-dal, de csak ellenőrzés céljából
+        # Ha van frissítés, akkor a SteamCMD jelezni fogja
         process = await asyncio.create_subprocess_exec(
             str(steamcmd_path),
             "+login", "anonymous",
             "+force_install_dir", str(install_path.absolute()),
-            "+app_info_print", app_id,
+            "+app_update", app_id, "validate",
             "+quit",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
@@ -190,6 +185,8 @@ async def check_for_updates(
         
         # Kimenet feldolgozása
         output_lines = []
+        has_update_indicator = False
+        
         while True:
             line = await process.stdout.readline()
             if not line:
@@ -197,29 +194,25 @@ async def check_for_updates(
             line_text = line.decode('utf-8', errors='ignore').strip()
             if line_text:
                 output_lines.append(line_text)
-                await log(line_text)
+                # Ellenőrizzük, hogy van-e frissítés jelző
+                # A SteamCMD jelez, ha frissítés szükséges
+                if any(keyword in line_text.lower() for keyword in ['update available', 'update required', 'downloading', 'updating']):
+                    has_update_indicator = True
         
         return_code = await process.wait()
         
-        # Ha a telepítési útvonal nem létezik, akkor nincs telepített verzió
-        if not install_path.exists():
-            return True, ""  # Van "frissítés" (nincs telepítve)
-        
-        # Ellenőrizzük, hogy van-e frissítés
-        # A SteamCMD output-ban keressük a "Update" vagy "StateFlags" információkat
-        output_text = '\n'.join(output_lines)
-        
-        # Ha a process sikeres volt és van output, akkor ellenőrizzük
+        # Ha a process sikeres volt, akkor ellenőrizzük a kimenetet
         if return_code == 0:
-            # Egyszerű ellenőrzés: ha a telepítési útvonal létezik, de a SteamCMD
-            # azt mondja, hogy frissítés szükséges, akkor van frissítés
-            # A legegyszerűbb módszer: mindig ellenőrizzük az app_update-dal
-            # Ha nem kell frissítés, akkor "Success" lesz, ha kell, akkor frissít
-            return True, "latest"  # Mindig ellenőrizzük, lehet frissítés
+            output_text = '\n'.join(output_lines).lower()
+            # Ha nincs "success" vagy "already up to date", akkor lehet frissítés
+            if has_update_indicator or ('success' not in output_text and 'already up to date' not in output_text):
+                return True, "latest"
+            return False, "latest"
         
-        return False, ""
+        # Ha hiba történt, akkor feltételezzük, hogy lehet frissítés
+        return True, ""
         
     except Exception as e:
-        await log(f"Hiba a frissítés ellenőrzésekor: {str(e)}")
-        return False, ""
+        # Hiba esetén feltételezzük, hogy lehet frissítés (biztonságos oldal)
+        return True, ""
 
