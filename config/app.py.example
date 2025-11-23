@@ -23,5 +23,9 @@ config = {
     'secret_key': 'your-secret-key-here-generate-with-secrets-token-urlsafe-32',
     'token_expiry_days': 30,
     'notification_days_before_expiry': 5,
+    
+    # Docker image beállítások (opcionális)
+    'ark_docker_image': 'zedinarkmanager/ark-server:latest',  # Saját image vagy 'acekorneya/asa_server:2_1_latest'
+    'ark_docker_use_custom': False,  # True = saját image (/home/zedin/arkserver), False = POK image (/home/pok/arkserver)
 }
 
