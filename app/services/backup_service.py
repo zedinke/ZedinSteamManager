@@ -59,6 +59,9 @@ def create_backup(server_path: Path, backup_name: Optional[str] = None) -> Optio
         # Backup mappa létrehozása
         backup_dir = get_server_backup_path(server_path)
         backup_dir.mkdir(parents=True, exist_ok=True)
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        from app.services.symlink_service import ensure_permissions
+        ensure_permissions(backup_dir)
         
         # Backup fájl neve
         if not backup_name:
@@ -487,6 +490,9 @@ def upload_backup(server_path: Path, uploaded_file, filename: str) -> Optional[P
         # Backup mappa létrehozása
         backup_dir = get_server_backup_path(server_path)
         backup_dir.mkdir(parents=True, exist_ok=True)
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        from app.services.symlink_service import ensure_permissions
+        ensure_permissions(backup_dir)
         
         # Fájl mentése
         backup_file = backup_dir / filename

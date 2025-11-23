@@ -4,12 +4,74 @@ Symlink kezelő szolgáltatás - szerverfájlok symlink kezelése
 
 import os
 import shutil
+import stat
 from pathlib import Path
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.config import settings
 from app.database import ArkServerFiles, SessionLocal
+
+def ensure_permissions(path: Path, recursive: bool = False) -> bool:
+    """
+    Biztosítja, hogy a mappa/fájl megfelelő jogosultságokkal és tulajdonjoggal rendelkezzen.
+    FONTOS: Minden mkdir után azonnal meghívni, hogy ne root jogosultságokkal jöjjön létre!
+    
+    Args:
+        path: A mappa/fájl útvonala
+        recursive: Ha True, akkor rekurzívan beállítja az összes almappára és fájlra
+    
+    Returns:
+        True ha sikeres, False ha hiba történt
+    """
+    try:
+        if not path.exists():
+            return False
+        
+        current_uid = os.getuid()
+        current_gid = os.getgid()
+        
+        # Jogosultságok beállítása
+        if path.is_dir():
+            # Mappa: 755 (rwxr-xr-x)
+            os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        else:
+            # Fájl: 644 (rw-r--r--)
+            os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+        
+        # Tulajdonjog beállítása (csak Linux-on)
+        if os.name != 'nt':
+            os.chown(path, current_uid, current_gid)
+        
+        # Rekurzív beállítás, ha kérték
+        if recursive and path.is_dir():
+            for root, dirs, files in os.walk(path):
+                for d in dirs:
+                    try:
+                        dir_path = Path(root) / d
+                        os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        if os.name != 'nt':
+                            os.chown(dir_path, current_uid, current_gid)
+                    except (PermissionError, OSError):
+                        pass
+                
+                for f in files:
+                    try:
+                        file_path = Path(root) / f
+                        os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                        if os.name != 'nt':
+                            os.chown(file_path, current_uid, current_gid)
+                    except (PermissionError, OSError):
+                        pass
+        
+        return True
+    except (PermissionError, OSError) as e:
+        # Ha nincs jogosultság, csak logoljuk, de ne dobjunk hibát
+        print(f"Figyelmeztetés: Jogosultságok beállítása sikertelen {path}: {e}")
+        return False
+    except Exception as e:
+        print(f"Figyelmeztetés: Jogosultságok beállítása hiba {path}: {e}")
+        return False
 
 def get_user_serverfiles_path(user_id: int) -> Path:
     """
@@ -139,23 +201,8 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         
         # Szülő könyvtárak létrehozása
         server_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Jogosultságok beállítása a szülő mappára
-        try:
-            import os
-            import pwd
-            current_user = os.getenv('USER') or os.getenv('USERNAME') or 'ai_developer'
-            try:
-                user_info = pwd.getpwnam(current_user)
-                os.chown(server_path.parent, user_info.pw_uid, user_info.pw_gid)
-            except (KeyError, ImportError):
-                # Ha nem található a felhasználó vagy nincs pwd modul, próbáljuk meg UID 1000-vel
-                try:
-                    os.chown(server_path.parent, 1000, 1000)
-                except (OSError, PermissionError):
-                    pass  # Ha nincs jogosultság, folytatjuk
-        except Exception:
-            pass  # Ha bármi hiba van, folytatjuk
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        ensure_permissions(server_path.parent)
         
         # Ha már létezik, töröljük
         if server_path.exists() or server_path.is_symlink():
@@ -166,6 +213,8 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         
         # Szerver mappa létrehozása
         server_path.mkdir(parents=True, exist_ok=True)
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        ensure_permissions(server_path)
         
         # ServerFiles symlink létrehozása az aktív Ark fájlokhoz
         serverfiles_link = server_path / "ServerFiles"
@@ -176,8 +225,8 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
                 shutil.rmtree(serverfiles_link)
         serverfiles_link.symlink_to(install_path)
         
-        # Jogosultságok beállítása a szerver mappára
-        _fix_permissions(server_path)
+        # Jogosultságok beállítása a szerver mappára (rekurzívan)
+        ensure_permissions(server_path, recursive=True)
         
         # Dedikált Saved mappa létrehozása és symlink
         # A server_path most már a Servers/server_{server_id}/ mappa
@@ -366,15 +415,17 @@ def create_dedicated_saved_folder(serverfiles_link: Path) -> bool:
         if not dedicated_saved_path.exists():
             # Saved mappa létrehozása
             dedicated_saved_path.mkdir(parents=True, exist_ok=True)
+            ensure_permissions(dedicated_saved_path)
             
             # Alapmappák létrehozása
             (dedicated_saved_path / "Config").mkdir(exist_ok=True)
+            ensure_permissions(dedicated_saved_path / "Config")
             (dedicated_saved_path / "Config" / "WindowsServer").mkdir(exist_ok=True)
+            ensure_permissions(dedicated_saved_path / "Config" / "WindowsServer")
             (dedicated_saved_path / "SavedArks").mkdir(exist_ok=True)
+            ensure_permissions(dedicated_saved_path / "SavedArks")
             (dedicated_saved_path / "Logs").mkdir(exist_ok=True)
-            
-            # Jogosultságok beállítása
-            _fix_permissions(dedicated_saved_path)
+            ensure_permissions(dedicated_saved_path / "Logs")
             
             print(f"Dedikált Saved mappa létrehozva: {dedicated_saved_path}")
         else:
@@ -383,6 +434,7 @@ def create_dedicated_saved_folder(serverfiles_link: Path) -> bool:
         # Tényleges szerver Saved mappa útvonala (a ServerFiles symlink mögött)
         real_saved_path = get_server_saved_path(serverfiles_link)
         real_saved_path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_permissions(real_saved_path.parent)
         
         # Ha már létezik Saved mappa vagy symlink, töröljük
         if real_saved_path.exists() or real_saved_path.is_symlink():
@@ -463,6 +515,7 @@ def copy_default_config_files(serverfiles_link: Path) -> bool:
         if not config_already_exists:
             # Config mappa létrehozása a Saved mappában, ha nem létezik
             dedicated_config_in_saved.mkdir(parents=True, exist_ok=True)
+            ensure_permissions(dedicated_config_in_saved)
             
             # Alapértelmezett fájlok másolása
             if default_config_path.is_dir():
@@ -496,6 +549,7 @@ def copy_default_config_files(serverfiles_link: Path) -> bool:
         dedicated_config_path = dedicated_saved_path / "Config" / "WindowsServer"
         if not dedicated_config_path.exists():
             dedicated_config_path.mkdir(parents=True, exist_ok=True)
+            ensure_permissions(dedicated_config_path)
         
         # Ha már létezik config mappa vagy symlink, töröljük
         if real_config_path.exists() or real_config_path.is_symlink():

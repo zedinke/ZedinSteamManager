@@ -196,6 +196,9 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
     try:
         instance_dir = get_instance_dir(server)  # Servers/server_{server_id}/
         instance_dir.mkdir(parents=True, exist_ok=True)
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        from app.services.symlink_service import ensure_permissions
+        ensure_permissions(instance_dir)
         
         # Ha a saved_path egy symlink, követjük
         if saved_path.is_symlink():
@@ -536,6 +539,9 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Log fájl létrehozása a szerver indításához
         log_file = server_path / f"startup_log_{int(time.time())}.txt"
         log_file.parent.mkdir(parents=True, exist_ok=True)
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        from app.services.symlink_service import ensure_permissions
+        ensure_permissions(log_file.parent)
         
         with open(log_file, 'w', encoding='utf-8') as log_f:
             log_f.write(f"=== Szerver indítás log - {datetime.now().isoformat()} ===\n")

@@ -92,6 +92,12 @@ async def install_ark_server_files(
         await log(f"⚠️ Mappa létrehozása sikertelen: {e}")
         # Próbáljuk meg úgyis létrehozni
         install_path.mkdir(parents=True, exist_ok=True)
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        try:
+            os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+            os.chown(install_path, current_uid, current_gid)
+        except (PermissionError, OSError):
+            pass
     
     # FONTOS: Jogosultságok beállítása a SteamCMD telepítés előtt (0x602 hiba elkerülésére)
     # A POK-manager.sh script is ezt csinálja: "Ensure ServerFiles directory has correct permissions to prevent SteamCMD error 0x602"

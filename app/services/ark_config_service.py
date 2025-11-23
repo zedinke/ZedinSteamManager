@@ -405,6 +405,9 @@ def save_ini_file(file_path: Path, data: Dict[str, Dict[str, Any]]) -> bool:
         
         # Szülő mappa létrehozása
         file_path.parent.mkdir(parents=True, exist_ok=True)
+        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+        from app.services.symlink_service import ensure_permissions
+        ensure_permissions(file_path.parent)
         
         # Fájl mentése
         with open(file_path, 'w', encoding='utf-8') as f:
