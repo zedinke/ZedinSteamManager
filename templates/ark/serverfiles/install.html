@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Szerverfájlok Telepítése - ZedinArkManager{% endblock %}
+{% block title %}{% if is_update %}Szerverfájlok Frissítése{% else %}Szerverfájlok Telepítése{% endif %} - ZedinArkManager{% endblock %}
 
 {% block content %}
 <div class="page">
     <div class="page-header">
-        <h2><i class="fas fa-download"></i> Szerverfájlok Telepítése</h2>
-        <p>Ark Survival Ascended szerverfájlok telepítése SteamCMD-vel</p>
+        <h2><i class="fas fa-{% if is_update %}sync-alt{% else %}download{% endif %}"></i> {% if is_update %}Szerverfájlok Frissítése{% else %}Szerverfájlok Telepítése{% endif %}</h2>
+        <p>Ark Survival Ascended szerverfájlok {% if is_update %}frissítése{% else %}telepítése{% endif %} SteamCMD-vel</p>
     </div>
     
     {% if request.query_params.get("error") %}
@@ -70,6 +70,90 @@
 <script>
 let websocket = null;
 let serverfilesId = null;
+
+// Ha van serverfiles_id (update esetén), automatikusan indítsuk
+{% if serverfiles_id %}
+document.addEventListener('DOMContentLoaded', function() {
+    const terminalCard = document.getElementById('terminalCard');
+    const terminal = document.getElementById('terminal');
+    const installBtn = document.getElementById('installBtn');
+    
+    if (terminalCard && terminal) {
+        terminalCard.style.display = 'block';
+        terminal.innerHTML = '<div style="color: #4ec9b0;">Frissítés indítása...</div>';
+        
+        // Automatikusan indítsuk a WebSocket kapcsolatot
+        startWebSocket({{ serverfiles_id }});
+    }
+});
+{% endif %}
+
+function startWebSocket(serverfilesId) {
+    const terminal = document.getElementById('terminal');
+    const installBtn = document.getElementById('installBtn');
+    const terminalCard = document.getElementById('terminalCard');
+    
+    if (!terminal || !serverfilesId) return;
+    
+    // WebSocket kapcsolat létrehozása
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ark/serverfiles/install/${serverfilesId}/stream`;
+    
+    websocket = new WebSocket(wsUrl);
+    
+    websocket.onmessage = function(event) {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'progress') {
+            const line = document.createElement('div');
+            line.textContent = message.message;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        } else if (message.type === 'complete') {
+            const line = document.createElement('div');
+            line.style.color = message.success ? '#4ec9b0' : '#f48771';
+            line.textContent = message.message;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            if (message.success) {
+                setTimeout(() => {
+                    window.location.href = `/ark/serverfiles?success={% if is_update %}Frissítés{% else %}Telepítés{% endif %}+sikeres`;
+                }, 2000);
+            } else {
+                if (installBtn) {
+                    installBtn.disabled = false;
+                    installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+                }
+                document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+            }
+        } else if (message.type === 'error') {
+            const line = document.createElement('div');
+            line.style.color = '#f48771';
+            line.textContent = `Hiba: ${message.message}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            if (installBtn) {
+                installBtn.disabled = false;
+                installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+            }
+            document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+        }
+    };
+    
+    websocket.onerror = function(error) {
+        terminal.innerHTML += '<div style="color: #f48771;">WebSocket hiba történt</div>';
+        if (installBtn) {
+            installBtn.disabled = false;
+            installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+        }
+    };
+    
+    websocket.onclose = function() {
+        console.log('WebSocket kapcsolat bezárva');
+    };
+}
 
 document.getElementById('installForm').addEventListener('submit', async function(e) {
     e.preventDefault();

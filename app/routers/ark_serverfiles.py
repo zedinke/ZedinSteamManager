@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 from app.database import get_db, User, UserServerFiles
-from app.services.ark_install_service import install_ark_server_files, delete_ark_server_files
+from app.services.ark_install_service import install_ark_server_files, delete_ark_server_files, check_for_updates
 from app.services.symlink_service import get_user_serverfiles_path
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -56,23 +56,45 @@ async def list_serverfiles(
         UserServerFiles.user_id == current_user.id
     ).order_by(desc(UserServerFiles.installed_at)).all()
     
+    # Aktív szerverfájlok ellenőrzése frissítésre
+    has_update = False
+    active_serverfiles = None
+    if serverfiles:
+        active_serverfiles = next((sf for sf in serverfiles if sf.is_active and sf.installation_status == "completed"), None)
+        if active_serverfiles:
+            install_path = Path(active_serverfiles.install_path)
+            if install_path.exists():
+                # Gyors ellenőrzés (nem blokkoló)
+                try:
+                    has_update, _ = await check_for_updates(install_path)
+                except:
+                    has_update = False
+    
     return templates.TemplateResponse("ark/serverfiles/list.html", {
         "request": request,
         "current_user": current_user,
-        "serverfiles": serverfiles
+        "serverfiles": serverfiles,
+        "has_update": has_update,
+        "active_serverfiles": active_serverfiles
     })
 
 @router.get("/install", response_class=HTMLResponse)
 async def show_install_form(
     request: Request,
+    update: int = None,
     db: Session = Depends(get_db)
 ):
     """Server Admin: Szerverfájlok telepítési form"""
     current_user = require_server_admin(request, db)
     
+    # Ha update paraméter van, akkor automatikusan indítsuk a streamelést
+    serverfiles_id = update
+    
     return templates.TemplateResponse("ark/serverfiles/install.html", {
         "request": request,
-        "current_user": current_user
+        "current_user": current_user,
+        "serverfiles_id": serverfiles_id,
+        "is_update": update is not None
     })
 
 @router.post("/install")
@@ -198,6 +220,7 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
             "message": "Telepítés elindítva..."
         })
         
+        # Telepítés vagy frissítés
         success, log = await install_ark_server_files(
             str(user.id),  # user_id stringként
             serverfiles.version,
@@ -343,5 +366,67 @@ async def activate_serverfiles(
     return JSONResponse({
         "success": True,
         "message": "Szerverfájlok aktiválva"
+    })
+
+@router.post("/update")
+async def start_update(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Szerverfájlok frissítése (legfrissebb verzió)"""
+    current_user = require_server_admin(request, db)
+    
+    # Aktív szerverfájlok lekérése
+    active_serverfiles = db.query(UserServerFiles).filter(
+        and_(
+            UserServerFiles.user_id == current_user.id,
+            UserServerFiles.is_active == True,
+            UserServerFiles.installation_status == "completed"
+        )
+    ).first()
+    
+    if not active_serverfiles:
+        raise HTTPException(
+            status_code=400,
+            detail="Nincs aktív szerverfájl telepítve. Először telepíts egyet!"
+        )
+    
+    # Ellenőrizzük, hogy van-e már telepítés folyamatban
+    existing_pending = db.query(UserServerFiles).filter(
+        and_(
+            UserServerFiles.user_id == current_user.id,
+            UserServerFiles.version == "latest",
+            UserServerFiles.installation_status.in_(["pending", "installing"])
+        )
+    ).first()
+    
+    if existing_pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Már van telepítés/frissítés folyamatban. Várj, amíg befejeződik!"
+        )
+    
+    # Telepítési útvonal
+    user_serverfiles = get_user_serverfiles_path(current_user.id)
+    install_path = user_serverfiles / "latest"
+    
+    # Új rekord létrehozása frissítéshez
+    serverfiles = UserServerFiles(
+        user_id=current_user.id,
+        version="latest",
+        install_path=str(install_path.absolute()),
+        is_active=False,
+        installed_by_id=current_user.id,
+        installation_status="pending"
+    )
+    
+    db.add(serverfiles)
+    db.commit()
+    db.refresh(serverfiles)
+    
+    return JSONResponse({
+        "success": True,
+        "serverfiles_id": serverfiles.id,
+        "message": "Frissítés elindítva"
     })
 

@@ -21,11 +21,25 @@
         </div>
     {% endif %}
     
-    <div style="margin-bottom: 20px;">
+    <div style="margin-bottom: 20px; display: flex; gap: 10px;">
         <a href="/ark/serverfiles/install" class="btn btn-primary">
             <i class="fas fa-download"></i> Új Verzió Telepítése
         </a>
+        {% if has_update and active_serverfiles %}
+            <form method="POST" action="/ark/serverfiles/update" style="display: inline;">
+                <button type="submit" class="btn btn-warning" id="updateBtn">
+                    <i class="fas fa-sync-alt"></i> Frissítés
+                </button>
+            </form>
+        {% endif %}
     </div>
+    
+    {% if has_update and active_serverfiles %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Elérhető frissítés a szerverfájlokhoz! 
+            Jelenlegi verzió: <strong>{{ active_serverfiles.version }}</strong>
+        </div>
+    {% endif %}
     
     <div class="card">
         <div class="card-header">
