@@ -74,7 +74,52 @@ async def install_ark_server_files(
         current_uid = os.getuid()
         current_gid = os.getgid()
         
-        # Mappa létrehozása
+        # FONTOS: Ha root-ként futunk, próbáljuk meg megtalálni a megfelelő felhasználót
+        if current_uid == 0 and os.name != 'nt':
+            # Root-ként futunk, próbáljuk meg megtalálni a SUDO_USER vagy a tényleges felhasználót
+            target_uid = current_uid
+            target_gid = current_gid
+            sudo_user = os.environ.get('SUDO_USER')
+            if sudo_user:
+                try:
+                    import pwd
+                    user_info = pwd.getpwnam(sudo_user)
+                    target_uid = user_info.pw_uid
+                    target_gid = user_info.pw_gid
+                    await log(f"Root-ként futunk, SUDO_USER alapján: {sudo_user} (UID: {target_uid})")
+                except (KeyError, ImportError):
+                    pass
+            else:
+                # Ha nincs SUDO_USER, próbáljuk meg a $USER-t
+                user_name = os.environ.get('USER') or os.environ.get('USERNAME')
+                if user_name and user_name != 'root':
+                    try:
+                        import pwd
+                        user_info = pwd.getpwnam(user_name)
+                        target_uid = user_info.pw_uid
+                        target_gid = user_info.pw_gid
+                        await log(f"Root-ként futunk, USER alapján: {user_name} (UID: {target_uid})")
+                    except (KeyError, ImportError):
+                        pass
+        else:
+            target_uid = current_uid
+            target_gid = current_gid
+        
+        # FONTOS: Először javítjuk a szülő mappák jogosultságait, hogy ne root jogosultságokkal jöjjön létre!
+        # Végigmegyünk a szülő mappákon és beállítjuk a jogosultságokat
+        parent_path = install_path.parent
+        while parent_path.exists() and parent_path != parent_path.parent:
+            try:
+                # Jogosultságok: 755 (rwxr-xr-x)
+                os.chmod(parent_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                # Tulajdonjog: megfelelő felhasználó
+                if os.name != 'nt':
+                    os.chown(parent_path, target_uid, target_gid)
+            except (PermissionError, OSError):
+                pass  # Ha nincs jogosultság, folytatjuk
+            parent_path = parent_path.parent
+        
+        # Most hozzuk létre a mappát (a szülő mappák már megfelelő jogosultságokkal vannak)
         install_path.mkdir(parents=True, exist_ok=True)
         
         # AZONNAL beállítjuk a jogosultságokat (0x602 hiba elkerülésére)
@@ -82,8 +127,9 @@ async def install_ark_server_files(
         try:
             # Jogosultságok: 755 (rwxr-xr-x)
             os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-            # Tulajdonjog: aktuális felhasználó
-            os.chown(install_path, current_uid, current_gid)
+            # Tulajdonjog: megfelelő felhasználó
+            if os.name != 'nt':
+                os.chown(install_path, target_uid, target_gid)
             await log("✓ Telepítési mappa létrehozva megfelelő jogosultságokkal")
         except (PermissionError, OSError) as e:
             await log(f"⚠️ Jogosultságok beállítása sikertelen: {e}")
@@ -94,8 +140,12 @@ async def install_ark_server_files(
         install_path.mkdir(parents=True, exist_ok=True)
         # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
         try:
+            import stat
+            current_uid = os.getuid()
+            current_gid = os.getgid()
             os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-            os.chown(install_path, current_uid, current_gid)
+            if current_uid != 0 and os.name != 'nt':
+                os.chown(install_path, current_uid, current_gid)
         except (PermissionError, OSError):
             pass
     
