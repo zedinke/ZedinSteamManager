@@ -119,7 +119,7 @@ async def install_ark_server_files(
         str(steamcmd_path),
         "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
         "+login", "anonymous",  # Utána a bejelentkezés
-        "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval
+        "+app_update", app_id,  # Teljes telepítés (validate nélkül új telepítésnél)
         "+quit"
     ]
     
@@ -194,7 +194,7 @@ async def install_ark_server_files(
                             str(steamcmd_path),
                             "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
                             "+login", "anonymous",  # Utána a bejelentkezés
-                            "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval
+                            "+app_update", app_id,  # Teljes telepítés (validate nélkül új telepítésnél)
                             "+quit",
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.STDOUT,
