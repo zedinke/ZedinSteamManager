@@ -83,6 +83,10 @@ async def show_backup(
     server_config = server.config if server.config else {}
     auto_backup_interval = server_config.get("AUTO_BACKUP_INTERVAL", None)  # 3, 6, 12, 24 óra
     
+    # Debug: ellenőrizzük a config értékét
+    print(f"DEBUG: Server config: {server_config}")
+    print(f"DEBUG: AUTO_BACKUP_INTERVAL értéke: {auto_backup_interval}, típus: {type(auto_backup_interval)}")
+    
     # Utolsó backup időpontja (legújabb backup létrehozási ideje)
     last_backup_time = None
     if backups and len(backups) > 0:

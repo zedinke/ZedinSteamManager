@@ -685,9 +685,14 @@ async def edit_server(
     if motd_duration is not None:
         server_config["MOTD_DURATION"] = motd_duration
     if auto_backup_interval is not None:
-        if auto_backup_interval.strip():
-            server_config["AUTO_BACKUP_INTERVAL"] = int(auto_backup_interval)
+        if auto_backup_interval and auto_backup_interval.strip():
+            try:
+                server_config["AUTO_BACKUP_INTERVAL"] = int(auto_backup_interval.strip())
+            except (ValueError, AttributeError):
+                # Ha nem lehet int-té konvertálni, akkor töröljük
+                server_config.pop("AUTO_BACKUP_INTERVAL", None)
         else:
+            # Üres string esetén töröljük
             server_config.pop("AUTO_BACKUP_INTERVAL", None)
     if custom_server_args:
         server_config["CUSTOM_SERVER_ARGS"] = custom_server_args.strip()
