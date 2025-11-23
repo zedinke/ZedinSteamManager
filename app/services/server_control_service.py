@@ -7,6 +7,8 @@ import os
 import signal
 import psutil
 import shutil
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict
 from sqlalchemy.orm import Session
@@ -525,22 +527,57 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 "message": "Docker Compose fájl létrehozása/frissítése sikertelen"
             }
         
-        # Docker Compose indítás
-        compose_cmd = docker_compose_cmd.split() + ["-f", str(compose_file), "up", "-d"]
+        # Log fájl létrehozása a szerver indításához
+        log_file = server_path / f"startup_log_{int(time.time())}.txt"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         
-        result = subprocess.run(
-            compose_cmd,
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
+        with open(log_file, 'w', encoding='utf-8') as log_f:
+            log_f.write(f"=== Szerver indítás log - {datetime.now().isoformat()} ===\n")
+            log_f.write(f"Szerver ID: {server.id}\n")
+            log_f.write(f"Container name: zedin_asa_{server.id}\n")
+            log_f.write(f"Compose file: {compose_file}\n")
+            log_f.write(f"ServerFiles: {serverfiles_link}\n")
+            log_f.write(f"Saved path: {saved_path}\n")
+            log_f.write("\n")
+            
+            # Docker Compose indítás részletes logolással
+            compose_cmd = docker_compose_cmd.split() + ["-f", str(compose_file), "up", "-d"]
+            log_f.write(f"Docker Compose parancs: {' '.join(compose_cmd)}\n")
+            log_f.write("\n--- Docker Compose kimenet ---\n")
+            log_f.flush()
+            
+            # Docker Compose futtatása és kimenet streamelése
+            process = subprocess.Popen(
+                compose_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
+            # Valós idejű log streamelés
+            for line in process.stdout:
+                log_f.write(line)
+                log_f.flush()
+                logger.info(f"[Docker] {line.strip()}")
+            
+            process.wait()
+            return_code = process.returncode
+            
+            log_f.write(f"\n--- Docker Compose exit code: {return_code} ---\n")
+            log_f.flush()
         
-        if result.returncode != 0:
-            logger.error(f"Docker Compose indítás hiba: {result.stderr}")
-            error_msg = result.stderr or result.stdout or "Ismeretlen hiba"
+        if return_code != 0:
+            # Olvassuk be a log fájl tartalmát
+            with open(log_file, 'r', encoding='utf-8') as log_f:
+                log_content = log_f.read()
+            
+            logger.error(f"Docker Compose indítás hiba (log: {log_file}):\n{log_content[-1000:]}")
             return {
                 "success": False,
-                "message": f"Docker Compose indítás sikertelen: {error_msg}"
+                "message": f"Docker Compose indítás sikertelen. Log fájl: {log_file}",
+                "log_file": str(log_file)
             }
         
         # Várakozás, hogy a konténer elinduljon (2 másodperc)
@@ -579,6 +616,15 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 
                 log_output = log_result.stdout or log_result.stderr or "Nincs log kimenet"
                 logger.error(f"Konténer {container_name} logok:\n{log_output}")
+                
+                # Log fájlba is írjuk
+                try:
+                    with open(log_file, 'a', encoding='utf-8') as log_f:
+                        log_f.write(f"\n--- Docker konténer logok (konténer nem fut) ---\n")
+                        log_f.write(log_output)
+                        log_f.write(f"\n--- Log vége ---\n")
+                except Exception as e:
+                    logger.warning(f"Log fájl írása sikertelen: {e}")
                 
                 # Konténer státusz ellenőrzése
                 inspect_result = subprocess.run(
@@ -659,9 +705,19 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         
         logger.info(f"Szerver {server.id} indítva Docker-rel")
         
+        # Log fájlba is írjuk a sikeres indítást
+        try:
+            with open(log_file, 'a', encoding='utf-8') as log_f:
+                log_f.write(f"\n--- Szerver sikeresen elindítva ---\n")
+                log_f.write(f"Konténer: {container_name}\n")
+                log_f.write(f"Időpont: {datetime.now().isoformat()}\n")
+        except Exception as e:
+            logger.warning(f"Log fájl írása sikertelen: {e}")
+        
         return {
             "success": True,
-            "message": "Szerver sikeresen elindítva Docker-rel"
+            "message": f"Szerver sikeresen elindítva Docker-rel. Log fájl: {log_file}",
+            "log_file": str(log_file)
         }
         
     except Exception as e:

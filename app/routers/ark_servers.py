@@ -17,6 +17,55 @@ import json
 
 router = APIRouter(prefix="/ark", tags=["ark_servers"])
 
+@router.get("/servers/{server_id}/logs")
+async def get_server_logs(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Szerver indítási logok megtekintése"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    from app.services.symlink_service import get_server_path
+    server_path = get_server_path(server.id)
+    
+    # Legutóbbi log fájl keresése
+    log_files = sorted(server_path.glob("startup_log_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
+    
+    if not log_files:
+        return JSONResponse({
+            "success": False,
+            "message": "Nincs log fájl"
+        })
+    
+    latest_log = log_files[0]
+    
+    try:
+        with open(latest_log, 'r', encoding='utf-8') as f:
+            log_content = f.read()
+        
+        return JSONResponse({
+            "success": True,
+            "log_file": latest_log.name,
+            "log_content": log_content,
+            "file_size": latest_log.stat().st_size
+        })
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"Log fájl olvasása sikertelen: {str(e)}"
+        })
+
 # Template-ek inicializálása
 BASE_DIR = Path(__file__).parent.parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
