@@ -5,7 +5,7 @@ Token árazás kezelő router - Manager Admin
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
-from app.database import get_db, User, TokenPricingRule, TokenBasePrice, TokenPeriodPrice, TokenType
+from app.database import get_db, User, TokenPricingRule, TokenBasePrice, TokenPeriodPrice, TokenType, RamPricing
 from app.dependencies import require_manager_admin
 from datetime import datetime
 from typing import Optional
@@ -130,6 +130,9 @@ async def pricing_management(
         TokenPricingRule.created_at.desc()
     ).all()
     
+    # RAM árazás lekérése
+    ram_pricing = db.query(RamPricing).order_by(RamPricing.updated_at.desc()).first()
+    
     from app.main import get_templates
     templates = get_templates()
     return templates.TemplateResponse(
@@ -140,7 +143,8 @@ async def pricing_management(
             "period_prices": period_prices,
             "available_periods": AVAILABLE_PERIODS,
             "exchange_rate": exchange_rate,
-            "pricing_rules": pricing_rules
+            "pricing_rules": pricing_rules,
+            "ram_pricing": ram_pricing
         }
     )
 

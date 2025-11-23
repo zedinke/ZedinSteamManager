@@ -279,6 +279,20 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 f'CUSTOM_SERVER_ARGS={config.get("CUSTOM_SERVER_ARGS")}'
             )
         
+        # RAM limit beállítása (ha van beállítva)
+        # Total RAM = ram_limit_gb (alapértelmezett) + purchased_ram_gb (vásárolt)
+        total_ram_gb = (server.ram_limit_gb or 0) + (server.purchased_ram_gb or 0)
+        if total_ram_gb > 0:
+            # Docker memória limit: GB -> MB konverzió
+            memory_limit_mb = total_ram_gb * 1024
+            compose_data['services'][f'asa_{server.id}']['deploy'] = {
+                'resources': {
+                    'limits': {
+                        'memory': f'{memory_limit_mb}M'
+                    }
+                }
+            }
+        
         # YAML fájl írása
         with open(compose_file, 'w') as f:
             yaml.dump(compose_data, f, default_flow_style=False, sort_keys=False)
@@ -334,18 +348,22 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             logger.warning(f"Docker ps hiba: {e}")
         
         # Szerver útvonal lekérése (új struktúra: Servers/server_{server_id}/)
+        # Mindig a helyes útvonalat használjuk, ne a server.server_path-et közvetlenül
+        from app.services.symlink_service import get_servers_base_path
+        servers_base = get_servers_base_path()
+        server_path = servers_base / f"server_{server.id}"
+        
+        # Ha a server.server_path tartalmazza a ServerFiles-t, akkor eltávolítjuk
+        # Ez biztosítja, hogy mindig a helyes útvonalat használjuk
         if server.server_path:
-            # Ha server_path van az adatbázisban, ellenőrizzük, hogy az új struktúrában van-e
-            server_path = Path(server.server_path)
-            # Ha a régi struktúrában van (user_X/server_Y), akkor az új struktúrára konvertáljuk
-            if "user_" in str(server_path) or not server_path.exists():
-                from app.services.symlink_service import get_servers_base_path
-                servers_base = get_servers_base_path()
+            server_path_str = str(server.server_path).replace("\\", "/")
+            # Ha a path végén van ServerFiles, akkor eltávolítjuk
+            if server_path_str.endswith("/ServerFiles"):
+                server_path = Path(server_path_str).parent
+            # Ha a path-ben van ServerFiles, de nem a helyes struktúrában, akkor újraépítjük
+            elif "/ServerFiles/" in server_path_str or server_path_str.count("/ServerFiles") > 1:
+                # Duplikált ServerFiles esetén újraépítjük
                 server_path = servers_base / f"server_{server.id}"
-        else:
-            from app.services.symlink_service import get_servers_base_path
-            servers_base = get_servers_base_path()
-            server_path = servers_base / f"server_{server.id}"
         
         if not server_path or not server_path.exists():
             return {
@@ -355,6 +373,19 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         
         # ServerFiles symlink útvonala (új struktúra: Servers/server_{server_id}/ServerFiles)
         serverfiles_link = server_path / "ServerFiles"
+        
+        # Debug logging
+        logger.info(f"Server path: {server_path}")
+        logger.info(f"ServerFiles link path: {serverfiles_link}")
+        logger.info(f"ServerFiles link exists: {serverfiles_link.exists()}")
+        if serverfiles_link.exists():
+            logger.info(f"ServerFiles link is symlink: {serverfiles_link.is_symlink()}")
+            if serverfiles_link.is_symlink():
+                try:
+                    logger.info(f"ServerFiles symlink target: {serverfiles_link.readlink()}")
+                except Exception as e:
+                    logger.warning(f"Symlink target olvasása sikertelen: {e}")
+        
         if not serverfiles_link.exists() or not serverfiles_link.is_symlink():
             return {
                 "success": False,

@@ -13,7 +13,8 @@ from app.database import (
     Base, engine, SessionLocal, User, UserRole,
     Ticket, TicketMessage, TicketRating, TicketStatus,
     ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest,
-    TokenPricingRule, TokenBasePrice, TokenPeriodPrice, Cluster, ArkServerFiles, UserMod, UserServerFiles
+    TokenPricingRule, TokenBasePrice, TokenPeriodPrice, Cluster, ArkServerFiles, UserMod, UserServerFiles,
+    RamPricing, RamPurchase
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -478,6 +479,8 @@ def init_db():
                             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                             started_at DATETIME NULL,
                             stopped_at DATETIME NULL,
+                            ram_limit_gb INT NULL,
+                            purchased_ram_gb INT NOT NULL DEFAULT 0,
                             PRIMARY KEY (id),
                             INDEX ix_server_instances_game_id (game_id),
                             INDEX ix_server_instances_server_admin_id (server_admin_id),
@@ -957,7 +960,9 @@ def init_db():
                 'rcon_port': 'INT NULL',
                 'active_mods': 'JSON NULL',
                 'passive_mods': 'JSON NULL',
-                'server_path': 'VARCHAR(500) NULL'
+                'server_path': 'VARCHAR(500) NULL',
+                'ram_limit_gb': 'INT NULL',
+                'purchased_ram_gb': 'INT NOT NULL DEFAULT 0'
             }
             
             for col_name, col_def in new_columns.items():
@@ -1089,6 +1094,95 @@ def init_db():
                 print("✓ token_period_prices tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: token_period_prices tábla: {e}")
+        
+        # RAM pricing tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'ram_pricing' not in existing_tables:
+            print("ram_pricing tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE ram_pricing (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            price_per_gb_eur INT NOT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                    
+                    # Alapértelmezett ár beállítása (5 EUR/GB = 500 cent)
+                    conn.execute(text("""
+                        INSERT INTO ram_pricing (price_per_gb_eur) VALUES (500)
+                    """))
+                    conn.commit()
+                print("✓ ram_pricing tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: ram_pricing tábla: {e}")
+        
+        # RAM purchases tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'ram_purchases' not in existing_tables:
+            print("ram_purchases tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    # Ellenőrizzük a server_instances.id típusát
+                    server_instances_id_type = id_type
+                    if 'server_instances' in inspector.get_table_names():
+                        result = conn.execute(text("""
+                            SELECT COLUMN_TYPE 
+                            FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                            AND TABLE_NAME = 'server_instances' 
+                            AND COLUMN_NAME = 'id'
+                        """))
+                        row = result.fetchone()
+                        if row:
+                            server_instances_id_type = row[0]
+                    
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE ram_purchases (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            server_id {server_instances_id_type} NOT NULL,
+                            user_id {users_id_type} NOT NULL,
+                            ram_gb INT NOT NULL,
+                            price_eur INT NOT NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            INDEX ix_ram_purchases_server_id (server_id),
+                            INDEX ix_ram_purchases_user_id (user_id),
+                            INDEX ix_ram_purchases_created_at (created_at),
+                            CONSTRAINT fk_ram_purchases_server_id
+                                FOREIGN KEY (server_id) REFERENCES server_instances(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_ram_purchases_user_id
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                print("✓ ram_purchases tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: ram_purchases tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

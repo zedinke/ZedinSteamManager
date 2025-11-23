@@ -308,12 +308,15 @@ class ServerInstance(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     started_at = Column(DateTime, nullable=True)
     stopped_at = Column(DateTime, nullable=True)
+    ram_limit_gb = Column(Integer, nullable=True)  # Alapértelmezett RAM limit GB-ban (Manager Admin állítja be)
+    purchased_ram_gb = Column(Integer, default=0, nullable=False)  # Vásárolt RAM bővítés GB-ban
     
     # Relationships
     game = relationship("Game", back_populates="server_instances")
     server_admin = relationship("User", foreign_keys=[server_admin_id])
     token_used = relationship("Token", foreign_keys=[token_used_id])
     cluster = relationship("Cluster", back_populates="servers")
+    ram_purchases = relationship("RamPurchase", back_populates="server")
 
 class ArkServerFiles(Base):
     """Ark Survival Ascended szerverfájlok (Manager Admin telepíti)"""
@@ -485,6 +488,30 @@ class TokenPeriodPrice(Base):
     __table_args__ = (
         UniqueConstraint('token_type', 'period_months', name='uq_token_period'),
     )
+
+class RamPricing(Base):
+    """RAM árazás (EUR/GB)"""
+    __tablename__ = "ram_pricing"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    price_per_gb_eur = Column(Integer, nullable=False)  # Ár EUR centekben GB-onként (pl. 500 = 5.00 EUR/GB)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class RamPurchase(Base):
+    """Vásárolt RAM bővítések"""
+    __tablename__ = "ram_purchases"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    server_id = Column(Integer, ForeignKey("server_instances.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    ram_gb = Column(Integer, nullable=False)  # Vásárolt RAM mennyiség GB-ban
+    price_eur = Column(Integer, nullable=False)  # Fizetett ár EUR centekben
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    
+    # Relationships
+    server = relationship("ServerInstance", back_populates="ram_purchases")
+    user = relationship("User", foreign_keys=[user_id])
 
 # Dependency
 def get_db():

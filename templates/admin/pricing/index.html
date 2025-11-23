@@ -88,6 +88,33 @@
     
     <!-- Megjegyzés: A periódus árak mindkét típusra (token igénylés és hosszabbítás) vonatkoznak -->
     
+    <!-- RAM árazás -->
+    <div class="card" style="margin-bottom: 30px;">
+        <div class="card-header">
+            <h3><i class="fas fa-memory"></i> RAM Árazás</h3>
+        </div>
+        <div class="card-body">
+            <p style="margin-bottom: 20px; color: #666;">Itt állíthatod be a RAM bővítés árát EUR-ban GB-onként. A Server Admin felhasználók ezt az árat fizetik, amikor RAM bővítést vásárolnak szervereikhez.</p>
+            
+            <form method="POST" action="/admin/pricing/ram-price">
+                <div style="max-width: 400px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ár EUR-ban / GB:</label>
+                    <input type="number" name="price_per_gb_eur" step="0.01" min="0" 
+                           value="{% if ram_pricing %}{{ "%.2f"|format(ram_pricing.price_per_gb_eur / 100) }}{% else %}5.00{% endif %}" 
+                           required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <small style="color: #666;">Pl. 5.00 = 5.00 EUR/GB</small>
+                    {% if ram_pricing %}
+                        {% set huf_price = ram_pricing.price_per_gb_eur / 100 * exchange_rate %}
+                        <br><small style="color: #999;">≈ {{ "{:,.0f}".format(huf_price) }} HUF/GB ({{ "%.2f"|format(exchange_rate) }} HUF/EUR árfolyammal)</small>
+                    {% endif %}
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top: 15px;">
+                    <i class="fas fa-save"></i> Mentés
+                </button>
+            </form>
+        </div>
+    </div>
+    
     <!-- Árazási szabályok -->
     <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
