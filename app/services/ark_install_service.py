@@ -78,7 +78,6 @@ async def install_ark_server_files(
         if not binaries.exists():
             # Hiányos telepítés - töröljük a ShooterGame mappát, hogy újratelepítsük
             import shutil
-            import os
             await log("⚠️ Hiányos telepítés észlelve (nincs Binaries mappa). Régi telepítés törlése...")
             try:
                 # Próbáljuk meg törölni, de ha nincs jogosultság, akkor csak figyelmeztetünk
