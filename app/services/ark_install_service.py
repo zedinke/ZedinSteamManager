@@ -75,38 +75,74 @@ async def install_ark_server_files(
     await log("Jogosultságok beállítása a telepítési útvonalra (0x602 hiba elkerülésére)...")
     try:
         import stat
+        import subprocess
         current_uid = os.getuid()
         current_gid = os.getgid()
         
         # Mappa jogosultságok beállítása: 755 (rwxr-xr-x)
-        os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        try:
+            os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        except (PermissionError, OSError):
+            # Ha nincs jogosultság, próbáljuk meg sudo-val
+            try:
+                subprocess.run(
+                    ["sudo", "chmod", "755", str(install_path)],
+                    capture_output=True,
+                    timeout=10
+                )
+            except Exception:
+                pass
+        
+        # Tulajdonjog beállítása (ha lehetséges)
+        try:
+            os.chown(install_path, current_uid, current_gid)
+        except (PermissionError, OSError):
+            # Ha nincs jogosultság, próbáljuk meg sudo-val
+            try:
+                subprocess.run(
+                    ["sudo", "chown", "-R", f"{current_uid}:{current_gid}", str(install_path)],
+                    capture_output=True,
+                    timeout=30
+                )
+            except Exception:
+                pass
         
         # Ha van már tartalom, akkor az összes mappát és fájlt is beállítjuk
         if install_path.exists():
-            for root, dirs, files in os.walk(install_path):
-                for d in dirs:
-                    try:
-                        dir_path = os.path.join(root, d)
-                        os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)  # 755
-                        # Tulajdonjog beállítása (ha lehetséges)
+            # Próbáljuk meg sudo-val is, ha van jogosultsági probléma
+            try:
+                # Először próbáljuk meg közvetlenül
+                for root, dirs, files in os.walk(install_path):
+                    for d in dirs:
                         try:
+                            dir_path = os.path.join(root, d)
+                            os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)  # 755
                             os.chown(dir_path, current_uid, current_gid)
                         except (PermissionError, OSError):
-                            pass  # Ha nincs jogosultság, folytatjuk
-                    except (PermissionError, OSError):
-                        pass  # Ha nincs jogosultság, folytatjuk
-                
-                for f in files:
-                    try:
-                        file_path = os.path.join(root, f)
-                        os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)  # 644
-                        # Tulajdonjog beállítása (ha lehetséges)
+                            pass
+                    
+                    for f in files:
                         try:
+                            file_path = os.path.join(root, f)
+                            os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)  # 644
                             os.chown(file_path, current_uid, current_gid)
                         except (PermissionError, OSError):
-                            pass  # Ha nincs jogosultság, folytatjuk
-                    except (PermissionError, OSError):
-                        pass  # Ha nincs jogosultság, folytatjuk
+                            pass
+            except Exception:
+                # Ha közvetlenül nem sikerült, próbáljuk meg sudo-val
+                try:
+                    subprocess.run(
+                        ["sudo", "chmod", "-R", "755", str(install_path)],
+                        capture_output=True,
+                        timeout=30
+                    )
+                    subprocess.run(
+                        ["sudo", "chown", "-R", f"{current_uid}:{current_gid}", str(install_path)],
+                        capture_output=True,
+                        timeout=30
+                    )
+                except Exception:
+                    pass
         
         await log("✓ Jogosultságok beállítva")
     except Exception as e:
@@ -182,6 +218,10 @@ async def install_ark_server_files(
         
         # Kimenet feldolgozása (real-time)
         # Valós idejű kimenet olvasása
+        download_complete = False
+        download_progress = 0.0
+        max_progress = 0.0
+        verifying = False
         while True:
             line = await process.stdout.readline()
             if not line:
@@ -189,9 +229,35 @@ async def install_ark_server_files(
             line_text = line.decode('utf-8', errors='ignore').strip()
             if line_text:
                 await log(line_text)
+                # Ellenőrizzük, hogy a letöltés befejeződött-e
+                if "Success!" in line_text or "fully installed" in line_text.lower():
+                    download_complete = True
+                # Ellenőrizzük, hogy verify fázisban van-e
+                if "verifying" in line_text.lower() or "0x81" in line_text:
+                    verifying = True
+                # Progress követése
+                if "progress:" in line_text.lower():
+                    try:
+                        # Kinyerjük a progress értéket (pl. "progress: 53.18")
+                        import re
+                        progress_match = re.search(r'progress:\s*(\d+\.?\d*)', line_text)
+                        if progress_match:
+                            download_progress = float(progress_match.group(1))
+                            if download_progress > max_progress:
+                                max_progress = download_progress
+                    except Exception:
+                        pass
         
         # Visszatérési kód ellenőrzése - várjuk meg, amíg a folyamat teljesen befejeződik
         return_code = await process.wait()
+        
+        # Ellenőrizzük, hogy a letöltés ténylegesen befejeződött-e
+        if return_code == 0:
+            if max_progress > 0 and max_progress < 100.0 and not verifying:
+                await log(f"⚠️ Figyelmeztetés: SteamCMD exit code 0, de a letöltés csak {max_progress}% volt!")
+                await log("⚠️ Lehet, hogy a telepítés nem teljes. Ellenőrizzük a fájlokat...")
+            elif verifying:
+                await log("ℹ️ SteamCMD verify fázisban volt, ez normális")
         
         # Folyamat befejeződése után várunk, hogy a fájlrendszer műveletek befejeződjenek
         await log("SteamCMD folyamat befejeződött, várakozás a fájlrendszer stabilizálódására...")
@@ -200,7 +266,57 @@ async def install_ark_server_files(
         # SteamCMD néhány exit code esetén is sikeres lehet (pl. 8 = részben sikeres)
         # Ellenőrizzük, hogy a bináris létezik-e, mert az a fontos
         if return_code == 0:
-            await log("✓ SteamCMD telepítés sikeresen befejeződött!")
+            # Ellenőrizzük, hogy a letöltés ténylegesen befejeződött-e
+            if max_progress > 0 and max_progress < 100.0 and not verifying and not download_complete:
+                await log(f"⚠️ Figyelmeztetés: SteamCMD exit code 0, de a letöltés csak {max_progress}% volt!")
+                await log("⚠️ A letöltés nem fejeződött be teljesen. Újratelepítés indítása...")
+                # Újratelepítés indítása, mert a letöltés nem fejeződött be
+                try:
+                    import subprocess
+                    shooter_game = install_path / "ShooterGame"
+                    if shooter_game.exists():
+                        # Töröljük a hiányos telepítést
+                        await log("Hiányos telepítés törlése...")
+                        result = subprocess.run(
+                            ["sudo", "rm", "-rf", str(shooter_game)],
+                            capture_output=True,
+                            text=True,
+                            timeout=30
+                        )
+                        if result.returncode == 0:
+                            await log("✓ Hiányos telepítés törölve")
+                        else:
+                            await log(f"⚠️ Hiányos telepítés törlése sikertelen: {result.stderr}")
+                    # Újratelepítés
+                    await asyncio.sleep(2)
+                    await log("Újratelepítés indítása SteamCMD-vel...")
+                    process2 = await asyncio.create_subprocess_exec(
+                        str(steamcmd_path),
+                        "+force_install_dir", str(install_path.absolute()),
+                        "+login", "anonymous",
+                        "+app_update", app_id,
+                        "+quit",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                        cwd=str(install_path.parent),
+                        bufsize=0
+                    )
+                    while True:
+                        line = await process2.stdout.readline()
+                        if not line:
+                            break
+                        line_text = line.decode('utf-8', errors='ignore').strip()
+                        if line_text:
+                            await log(line_text)
+                    return_code = await process2.wait()
+                    await log("Újratelepítés befejeződött, várakozás a fájlrendszer stabilizálódására...")
+                    await asyncio.sleep(3)
+                except Exception as e:
+                    await log(f"⚠️ Újratelepítés sikertelen: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                await log("✓ SteamCMD telepítés sikeresen befejeződött!")
             
             # Várunk egy kicsit, hogy a fájlrendszer frissüljön
             await asyncio.sleep(3)
@@ -260,12 +376,21 @@ async def install_ark_server_files(
             
             # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
             # Lehet, hogy a linux64/ mappában van közvetlenül (más rendszerekben így van)
+            # Várunk egy kicsit, hogy a fájlrendszer biztosan frissüljön
+            await asyncio.sleep(2)
+            
             linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
             # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
             linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
+            
+            # Részletes ellenőrzés logolása
+            await log(f"Bináris ellenőrzés:")
+            await log(f"  - Linux (ShooterGame/Binaries/Linux): {linux_binary_shootergame.exists()}")
+            await log(f"  - Linux (linux64/): {linux_binary_linux64.exists()}")
+            await log(f"  - Windows: {win64_binary.exists()}")
             
             if not linux_binary and not win64_binary.exists():
                 error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer bináris nem található (sem Linux, sem Windows)"
