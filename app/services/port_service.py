@@ -161,15 +161,19 @@ def get_query_port(game_port: int, db: Session = None) -> int:
 
 def get_rcon_port(game_port: int, db: Session = None) -> int:
     """
-    RCON port számítása a game port alapján
-    Ark Survival Ascended esetén általában game_port + 1
+    RCON port számítása
+    Ark Survival Ascended esetén alapértelmezett: 27015
+    Ha foglalt, akkor 27015-től keresünk szabad portot
     """
-    # Ark Survival Ascended: RCON port = game_port + 1
-    rcon_port = game_port + 1
+    from app.config import settings
+    
+    # Ark Survival Ascended: RCON port alapértelmezett = 27015
+    default_rcon_port = 27015
+    rcon_port = default_rcon_port
     
     # Ellenőrizzük, hogy elérhető-e
     if not check_port_available(rcon_port):
-        # Ha nem elérhető, keressünk egy szabad portot az adatbázisból
+        # Ha nem elérhető, keressünk egy szabad portot
         if db:
             # Lekérjük az összes használt RCON portot
             used_rcon_ports = []
@@ -182,18 +186,22 @@ def get_rcon_port(game_port: int, db: Session = None) -> int:
             except Exception:
                 pass
             
-            # Keressünk egy szabad portot (game_port + 1, +3, +4, stb., de ne legyen query_port)
-            query_port = game_port + 2  # Query port
-            for offset in [1, 3, 4, 5, 6, 7, 8, 9, 10]:
-                candidate_port = game_port + offset
+            # Query port lekérése (game_port + 2)
+            query_port = game_port + 2
+            
+            # Keressünk egy szabad portot 27015-től kezdve
+            # Maximum 100 portot próbálunk meg
+            for offset in range(0, 100):
+                candidate_port = default_rcon_port + offset
+                # Ne legyen query_port és ne legyen használt
                 if candidate_port != query_port and candidate_port not in used_rcon_ports and check_port_available(candidate_port):
                     rcon_port = candidate_port
                     break
         else:
-            # Ha nincs db session, próbáljuk meg a game_port + 3, +4, stb. (de ne legyen query_port)
+            # Ha nincs db session, próbáljuk meg 27015-től
             query_port = game_port + 2
-            for offset in [3, 4, 5, 6, 7, 8, 9, 10]:
-                candidate_port = game_port + offset
+            for offset in range(0, 100):
+                candidate_port = default_rcon_port + offset
                 if candidate_port != query_port and check_port_available(candidate_port):
                     rcon_port = candidate_port
                     break
