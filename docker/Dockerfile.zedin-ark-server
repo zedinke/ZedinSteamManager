@@ -1,7 +1,7 @@
 # ZedinArkManager - ARK Survival Ascended Server Docker Image
 # Saját struktúrát használ: /home/zedin/arkserver
 
-FROM ubuntu:22.04
+FROM debian:12
 
 # Környezeti változók
 ENV DEBIAN_FRONTEND=noninteractive
@@ -15,16 +15,17 @@ RUN useradd -m -u 1000 -s /bin/bash zedin && \
     mkdir -p ${ARK_SERVER_DIR} ${STEAMCMD_DIR} && \
     chown -R zedin:zedin /home/zedin
 
-# Wine repository hozzáadása
+# Wine repository hozzáadása (Debian 12)
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         gnupg2 \
-        software-properties-common \
+        ca-certificates \
+        wget \
         && \
     mkdir -pm755 /etc/apt/keyrings && \
     wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key && \
-    wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources && \
+    echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main" > /etc/apt/sources.list.d/winehq-bookworm.sources && \
     apt-get update
 
 # Szükséges csomagok telepítése
