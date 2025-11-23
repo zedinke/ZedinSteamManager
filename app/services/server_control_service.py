@@ -377,22 +377,27 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                     logger.warning(f"Binaries mappa nem létezik: {binaries_path}")
                     logger.warning(f"  - ShooterGame tartalma: {[item.name for item in shooter_game_path.iterdir()] if shooter_game_path.exists() else 'N/A'}")
                 else:
-                    # Ellenőrizzük a Linux binárist
-                    linux_binary = binaries_path / "Linux" / "ShooterGameServer"
+                    # Ellenőrizzük a Linux binárist (két helyen is lehet: ShooterGame/Binaries/Linux vagy linux64/)
+                    linux_binary_shootergame = binaries_path / "Linux" / "ShooterGameServer"
+                    linux_binary_linux64 = real_server_path / "linux64" / "ShooterGameServer"
                     # Ellenőrizzük a Windows binárist is
                     win64_binary = binaries_path / "Win64" / "ShooterGameServer.exe"
+                    
+                    # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
+                    linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
                     
                     # Nézzük meg, mi van a Binaries mappában
                     binaries_contents = [item.name for item in binaries_path.iterdir()] if binaries_path.exists() else []
                     logger.info(f"Binaries mappa tartalma: {binaries_contents}")
                     
-                    if linux_binary.exists():
+                    if linux_binary:
                         logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
                     elif win64_binary.exists():
                         logger.info(f"Windows ShooterGameServer.exe bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
                     else:
                         logger.warning(f"ShooterGameServer bináris nem található (sem Linux, sem Windows):")
-                        logger.warning(f"  - Linux: {linux_binary}")
+                        logger.warning(f"  - Linux (ShooterGame/Binaries/Linux): {linux_binary_shootergame}")
+                        logger.warning(f"  - Linux (linux64/): {linux_binary_linux64}")
                         logger.warning(f"  - Windows: {win64_binary}")
                         logger.warning(f"  - Binaries mappa tartalma: {binaries_contents}")
                         if binaries_path.exists():
@@ -401,6 +406,10 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                                 if item.is_dir():
                                     sub_contents = [subitem.name for subitem in item.iterdir()] if item.exists() else []
                                     logger.warning(f"  - {item.name}/ tartalma: {sub_contents[:10]}")
+                        # Ellenőrizzük a linux64/ mappát is
+                        if (real_server_path / "linux64").exists():
+                            linux64_contents = [item.name for item in (real_server_path / "linux64").iterdir()] if (real_server_path / "linux64").exists() else []
+                            logger.warning(f"  - linux64/ mappa tartalma: {linux64_contents[:10]}")
         
         # YAML fájl írása
         with open(compose_file, 'w') as f:

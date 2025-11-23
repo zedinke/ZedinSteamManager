@@ -218,10 +218,15 @@ async def install_ark_server_files(
                     await log(f"⚠️ Újratelepítés sikertelen: {e}")
             
             # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
-            linux_binary = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            # Lehet, hogy a linux64/ mappában van közvetlenül (más rendszerekben így van)
+            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
-            if not linux_binary.exists() and not win64_binary.exists():
+            # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
+            linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
+            
+            if not linux_binary and not win64_binary.exists():
                 error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer bináris nem található (sem Linux, sem Windows)"
                 await log(f"✗ {error_msg}")
                 await log("Ellenőrzés:")
@@ -252,8 +257,12 @@ async def install_ark_server_files(
                             await log(f"  - A telepítés hiányos! Próbáljuk meg újratelepíteni!")
                 return False, '\n'.join(log_lines)
             
-            await log(f"✓ ShooterGameServer bináris megtalálva: {binary_path}")
-            await log("✓ Telepítés teljesen befejeződött!")
+            if linux_binary:
+                await log(f"✓ Linux ShooterGameServer bináris megtalálva: {linux_binary}")
+                await log("✓ Telepítés teljesen befejeződött!")
+            elif win64_binary.exists():
+                await log(f"✓ Windows ShooterGameServer.exe bináris megtalálva: {win64_binary}")
+                await log("✓ Telepítés teljesen befejeződött! (Windows bináris, Wine-nal fog futni)")
             return True, '\n'.join(log_lines)
         elif return_code == 8:
             # Exit code 8 gyakran előfordul, de a telepítés mégis sikeres lehet
@@ -262,7 +271,9 @@ async def install_ark_server_files(
             await log("Ellenőrizzük, hogy a telepítés sikeres volt-e...")
             
             # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
-            linux_binary = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            # Lehet, hogy a linux64/ mappában van közvetlenül (más rendszerekben így van)
+            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
             # Várunk, amíg a bináris létrejön (max 60 másodperc, de csak akkor várunk, ha még nincs)
@@ -272,20 +283,18 @@ async def install_ark_server_files(
             
             while waited_time < max_wait_time:
                 # Részletes ellenőrzés
-                shooter_game = install_path / "ShooterGame"
-                if shooter_game.exists():
-                    binaries = shooter_game / "Binaries"
-                    if binaries.exists():
-                        # Ellenőrizzük mindkét binárist
-                        if linux_binary.exists():
-                            await log(f"✓ Linux bináris megtalálva: {linux_binary}")
-                            await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
-                            return True, '\n'.join(log_lines)
-                        elif win64_binary.exists():
-                            await log(f"✓ Windows bináris megtalálva: {win64_binary}")
-                            await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
-                            await log("ℹ️ Windows binárist használunk Wine-nal")
-                            return True, '\n'.join(log_lines)
+                # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
+                linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
+                
+                if linux_binary:
+                    await log(f"✓ Linux bináris megtalálva: {linux_binary}")
+                    await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
+                    return True, '\n'.join(log_lines)
+                elif win64_binary.exists():
+                    await log(f"✓ Windows bináris megtalálva: {win64_binary}")
+                    await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
+                    await log("ℹ️ Windows binárist használunk Wine-nal")
+                    return True, '\n'.join(log_lines)
                 
                 # Ha még nincs, várunk és újra ellenőrizzük
                 if waited_time == 0:
@@ -313,10 +322,14 @@ async def install_ark_server_files(
             
             # Mégis ellenőrizzük, hogy esetleg a bináris létezik-e
             await asyncio.sleep(2)
-            linux_binary = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
-            if linux_binary.exists():
+            # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
+            linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
+            
+            if linux_binary:
                 await log("⚠️ Linux bináris mégis létezik, telepítés valószínűleg sikeres volt!")
                 await log(f"✓ Linux bináris: {linux_binary}")
                 return True, '\n'.join(log_lines)
