@@ -372,19 +372,36 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             if not shooter_game_path.exists():
                 logger.warning(f"ShooterGame mappa nem létezik: {shooter_game_path}")
             else:
-                # Ellenőrizzük a Linux binárist
-                linux_binary = shooter_game_path / "Binaries" / "Linux" / "ShooterGameServer"
-                # Ellenőrizzük a Windows binárist is
-                win64_binary = shooter_game_path / "Binaries" / "Win64" / "ShooterGameServer.exe"
-                
-                if linux_binary.exists():
-                    logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
-                elif win64_binary.exists():
-                    logger.info(f"Windows ShooterGameServer bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
+                # Ellenőrizzük a Binaries mappát
+                binaries_path = shooter_game_path / "Binaries"
+                if not binaries_path.exists():
+                    logger.warning(f"Binaries mappa nem létezik: {binaries_path}")
+                    logger.warning(f"  - ShooterGame tartalma: {[item.name for item in shooter_game_path.iterdir()] if shooter_game_path.exists() else 'N/A'}")
                 else:
-                    logger.warning(f"ShooterGameServer bináris nem található (sem Linux, sem Windows):")
-                    logger.warning(f"  - Linux: {linux_binary}")
-                    logger.warning(f"  - Windows: {win64_binary}")
+                    # Ellenőrizzük a Linux binárist
+                    linux_binary = binaries_path / "Linux" / "ShooterGameServer"
+                    # Ellenőrizzük a Windows binárist is
+                    win64_binary = binaries_path / "Win64" / "ShooterGameServer.exe"
+                    
+                    # Nézzük meg, mi van a Binaries mappában
+                    binaries_contents = [item.name for item in binaries_path.iterdir()] if binaries_path.exists() else []
+                    logger.info(f"Binaries mappa tartalma: {binaries_contents}")
+                    
+                    if linux_binary.exists():
+                        logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
+                    elif win64_binary.exists():
+                        logger.info(f"Windows ShooterGameServer bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
+                    else:
+                        logger.warning(f"ShooterGameServer bináris nem található (sem Linux, sem Windows):")
+                        logger.warning(f"  - Linux: {linux_binary}")
+                        logger.warning(f"  - Windows: {win64_binary}")
+                        logger.warning(f"  - Binaries mappa tartalma: {binaries_contents}")
+                        if binaries_path.exists():
+                            # Nézzük meg részletesebben, mi van a Binaries mappában
+                            for item in binaries_path.iterdir():
+                                if item.is_dir():
+                                    sub_contents = [subitem.name for subitem in item.iterdir()] if item.exists() else []
+                                    logger.warning(f"  - {item.name}/ tartalma: {sub_contents[:10]}")
         
         # YAML fájl írása
         with open(compose_file, 'w') as f:
