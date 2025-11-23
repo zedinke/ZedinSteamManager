@@ -38,10 +38,13 @@ RUN apt-get install -y --no-install-recommends \
         unzip \
         ca-certificates \
         winehq-stable \
-        winetricks \
         xvfb \
         && \
     rm -rf /var/lib/apt/lists/*
+
+# Winetricks telepítése (külön, mert nincs a Debian repository-kban)
+RUN wget -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks && \
+    chmod +x /usr/local/bin/winetricks
 
 # SteamCMD letöltése és telepítése
 RUN cd ${STEAMCMD_DIR} && \
