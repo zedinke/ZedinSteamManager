@@ -103,6 +103,29 @@ async def show_backup(
             # Ha nincs még backup, akkor az intervallum órával később lesz
             next_backup_time = datetime.now() + timedelta(hours=int(auto_backup_interval))
     
+    # Backup korlátok számítása
+    from app.services.backup_service import get_total_backup_size
+    from app.config import settings
+    
+    current_backup_count = len(backups)
+    max_backup_per_server = settings.backup_max_per_server
+    
+    # Jelenlegi szerver backup mérete
+    current_server_backup_size = sum(b["size"] for b in backups)
+    current_server_backup_size_gb = current_server_backup_size / (1024 * 1024 * 1024)
+    
+    # Összes backup méret
+    total_backup_size = get_total_backup_size()
+    total_backup_size_gb = total_backup_size / (1024 * 1024 * 1024)
+    max_total_backup_size_gb = settings.backup_max_total_size_gb
+    
+    # Figyelmeztetések
+    warnings = []
+    if current_backup_count >= max_backup_per_server * 0.8:  # 80% felett
+        warnings.append(f"Figyelem: {current_backup_count}/{max_backup_per_server} backup van ezen a szerveren. Ha eléri a maximumot, a legrégebbi backup automatikusan törlődik.")
+    if total_backup_size_gb >= max_total_backup_size_gb * 0.8:  # 80% felett
+        warnings.append(f"Figyelem: Az összes backup mérete {total_backup_size_gb:.2f} GB / {max_total_backup_size_gb} GB. Ha eléri a maximumot, a legrégebbi backup automatikusan törlődik.")
+    
     return templates.TemplateResponse("ark/server_backup.html", {
         "request": request,
         "current_user": current_user,
@@ -110,7 +133,13 @@ async def show_backup(
         "backups": backups,
         "auto_backup_interval": auto_backup_interval,
         "last_backup_time": last_backup_time,
-        "next_backup_time": next_backup_time
+        "next_backup_time": next_backup_time,
+        "current_backup_count": current_backup_count,
+        "max_backup_per_server": max_backup_per_server,
+        "current_server_backup_size_gb": current_server_backup_size_gb,
+        "total_backup_size_gb": total_backup_size_gb,
+        "max_total_backup_size_gb": max_total_backup_size_gb,
+        "warnings": warnings
     })
 
 @router.post("/{server_id}/backup/create")

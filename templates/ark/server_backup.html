@@ -41,6 +41,41 @@
                 </ul>
             </div>
             
+            <!-- Backup korlátok információ -->
+            <div class="alert alert-warning" style="margin-top: 20px;">
+                <strong><i class="fas fa-exclamation-triangle"></i> Backup Korlátok:</strong>
+                <div style="margin-top: 10px;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>Szerver-specifikus korlát:</strong> 
+                        <span style="color: {% if current_backup_count >= max_backup_per_server * 0.8 %}red{% elif current_backup_count >= max_backup_per_server * 0.6 %}orange{% else %}green{% endif %};">
+                            {{ current_backup_count }} / {{ max_backup_per_server }} backup
+                        </span>
+                        {% if current_server_backup_size_gb > 0 %}
+                            ({{ "%.2f"|format(current_server_backup_size_gb) }} GB)
+                        {% endif %}
+                    </div>
+                    <div>
+                        <strong>Rendszer-szintű korlát:</strong> 
+                        <span style="color: {% if total_backup_size_gb >= max_total_backup_size_gb * 0.8 %}red{% elif total_backup_size_gb >= max_total_backup_size_gb * 0.6 %}orange{% else %}green{% endif %};">
+                            {{ "%.2f"|format(total_backup_size_gb) }} / {{ max_total_backup_size_gb }} GB
+                        </span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                        <i class="fas fa-info-circle"></i> Ha valamelyik korlát megtelik, a legrégebbi backup automatikusan törlődik.
+                    </div>
+                </div>
+            </div>
+            
+            {% if warnings %}
+                <div class="alert alert-warning" style="margin-top: 15px;">
+                    {% for warning in warnings %}
+                        <div style="margin-bottom: 5px;">
+                            <i class="fas fa-exclamation-triangle"></i> {{ warning }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
             <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                 <form method="POST" action="/ark/servers/{{ server.id }}/backup/create" style="display: inline;">
                     <button type="submit" class="btn btn-primary">
