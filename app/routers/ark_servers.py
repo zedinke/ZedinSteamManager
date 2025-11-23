@@ -609,27 +609,69 @@ async def delete_server(
     
     # Ha fut a szerver, akkor először le kell állítani
     if server.status == ServerStatus.RUNNING:
-        return RedirectResponse(
-            url=f"/ark/servers?error=A+szerver+törlése+előtt+először+le+kell+állítani",
-            status_code=302
-        )
+        # Automatikusan leállítjuk a szervert
+        try:
+            from app.services.server_control_service import stop_server
+            stop_result = stop_server(server, db)
+            if not stop_result.get("success"):
+                return RedirectResponse(
+                    url=f"/ark/servers?error=A+szerver+leállítása+sikertelen.+Kérem,+állítsa+le+manuálisan",
+                    status_code=302
+                )
+            # Várunk egy kicsit, hogy a konténer biztosan leálljon
+            import time
+            time.sleep(2)
+        except Exception as e:
+            print(f"Figyelmeztetés: Szerver automatikus leállítása sikertelen: {e}")
+            return RedirectResponse(
+                url=f"/ark/servers?error=A+szerver+törlése+előtt+először+le+kell+állítani",
+                status_code=302
+            )
     
-    # Symlink eltávolítása (ha létezik)
+    # Docker konténer leállítása és törlése (ha még fut)
     try:
-        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first() if server.cluster_id else None
-        cluster_id_str = cluster.cluster_id if cluster else None
-        remove_server_symlink(server.id, cluster_id_str)
+        import subprocess
+        container_name = f"zedin_asa_{server.id}"
+        # Ellenőrizzük, hogy a konténer fut-e
+        result = subprocess.run(
+            ["docker", "ps", "-a", "-q", "-f", f"name=^{container_name}$"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            # Konténer leállítása és törlése
+            subprocess.run(
+                ["docker", "stop", container_name],
+                capture_output=True,
+                timeout=10
+            )
+            subprocess.run(
+                ["docker", "rm", container_name],
+                capture_output=True,
+                timeout=10
+            )
+            print(f"Docker konténer leállítva és törölve: {container_name}")
     except Exception as e:
-        # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
-        print(f"Figyelmeztetés: Symlink eltávolítása sikertelen: {e}")
+        print(f"Figyelmeztetés: Docker konténer törlése sikertelen: {e}")
     
-    # Instance mappa törlése (Docker Compose fájlokkal együtt)
+    # Instance mappa törlése (Docker Compose fájlokkal együtt) - ELŐSZÖR
+    # Ezt előbb töröljük, hogy a fájlok ne legyenek lock-olva
     try:
         from app.services.server_control_service import remove_instance_dir
         remove_instance_dir(server.id)
     except Exception as e:
         # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
         print(f"Figyelmeztetés: Instance mappa törlése sikertelen: {e}")
+    
+    # Symlink eltávolítása és Saved mappa törlése (ha létezik)
+    try:
+        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first() if server.cluster_id else None
+        cluster_id_str = cluster.cluster_id if cluster else None
+        remove_server_symlink(server.id, cluster_id_str)
+    except Exception as e:
+        # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
+        print(f"Figyelmeztetés: Symlink és Saved mappa törlése sikertelen: {e}")
     
     # Szerver törlése
     db.delete(server)

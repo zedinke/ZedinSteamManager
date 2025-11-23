@@ -224,22 +224,47 @@ def remove_server_symlink(server_id: int, cluster_id: Optional[str] = None) -> b
             # Saved symlink törlése (ha létezik) - a ServerFiles symlink mögött
             serverfiles_link = server_path / "ServerFiles"
             if serverfiles_link.exists() and serverfiles_link.is_symlink():
+                # Saved symlink törlése a ServerFiles symlink mögött
                 real_saved_path = get_server_saved_path(serverfiles_link)
-                if real_saved_path.exists() and real_saved_path.is_symlink():
+                if real_saved_path.exists():
                     try:
-                        real_saved_path.unlink()
-                        print(f"Saved symlink törölve: {real_saved_path}")
+                        if real_saved_path.is_symlink():
+                            real_saved_path.unlink()
+                            print(f"Saved symlink törölve: {real_saved_path}")
+                        else:
+                            # Ha mappa (nem symlink), akkor töröljük a teljes mappát
+                            shutil.rmtree(real_saved_path)
+                            print(f"Saved mappa törölve: {real_saved_path}")
                     except Exception as e:
-                        print(f"Figyelmeztetés: Saved symlink törlése sikertelen: {e}")
+                        print(f"Figyelmeztetés: Saved mappa/symlink törlése sikertelen: {e}")
                 
                 # Config symlink törlése (ha létezik)
                 real_config_path = get_server_config_path(serverfiles_link)
-                if real_config_path.exists() and real_config_path.is_symlink():
+                if real_config_path.exists():
                     try:
-                        real_config_path.unlink()
-                        print(f"Config symlink törölve: {real_config_path}")
+                        if real_config_path.is_symlink():
+                            real_config_path.unlink()
+                            print(f"Config symlink törölve: {real_config_path}")
+                        else:
+                            # Ha mappa (nem symlink), akkor töröljük a teljes mappát
+                            shutil.rmtree(real_config_path)
+                            print(f"Config mappa törölve: {real_config_path}")
                     except Exception as e:
-                        print(f"Figyelmeztetés: Config symlink törlése sikertelen: {e}")
+                        print(f"Figyelmeztetés: Config mappa/symlink törlése sikertelen: {e}")
+            
+            # Dedikált Saved mappa törlése (ha létezik) - Servers/server_{server_id}/Saved/
+            dedicated_saved_path = server_path / "Saved"
+            if dedicated_saved_path.exists():
+                try:
+                    if dedicated_saved_path.is_symlink():
+                        dedicated_saved_path.unlink()
+                        print(f"Dedikált Saved symlink törölve: {dedicated_saved_path}")
+                    else:
+                        # Ha mappa (nem symlink), akkor töröljük a teljes mappát
+                        shutil.rmtree(dedicated_saved_path)
+                        print(f"Dedikált Saved mappa törölve: {dedicated_saved_path}")
+                except Exception as e:
+                    print(f"Figyelmeztetés: Dedikált Saved mappa törlése sikertelen: {e}")
             
             # Teljes szerver mappa törlése (Saved, ServerFiles symlink, stb. mind benne van)
             try:
