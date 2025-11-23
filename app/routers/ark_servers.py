@@ -648,7 +648,9 @@ async def edit_server(
     server.passive_mods = passive_mods_list
     
     # Config JSON frissítése
-    server_config = server.config if server.config else {}
+    # Fontos: másoljuk a config-ot, hogy ne módosítsuk közvetlenül az eredeti objektumot
+    import copy
+    server_config = copy.deepcopy(server.config) if server.config else {}
     
     # Beállítások frissítése a config JSON-ban
     if timezone:
