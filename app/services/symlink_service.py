@@ -79,19 +79,16 @@ def get_active_user_serverfiles(db: Session, user_id: int) -> Optional[Path]:
 
 def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = None, db: Session = None) -> Optional[Path]:
     """
-    Symlink létrehozása a szerverhez (cluster serverfiles mappában)
+    Symlink létrehozása a szerverhez (felhasználó serverfiles mappában)
     
     Args:
         server_id: Szerver ID
-        cluster_id: Cluster ID (kötelező)
+        cluster_id: Cluster ID (opcionális, csak kompatibilitás miatt)
         db: Adatbázis session
     
     Returns:
         Path objektum a symlink útvonalához vagy None
     """
-    if not cluster_id:
-        raise ValueError("cluster_id kötelező az Ark szerverekhez")
-    
     if db is None:
         db = SessionLocal()
         should_close = True
@@ -119,24 +116,12 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
             if not install_path.exists():
                 return None
         
-        # Szerver útvonal (cluster serverfiles mappában)
-        if server_id is None:
-            return None
-        
-        # Server instance lekérése a user_id-hoz
-        from app.database import ServerInstance
-        server_instance = db.query(ServerInstance).filter(
-            ServerInstance.id == server_id
-        ).first()
-        
-        if not server_instance:
-            return None
-        
         # Felhasználó serverfiles mappa létrehozása
         user_serverfiles = get_user_serverfiles_path(server_instance.server_admin_id)
         user_serverfiles.mkdir(parents=True, exist_ok=True)
         
-        server_path = get_server_path(server_id, cluster_id)
+        # Szerver útvonal a felhasználó serverfiles mappában
+        server_path = user_serverfiles / f"server_{server_id}"
         
         # Szülő könyvtárak létrehozása
         server_path.parent.mkdir(parents=True, exist_ok=True)
