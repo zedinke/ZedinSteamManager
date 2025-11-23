@@ -76,6 +76,23 @@ async def show_cart(
                     total_final_price += pricing["final_price"]
                 else:
                     item.pricing = None
+            elif item.item_type == "ram_upgrade":
+                # RAM bővítés ár számítása
+                import json
+                try:
+                    notes_data = json.loads(item.notes) if item.notes else {}
+                    price_eur_cents = notes_data.get("price_eur_cents", 0)
+                    pricing = {
+                        "total_base_price": price_eur_cents,
+                        "discount_amount": 0,
+                        "final_price": price_eur_cents
+                    }
+                    item.pricing = pricing
+                    item.ram_data = notes_data  # Kényelmi célokra
+                    total_base_price += price_eur_cents
+                    total_final_price += price_eur_cents
+                except (json.JSONDecodeError, KeyError):
+                    item.pricing = None
         except Exception as e:
             # Hiba esetén logoljuk, de ne akadjon el
             import logging
@@ -185,6 +202,56 @@ async def add_extension_request(
     db.commit()
     
     return RedirectResponse(url="/cart?success=Hosszabbítási+kérés+hozzáadva+a+kosárhoz", status_code=302)
+
+@router.get("/cart/add-ram-upgrade")
+async def add_ram_upgrade(
+    request: Request,
+    server_id: int,
+    ram_gb: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: RAM bővítés hozzáadása a kosárhoz"""
+    current_user = require_server_admin(request, db)
+    
+    # Szerver ellenőrzése
+    from app.database import ServerInstance
+    server = db.query(ServerInstance).filter(
+        ServerInstance.id == server_id,
+        ServerInstance.server_admin_id == current_user.id
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    if ram_gb <= 0:
+        raise HTTPException(status_code=400, detail="A RAM mennyiségnek pozitívnak kell lennie")
+    
+    # RAM árazás lekérése
+    from app.database import RamPricing
+    ram_pricing = db.query(RamPricing).order_by(RamPricing.updated_at.desc()).first()
+    if not ram_pricing:
+        raise HTTPException(status_code=400, detail="RAM árazás nincs beállítva. Kérjük, vedd fel a kapcsolatot a Manager Adminisztrátorral.")
+    
+    # Ár számítása
+    price_eur_cents = ram_pricing.price_per_gb_eur * ram_gb
+    
+    # Kosár elem létrehozása (JSON-ben tároljuk a server_id-t és ram_gb-t)
+    import json
+    cart_item = CartItem(
+        user_id=current_user.id,
+        item_type="ram_upgrade",
+        notes=json.dumps({
+            "server_id": server_id,
+            "server_name": server.name,
+            "ram_gb": ram_gb,
+            "price_eur_cents": price_eur_cents
+        })
+    )
+    
+    db.add(cart_item)
+    db.commit()
+    
+    return RedirectResponse(url="/cart?success=RAM+bővítés+hozzáadva+a+kosárhoz", status_code=302)
 
 @router.post("/cart/remove/{item_id}")
 async def remove_cart_item(

@@ -475,10 +475,21 @@ async def list_servers(
         
         servers_data.append(server_dict)
     
+    # Manager Admin jogosultság ellenőrzése
+    is_manager_admin = current_user.role.value == "manager_admin"
+    
+    # RAM árazás lekérése (ha Manager Admin)
+    ram_pricing = None
+    if is_manager_admin:
+        from app.database import RamPricing
+        ram_pricing = db.query(RamPricing).order_by(RamPricing.updated_at.desc()).first()
+    
     return templates.TemplateResponse("ark/servers.html", {
         "request": request,
         "current_user": current_user,
-        "servers_data": servers_data
+        "servers_data": servers_data,
+        "is_manager_admin": is_manager_admin,
+        "ram_pricing": ram_pricing
     })
 
 @router.get("/servers/{server_id}/edit", response_class=HTMLResponse)
@@ -904,4 +915,46 @@ async def restart_server_endpoint(
             url=f"/ark/servers?error={result['message']}",
             status_code=302
         )
+
+@router.post("/servers/{server_id}/ram-limit")
+async def set_ram_limit(
+    request: Request,
+    server_id: int,
+    ram_limit_gb: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Manager Admin: RAM limit beállítása szerverenként"""
+    from app.dependencies import require_manager_admin
+    current_user = require_manager_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    if ram_limit_gb < 0:
+        raise HTTPException(status_code=400, detail="A RAM limit nem lehet negatív")
+    
+    server.ram_limit_gb = ram_limit_gb if ram_limit_gb > 0 else None
+    db.commit()
+    
+    # Docker Compose fájl frissítése, ha fut a szerver
+    if server.status == ServerStatus.RUNNING:
+        from app.services.server_control_service import create_docker_compose_file
+        from app.services.symlink_service import get_servers_base_path
+        
+        servers_base = get_servers_base_path()
+        server_path = servers_base / f"server_{server.id}"
+        serverfiles_link = server_path / "ServerFiles"
+        saved_path = server_path / "Saved"
+        
+        if serverfiles_link.exists() and saved_path.exists():
+            create_docker_compose_file(server, serverfiles_link, saved_path)
+            # Szerver újraindítása, hogy a memória limit életbe lépjen
+            from app.services.server_control_service import restart_server
+            restart_server(server, db)
+    
+    return RedirectResponse(
+        url=f"/ark/servers?success=RAM+limit+beállítva",
+        status_code=302
+    )
 

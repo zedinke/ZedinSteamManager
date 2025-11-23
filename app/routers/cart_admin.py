@@ -126,6 +126,47 @@ async def process_cart_item(
                     f"A token hosszabbítási kérelmed jóváhagyásra került.\n\nHosszabbítás: {cart_item.requested_days} nap\nÚj lejárat: {new_expires_at.strftime('%Y-%m-%d %H:%M')}"
                 )
         
+        elif cart_item.item_type == "ram_upgrade":
+            # RAM bővítés feldolgozása
+            import json
+            from app.database import ServerInstance, RamPurchase
+            
+            notes_data = json.loads(cart_item.notes) if cart_item.notes else {}
+            server_id = notes_data.get("server_id")
+            ram_gb = notes_data.get("ram_gb", 0)
+            price_eur_cents = notes_data.get("price_eur_cents", 0)
+            
+            if not server_id or ram_gb <= 0:
+                raise HTTPException(status_code=400, detail="Érvénytelen RAM bővítés adatok")
+            
+            server = db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+            if not server:
+                raise HTTPException(status_code=404, detail="Szerver nem található")
+            
+            # Szerver purchased_ram_gb frissítése
+            server.purchased_ram_gb = (server.purchased_ram_gb or 0) + ram_gb
+            
+            # RamPurchase rekord létrehozása
+            ram_purchase = RamPurchase(
+                server_id=server_id,
+                user_id=cart_item.user_id,
+                ram_gb=ram_gb,
+                price_eur=price_eur_cents
+            )
+            db.add(ram_purchase)
+            
+            db.commit()
+            
+            # Értesítés küldése
+            from app.services.notification_service import create_notification
+            create_notification(
+                db,
+                cart_item.user_id,
+                "ram_upgrade_approved",
+                "RAM bővítés jóváhagyva",
+                f"A RAM bővítési kérelmed jóváhagyásra került.\n\nSzerver: {server.name}\nBővítés: {ram_gb} GB\nÚj összes vásárolt RAM: {server.purchased_ram_gb} GB"
+            )
+        
         # Kosár elem törlése
         db.delete(cart_item)
         db.commit()

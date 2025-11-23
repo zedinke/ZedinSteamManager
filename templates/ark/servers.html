@@ -45,6 +45,8 @@
                             <th>Query Port</th>
                             <th>RCON Port</th>
                             <th>Max Játékosok</th>
+                            <th>RAM Limit</th>
+                            <th>Vásárolt RAM</th>
                             <th>Státusz</th>
                             <th>Token információk</th>
                             <th>Létrehozva</th>
@@ -67,6 +69,40 @@
                                 <td>{{ server.query_port or '-' }}</td>
                                 <td>{{ server.rcon_port or '-' }}</td>
                                 <td>{{ server.max_players }}</td>
+                                <td>
+                                    {% if server.ram_limit_gb %}
+                                        {{ server.ram_limit_gb }} GB
+                                        {% if is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-secondary" onclick="showRamLimitModal({{ server.id }}, {{ server.ram_limit_gb }})" title="RAM limit módosítása">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Nincs beállítva</span>
+                                        {% if is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-primary" onclick="showRamLimitModal({{ server.id }}, 0)" title="RAM limit beállítása">
+                                                <i class="fas fa-plus"></i> Beállítás
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if server.purchased_ram_gb and server.purchased_ram_gb > 0 %}
+                                        {{ server.purchased_ram_gb }} GB
+                                        {% if not is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-success" onclick="showRamPurchaseModal({{ server.id }}, {{ server.purchased_ram_gb }})" title="RAM bővítés vásárlása">
+                                                <i class="fas fa-shopping-cart"></i> Bővítés
+                                            </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">0 GB</span>
+                                        {% if not is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-success" onclick="showRamPurchaseModal({{ server.id }}, 0)" title="RAM bővítés vásárlása">
+                                                <i class="fas fa-shopping-cart"></i> Vásárlás
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if server.status.value == 'running' %}
                                         <span class="badge badge-success">Fut</span>
@@ -129,7 +165,7 @@
                             </tr>
                             {% if item.start_command %}
                             <tr class="command-row" style="background-color: #f8f9fa;">
-                                <td colspan="10" style="padding: 10px;">
+                                <td colspan="12" style="padding: 10px;">
                                     <div style="display: flex; align-items: center; gap: 10px;">
                                         <strong style="min-width: 120px;">Indítási parancs:</strong>
                                         <code style="flex: 1; background: #1e1e1e; color: #d4d4d4; padding: 8px 12px; border-radius: 4px; font-size: 12px; word-break: break-all; white-space: pre-wrap;">{{ item.start_command }}</code>
@@ -203,6 +239,55 @@ function copyCommand(button) {
         document.body.removeChild(textarea);
     }
 }
+
+{% if is_manager_admin %}
+// RAM Limit Modal (Manager Admin)
+function showRamLimitModal(serverId, currentLimit) {
+    const limit = prompt('Adja meg a RAM limitet GB-ban:', currentLimit || '');
+    if (limit !== null && limit !== '') {
+        const limitValue = parseInt(limit);
+        if (isNaN(limitValue) || limitValue < 0) {
+            alert('Érvénytelen érték! Kérjük, adjon meg egy pozitív számot.');
+            return;
+        }
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/ark/servers/${serverId}/ram-limit`;
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'ram_limit_gb';
+        input.value = limitValue;
+        form.appendChild(input);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+{% endif %}
+
+{% if not is_manager_admin and ram_pricing %}
+// RAM Purchase Modal (Server Admin)
+function showRamPurchaseModal(serverId, currentPurchased) {
+    const ramGb = prompt('Hány GB RAM-ot szeretne vásárolni?', '');
+    if (ramGb !== null && ramGb !== '') {
+        const ramValue = parseInt(ramGb);
+        if (isNaN(ramValue) || ramValue <= 0) {
+            alert('Érvénytelen érték! Kérjük, adjon meg egy pozitív számot.');
+            return;
+        }
+        
+        const pricePerGb = {{ ram_pricing.price_per_gb_eur / 100 }};
+        const totalPrice = ramValue * pricePerGb;
+        
+        if (confirm(`RAM bővítés vásárlása:\n\nMennyiség: ${ramValue} GB\nÁr: ${totalPrice.toFixed(2)} EUR\n\nFolytatja?`)) {
+            // Hozzáadás a kosárhoz
+            window.location.href = `/cart/add-ram-upgrade?server_id=${serverId}&ram_gb=${ramValue}`;
+        }
+    }
+}
+{% endif %}
 </script>
 {% endblock %}
 
