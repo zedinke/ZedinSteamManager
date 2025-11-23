@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Raw Konfiguráció Szerkesztése - {{ config_file_name }} - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-code"></i> Raw Konfiguráció Szerkesztése</h2>
+        <p>{{ server.name }} - {{ config_file_name }}</p>
+        <div style="margin-top: 10px;">
+            <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Vissza a szerver szerkesztéshez
+            </a>
+            <a href="/ark/servers/{{ server.id }}/config?config_file={{ config_file }}" class="btn btn-info">
+                <i class="fas fa-list"></i> Formázott Szerkesztő
+            </a>
+            <a href="/ark/servers/{{ server.id }}/config?config_file=GameUserSettings" 
+               class="btn {% if config_file == 'GameUserSettings' %}btn-primary{% else %}btn-info{% endif %}">
+                <i class="fas fa-file-ini"></i> GameUserSettings.ini
+            </a>
+            <a href="/ark/servers/{{ server.id }}/config?config_file=Game" 
+               class="btn {% if config_file == 'Game' %}btn-primary{% else %}btn-info{% endif %}">
+                <i class="fas fa-file-ini"></i> Game.ini
+            </a>
+        </div>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-code"></i> {{ config_file_name }} Raw Szerkesztése</h3>
+            <p style="margin-top: 10px; color: #666;">
+                <i class="fas fa-info-circle"></i> 
+                Itt a konfigurációs fájl teljes tartalma szabadon szerkeszthető. 
+                Bármilyen beállítást hozzáadhatsz, módosíthatasz vagy törölhetsz.
+            </p>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/ark/servers/{{ server.id }}/config/{{ config_file }}/raw/save" id="rawConfigForm">
+                <div style="margin-bottom: 15px;">
+                    <label for="file_content" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                        <i class="fas fa-file-code"></i> Fájl tartalma:
+                    </label>
+                    <textarea 
+                        id="file_content" 
+                        name="file_content" 
+                        rows="30" 
+                        style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; resize: vertical; min-height: 500px;"
+                        placeholder="[ServerSettings]
+ServerName=My Server
+MaxPlayers=70
+..."
+                    >{{ file_content }}</textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Konfiguráció Mentése
+                    </button>
+                    <a href="/ark/servers/{{ server.id }}/config?config_file={{ config_file }}" class="btn btn-info">
+                        <i class="fas fa-list"></i> Formázott Szerkesztő
+                    </a>
+                    <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+textarea {
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.card-header p {
+    font-size: 14px;
+    line-height: 1.6;
+}
+</style>
+
+<script>
+// Tab karakter kezelése a textarea-ban
+document.addEventListener('DOMContentLoaded', function() {
+    const textarea = document.getElementById('file_content');
+    
+    if (textarea) {
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                const value = this.value;
+                
+                // Tab beszúrása
+                this.value = value.substring(0, start) + '    ' + value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+            }
+        });
+        
+        // Auto-resize
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+        
+        // Kezdeti magasság beállítása
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+});
+</script>
+{% endblock %}
+

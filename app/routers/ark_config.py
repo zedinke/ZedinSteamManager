@@ -262,3 +262,132 @@ async def save_config(
             detail="Konfiguráció mentése sikertelen"
         )
 
+@router.get("/{server_id}/config/{config_file}/raw", response_class=HTMLResponse)
+async def show_raw_config(
+    request: Request,
+    server_id: int,
+    config_file: str,
+    db: Session = Depends(get_db)
+):
+    """Raw konfigurációs fájl szerkesztése"""
+    current_user = require_server_admin(request, db)
+    
+    # Szerver lekérése
+    server = db.query(ServerInstance).filter(
+        ServerInstance.id == server_id,
+        ServerInstance.server_admin_id == current_user.id
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    # Szerver útvonal
+    server_path = get_server_path_from_instance(server)
+    
+    if not server_path.exists() and not server_path.is_symlink():
+        raise HTTPException(
+            status_code=404,
+            detail="Szerver útvonal nem található. Először hozd létre a szervert!"
+        )
+    
+    # Konfigurációs fájlok útvonalai
+    game_user_settings_path, game_ini_path = get_server_config_files(server_path)
+    
+    # Kiválasztott fájl meghatározása
+    if config_file == "GameUserSettings":
+        config_file_path = game_user_settings_path
+        config_file_name = "GameUserSettings.ini"
+    elif config_file == "Game":
+        config_file_path = game_ini_path
+        config_file_name = "Game.ini"
+    else:
+        raise HTTPException(status_code=400, detail="Érvénytelen konfigurációs fájl")
+    
+    # Fájl tartalmának beolvasása
+    file_content = ""
+    if config_file_path and config_file_path.exists():
+        try:
+            with open(config_file_path, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+        except Exception as e:
+            print(f"Hiba a fájl beolvasásakor: {e}")
+            file_content = ""
+    
+    return templates.TemplateResponse("ark/server_config_raw.html", {
+        "request": request,
+        "current_user": current_user,
+        "server": server,
+        "config_file": config_file,
+        "config_file_name": config_file_name,
+        "file_content": file_content,
+        "config_file_path": config_file_path
+    })
+
+@router.post("/{server_id}/config/{config_file}/raw/save")
+async def save_raw_config(
+    request: Request,
+    server_id: int,
+    config_file: str,
+    file_content: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Raw konfigurációs fájl mentése"""
+    current_user = require_server_admin(request, db)
+    
+    # Szerver lekérése
+    server = db.query(ServerInstance).filter(
+        ServerInstance.id == server_id,
+        ServerInstance.server_admin_id == current_user.id
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    # Szerver útvonal
+    server_path = get_server_path_from_instance(server)
+    
+    if not server_path.exists() and not server_path.is_symlink():
+        raise HTTPException(
+            status_code=404,
+            detail="Szerver útvonal nem található"
+        )
+    
+    # Konfigurációs fájlok útvonalai
+    game_user_settings_path, game_ini_path = get_server_config_files(server_path)
+    
+    # Kiválasztott fájl meghatározása
+    if config_file == "GameUserSettings":
+        config_file_path = game_user_settings_path
+    elif config_file == "Game":
+        config_file_path = game_ini_path
+    else:
+        raise HTTPException(status_code=400, detail="Érvénytelen konfigurációs fájl")
+    
+    if not config_file_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Konfigurációs fájl útvonal nem található"
+        )
+    
+    # Fájl mentése
+    try:
+        # Szülő mappa létrehozása
+        config_file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Fájl írása
+        with open(config_file_path, 'w', encoding='utf-8') as f:
+            f.write(file_content)
+        
+        return RedirectResponse(
+            url=f"/ark/servers/{server_id}/config/{config_file}/raw?success=Konfiguráció+mentve",
+            status_code=302
+        )
+    except Exception as e:
+        print(f"Hiba a fájl mentésekor: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Konfiguráció mentése sikertelen: {str(e)}"
+        )
+
