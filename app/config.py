@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     ark_default_port: int = 7777  # Alapértelmezett port
     ark_default_query_port: int = 27015  # Alapértelmezett query port
     ark_default_rcon_port: int = 27015  # Alapértelmezett RCON port
+    ark_docker_image: str = "zedinarkmanager/ark-server:latest"  # Docker image neve (saját image vagy acekorneya/asa_server:2_1_latest)
+    ark_docker_use_custom: bool = False  # Saját Docker image használata (True esetén /home/zedin/arkserver, False esetén /home/pok/arkserver)
     
     # Backup korlátok
     backup_max_per_server: int = 20  # Maximum backup száma szerverenként

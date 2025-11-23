@@ -272,12 +272,25 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         query_port = server.query_port or (port + 2)
         rcon_port = server.rcon_port or settings.ark_default_rcon_port
         
+        # Docker image és útvonalak meghatározása
+        use_custom_image = getattr(settings, 'ark_docker_use_custom', False)
+        docker_image = getattr(settings, 'ark_docker_image', 'acekorneya/asa_server:2_1_latest')
+        
+        if use_custom_image:
+            # Saját Docker image: /home/zedin/arkserver struktúra
+            container_work_dir = '/home/zedin/arkserver'
+            container_saved_path = '/home/zedin/arkserver/ShooterGame/Saved'
+        else:
+            # POK Docker image: /home/pok/arkserver struktúra
+            container_work_dir = '/home/pok/arkserver'
+            container_saved_path = '/home/pok/arkserver/ShooterGame/Saved'
+        
         # Docker Compose YAML összeállítása
         compose_data = {
             'version': '2.4',
             'services': {
                 'asaserver': {
-                    'image': 'acekorneya/asa_server:2_1_latest',
+                    'image': docker_image,
                     'container_name': f'asa_{server.id}',
                     'restart': 'unless-stopped',
                     'ports': [
@@ -285,13 +298,11 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         f'{port}:{port}/udp',
                         f'{rcon_port}:{rcon_port}/tcp',
                     ],
-                    # Megjegyzés: A Docker image belső struktúrája fix (/home/pok/arkserver)
-                    # Ha saját Docker image-t használsz, módosíthatod ezeket az útvonalakat
                     'volumes': [
-                        f'{real_server_path}:/home/pok/arkserver',
-                        f'{saved_path}:/home/pok/arkserver/ShooterGame/Saved',
+                        f'{real_server_path}:{container_work_dir}',
+                        f'{saved_path}:{container_saved_path}',
                     ],
-                    'working_dir': '/home/pok/arkserver',
+                    'working_dir': container_work_dir,
                     'environment': [
                         f'INSTANCE_NAME={server.id}',
                         f'MAP_NAME={config_values.get("MAP_NAME", "TheIsland")}',

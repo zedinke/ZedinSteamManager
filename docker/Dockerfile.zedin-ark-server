@@ -1,0 +1,46 @@
+# ZedinArkManager - ARK Survival Ascended Server Docker Image
+# Saját struktúrát használ: /home/zedin/arkserver
+
+FROM ubuntu:22.04
+
+# Környezeti változók
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ARK_SERVER_DIR=/home/zedin/arkserver
+ENV STEAMCMD_DIR=/home/zedin/steamcmd
+
+# Felhasználó létrehozása (zedin user)
+RUN useradd -m -u 1000 -s /bin/bash zedin && \
+    mkdir -p ${ARK_SERVER_DIR} ${STEAMCMD_DIR} && \
+    chown -R zedin:zedin /home/zedin
+
+# Szükséges csomagok telepítése
+RUN apt-get update && \
+    apt-get install -y \
+        curl \
+        lib32gcc-s1 \
+        lib32stdc++6 \
+        libc6-i386 \
+        wget \
+        unzip \
+        ca-certificates \
+        && \
+    rm -rf /var/lib/apt/lists/*
+
+# SteamCMD letöltése és telepítése
+RUN cd ${STEAMCMD_DIR} && \
+    curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
+    chown -R zedin:zedin ${STEAMCMD_DIR}
+
+# Entrypoint script másolása
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Munkakönyvtár beállítása
+WORKDIR ${ARK_SERVER_DIR}
+
+# Felhasználó váltás
+USER zedin
+
+# Entrypoint beállítása
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
