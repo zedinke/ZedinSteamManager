@@ -702,14 +702,42 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         
         logger.info(f"Szerver {server.id} indítva Docker-rel")
         
-        # Log fájlba is írjuk a sikeres indítást
+        # Várakozás, hogy a szerver elinduljon a konténerben (3 másodperc)
+        time.sleep(3)
+        
+        # Docker konténer logok lekérése, hogy lássuk, mi történik
         try:
+            log_result = subprocess.run(
+                ["docker", "logs", "--tail", "100", container_name],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            container_logs = log_result.stdout or log_result.stderr or "Nincs log kimenet"
+            
+            # Log fájlba is írjuk a sikeres indítást és a konténer logokat
             with open(log_file, 'a', encoding='utf-8') as log_f:
                 log_f.write(f"\n--- Szerver sikeresen elindítva ---\n")
                 log_f.write(f"Konténer: {container_name}\n")
                 log_f.write(f"Időpont: {datetime.now().isoformat()}\n")
+                log_f.write(f"\n--- Docker konténer logok (utolsó 100 sor) ---\n")
+                log_f.write(container_logs)
+                log_f.write(f"\n--- Log vége ---\n")
+            
+            # Ha a logokban van hiba, logoljuk
+            if "error" in container_logs.lower() or "hiba" in container_logs.lower() or "HIBA" in container_logs:
+                logger.warning(f"Konténer {container_name} logokban hiba van:\n{container_logs[-500:]}")
         except Exception as e:
-            logger.warning(f"Log fájl írása sikertelen: {e}")
+            logger.warning(f"Docker logok lekérése sikertelen: {e}")
+            try:
+                with open(log_file, 'a', encoding='utf-8') as log_f:
+                    log_f.write(f"\n--- Szerver sikeresen elindítva ---\n")
+                    log_f.write(f"Konténer: {container_name}\n")
+                    log_f.write(f"Időpont: {datetime.now().isoformat()}\n")
+                    log_f.write(f"\n⚠️ Docker logok lekérése sikertelen: {e}\n")
+            except:
+                pass
         
         return {
             "success": True,
