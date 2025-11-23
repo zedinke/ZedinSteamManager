@@ -140,69 +140,31 @@
                     <div class="form-group" style="margin-top: 30px; border-top: 2px solid #ddd; padding-top: 20px;">
                         <h3 style="margin-bottom: 20px;"><i class="fas fa-cog"></i> Szerver Beállítások</h3>
                         
-                        <!-- Alapbeállítások -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                            <div class="form-group">
-                                <label for="timezone">
-                                    <i class="fas fa-clock"></i> Időzóna
-                                </label>
-                                <select id="timezone" name="timezone" 
-                                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                                    <option value="Europe/Budapest" selected>Europe/Budapest</option>
-                                    <option value="UTC">UTC</option>
-                                    <option value="Europe/London">Europe/London</option>
-                                    <option value="America/New_York">America/New_York</option>
-                                    <option value="America/Los_Angeles">America/Los_Angeles</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="map_name">
-                                    <i class="fas fa-map"></i> Térkép
-                                </label>
-                                <select id="map_name" name="map_name" 
-                                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                                    <option value="TheIsland" selected>The Island</option>
-                                    <option value="TheCenter">The Center</option>
-                                    <option value="ScorchedEarth">Scorched Earth</option>
-                                    <option value="Ragnarok">Ragnarok</option>
-                                    <option value="Aberration">Aberration</option>
-                                    <option value="Extinction">Extinction</option>
-                                    <option value="Valguero">Valguero</option>
-                                    <option value="Genesis">Genesis</option>
-                                    <option value="CrystalIsles">Crystal Isles</option>
-                                    <option value="Fjordur">Fjordur</option>
-                                </select>
-                            </div>
-                        </div>
-                        
+                        <!-- Map name - hivatalos mapok + egyedi bevitel -->
                         <div class="form-group">
-                            <label for="session_name">
-                                <i class="fas fa-tag"></i> Szerver Munkamenet Neve
+                            <label for="map_name">
+                                <i class="fas fa-map"></i> Térkép <span style="color: red;">*</span>
                             </label>
-                            <input type="text" id="session_name" name="session_name" 
-                                   placeholder="pl. Rexodon - The Island" 
-                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                            <div class="form-group">
-                                <label for="server_admin_password">
-                                    <i class="fas fa-key"></i> Szerver Admin Jelszó
-                                </label>
-                                <input type="password" id="server_admin_password" name="server_admin_password" 
-                                       placeholder="Admin jelszó" 
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="server_password">
-                                    <i class="fas fa-lock"></i> Szerver Jelszó (opcionális)
-                                </label>
-                                <input type="password" id="server_password" name="server_password" 
-                                       placeholder="Játékos jelszó (üres = nyilvános)" 
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            </div>
+                            <select id="map_name" name="map_name" required
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px;">
+                                <option value="TheIsland" selected>The Island</option>
+                                <option value="TheCenter">The Center</option>
+                                <option value="ScorchedEarth">Scorched Earth</option>
+                                <option value="Ragnarok">Ragnarok</option>
+                                <option value="Aberration">Aberration</option>
+                                <option value="Extinction">Extinction</option>
+                                <option value="Valguero">Valguero</option>
+                                <option value="Genesis">Genesis</option>
+                                <option value="CrystalIsles">Crystal Isles</option>
+                                <option value="Fjordur">Fjordur</option>
+                                <option value="__custom__">Egyedi térkép név...</option>
+                            </select>
+                            <input type="text" id="map_name_custom" name="map_name_custom" 
+                                   placeholder="Egyedi térkép név (pl. modos map neve)" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; display: none;">
+                            <small style="color: #666; display: block; margin-top: 5px;">
+                                Válassz egy hivatalos térképet, vagy válaszd az "Egyedi térkép név..." opciót modos mapokhoz.
+                            </small>
                         </div>
                         
                         <!-- Boolean beállítások -->
@@ -220,10 +182,6 @@
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                     <input type="checkbox" name="rcon_enabled" value="true" checked style="width: auto;">
                                     <span>RCON Engedélyezve</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                    <input type="checkbox" name="display_pok_monitor_message" value="true" style="width: auto;">
-                                    <span>POK Monitor Üzenet</span>
                                 </label>
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                     <input type="checkbox" name="random_startup_delay" value="true" checked style="width: auto;">
@@ -263,33 +221,6 @@
                                     <input type="number" id="motd_duration" name="motd_duration" value="30" min="1" 
                                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Frissítés beállítások -->
-                        <div class="form-group" id="update_settings" style="display: block; margin-top: 20px;">
-                            <h4 style="margin-bottom: 10px;">Frissítés Beállítások</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                                <div>
-                                    <label for="check_for_update_interval">Frissítés Ellenőrzés Intervallum (óra)</label>
-                                    <input type="number" id="check_for_update_interval" name="check_for_update_interval" value="24" min="1" 
-                                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                                </div>
-                                <div>
-                                    <label for="update_window_minimum_time">Frissítés Ablak Kezdete</label>
-                                    <input type="time" id="update_window_minimum_time" name="update_window_minimum_time" value="03:00" 
-                                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                                </div>
-                                <div>
-                                    <label for="update_window_maximum_time">Frissítés Ablak Vége</label>
-                                    <input type="time" id="update_window_maximum_time" name="update_window_maximum_time" value="05:00" 
-                                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                                </div>
-                            </div>
-                            <div style="margin-top: 10px;">
-                                <label for="restart_notice_minutes">Újraindítás Értesítés (perc)</label>
-                                <input type="number" id="restart_notice_minutes" name="restart_notice_minutes" value="30" min="0" 
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
                             </div>
                         </div>
                         
@@ -449,10 +380,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Dinamikus beállítások megjelenítése/elrejtése
 document.addEventListener('DOMContentLoaded', function() {
+    // MOTD beállítások megjelenítése/elrejtése
     const enableMotdCheckbox = document.querySelector('input[name="enable_motd"]');
     const motdSettings = document.getElementById('motd_settings');
-    const updateServerCheckbox = document.querySelector('input[name="update_server"]');
-    const updateSettings = document.getElementById('update_settings');
     
     if (enableMotdCheckbox && motdSettings) {
         function toggleMotdSettings() {
@@ -462,12 +392,40 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleMotdSettings(); // Kezdeti állapot
     }
     
-    if (updateServerCheckbox && updateSettings) {
-        function toggleUpdateSettings() {
-            updateSettings.style.display = updateServerCheckbox.checked ? 'block' : 'none';
+    // Egyedi térképnév mező megjelenítése/elrejtése
+    const mapNameSelect = document.getElementById('map_name');
+    const mapNameCustom = document.getElementById('map_name_custom');
+    
+    if (mapNameSelect && mapNameCustom) {
+        function toggleCustomMapName() {
+            if (mapNameSelect.value === '__custom__') {
+                mapNameCustom.style.display = 'block';
+                mapNameCustom.required = true;
+                mapNameSelect.required = false;
+            } else {
+                mapNameCustom.style.display = 'none';
+                mapNameCustom.required = false;
+                mapNameSelect.required = true;
+            }
         }
-        updateServerCheckbox.addEventListener('change', toggleUpdateSettings);
-        toggleUpdateSettings(); // Kezdeti állapot
+        mapNameSelect.addEventListener('change', toggleCustomMapName);
+        toggleCustomMapName(); // Kezdeti állapot
+        
+        // Form submit előtt térképnév beállítása
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (mapNameSelect.value === '__custom__') {
+                    if (!mapNameCustom.value.trim()) {
+                        e.preventDefault();
+                        alert('Kérlek add meg az egyedi térkép nevét!');
+                        return false;
+                    }
+                    // Az egyedi térképnevet beállítjuk a map_name mezőbe
+                    mapNameSelect.value = mapNameCustom.value.trim();
+                }
+            });
+        }
     }
 });
 </script>
