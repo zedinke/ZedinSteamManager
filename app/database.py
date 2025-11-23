@@ -463,8 +463,8 @@ class TokenBasePrice(Base):
     id = Column(Integer, primary_key=True, index=True)
     token_type = Column(EnumType(TokenType), nullable=False, unique=True, index=True)
     item_type = Column(String(20), nullable=False, index=True)  # "token_request" vagy "token_extension"
-    base_price = Column(Integer, nullable=False)  # Alapár (pl. forintban)
-    price_per_day = Column(Integer, nullable=True)  # Napi ár (hosszabbítás esetén)
+    base_price = Column(Integer, nullable=False)  # Alapár (EUR centekben, pl. 2500 = 25.00 EUR)
+    price_per_day = Column(Integer, nullable=True)  # Napi ár EUR centekben (hosszabbítás esetén, pl. 250 = 2.50 EUR/nap)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
