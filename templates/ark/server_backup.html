@@ -57,8 +57,14 @@
             </div>
             
             {% if auto_backup_interval %}
-                <div class="alert alert-success" style="margin-bottom: 20px;">
+                <div class="alert alert-success" style="margin-bottom: 20px;" id="auto_backup_status">
                     <i class="fas fa-clock"></i> Automatikus backup beállítva: {{ auto_backup_interval }} óránként
+                    {% if next_backup_time %}
+                        <br>
+                        <strong id="next_backup_countdown" style="margin-top: 10px; display: block;">
+                            Következő backup: <span id="countdown_text">Számítás...</span>
+                        </strong>
+                    {% endif %}
                 </div>
             {% else %}
                 <div class="alert alert-warning" style="margin-bottom: 20px;">
@@ -116,5 +122,47 @@
         </div>
     </div>
 </div>
+
+{% if auto_backup_interval and next_backup_time %}
+<script>
+// Dinamikus countdown frissítés
+function updateCountdown() {
+    const nextBackupTime = new Date('{{ next_backup_time.strftime("%Y-%m-%d %H:%M:%S") }}');
+    const now = new Date();
+    const diff = nextBackupTime - now;
+    
+    if (diff <= 0) {
+        // Ha lejárt az idő, akkor frissítjük az oldalt
+        document.getElementById('countdown_text').textContent = 'Hamarosan...';
+        setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+        return;
+    }
+    
+    // Idő számítása
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    // Szöveg formázása
+    let countdownText = '';
+    if (hours > 0) {
+        countdownText = `${hours} óra ${minutes} perc ${seconds} másodperc`;
+    } else if (minutes > 0) {
+        countdownText = `${minutes} perc ${seconds} másodperc`;
+    } else {
+        countdownText = `${seconds} másodperc`;
+    }
+    
+    document.getElementById('countdown_text').textContent = countdownText;
+}
+
+// Frissítés másodpercenként
+updateCountdown();
+setInterval(updateCountdown, 1000);
+</script>
+{% endif %}
+
 {% endblock %}
 

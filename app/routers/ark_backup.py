@@ -79,27 +79,33 @@ async def show_backup(
     # Backup lista
     backups = list_backups(server_path)
     
-    # Debug: backup lista és útvonal ellenőrzése
-    print(f"DEBUG: Backup lista hossza: {len(backups)}")
-    print(f"DEBUG: Szerver útvonal: {server_path}")
-    if server_path:
-        from app.services.backup_service import get_server_backup_path
-        backup_dir = get_server_backup_path(server_path)
-        print(f"DEBUG: Backup mappa útvonal: {backup_dir}")
-        print(f"DEBUG: Backup mappa létezik: {backup_dir.exists() if backup_dir else False}")
-        if backup_dir and backup_dir.exists():
-            print(f"DEBUG: Backup mappa tartalma: {list(backup_dir.iterdir())}")
-    
     # Backup beállítások a config-ból
     server_config = server.config if server.config else {}
     auto_backup_interval = server_config.get("AUTO_BACKUP_INTERVAL", None)  # 3, 6, 12, 24 óra
+    
+    # Utolsó backup időpontja (legújabb backup létrehozási ideje)
+    last_backup_time = None
+    if backups and len(backups) > 0:
+        last_backup_time = backups[0]["created"]  # Legújabb backup (rendezve van)
+    
+    # Következő backup ideje számítása
+    next_backup_time = None
+    if auto_backup_interval and last_backup_time:
+        from datetime import timedelta
+        next_backup_time = last_backup_time + timedelta(hours=int(auto_backup_interval))
+    elif auto_backup_interval:
+        # Ha nincs még backup, akkor az intervallum órával később lesz
+        from datetime import datetime, timedelta
+        next_backup_time = datetime.now() + timedelta(hours=int(auto_backup_interval))
     
     return templates.TemplateResponse("ark/server_backup.html", {
         "request": request,
         "current_user": current_user,
         "server": server,
         "backups": backups,
-        "auto_backup_interval": auto_backup_interval
+        "auto_backup_interval": auto_backup_interval,
+        "last_backup_time": last_backup_time,
+        "next_backup_time": next_backup_time
     })
 
 @router.post("/{server_id}/backup/create")
