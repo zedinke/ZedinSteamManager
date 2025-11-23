@@ -119,8 +119,13 @@ def get_instance_dir(server: ServerInstance) -> Path:
     # A BASE_DIR a ServerFiles mappa szülő mappája
     # Példa: ark_serverfiles_base = /home/ai_developer/ZedinSteamManager/Server/ArkAscended/ServerFiles
     # BASE_DIR = /home/ai_developer/ZedinSteamManager/Server/ArkAscended
-    base_dir = Path(settings.ark_serverfiles_base).parent if hasattr(settings, 'ark_serverfiles_base') else Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
+    if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
+        base_dir = Path(settings.ark_serverfiles_base).parent
+    else:
+        base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
+    
     instance_dir = base_dir / f"Instance_{server.id}"
+    logger.info(f"Instance mappa útvonal: {instance_dir}")
     return instance_dir
 
 def get_docker_compose_file(server: ServerInstance) -> Path:

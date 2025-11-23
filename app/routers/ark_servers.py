@@ -415,17 +415,20 @@ async def create_server(
             rcon_port=rcon_port_value
         )
         
-        # Docker Compose fájl létrehozása szerver létrehozásakor (ha Docker elérhető)
-        from app.services.server_control_service import check_docker_available, get_server_dedicated_saved_path, create_docker_compose_file
-        if check_docker_available():
-            try:
-                saved_path = get_server_dedicated_saved_path(server_path)
-                if saved_path and saved_path.exists():
-                    create_docker_compose_file(server_instance, server_path, saved_path)
-                    print(f"Docker Compose fájl létrehozva szerver létrehozásakor: {server_instance.id}")
-            except Exception as e:
-                # Ha hiba van, csak logoljuk, de ne akadályozza a szerver létrehozását
-                print(f"Figyelmeztetés: Docker Compose fájl létrehozása sikertelen: {e}")
+        # Docker Compose fájl létrehozása szerver létrehozásakor (mindig, még akkor is, ha Docker nem elérhető)
+        from app.services.server_control_service import get_server_dedicated_saved_path, create_docker_compose_file
+        try:
+            saved_path = get_server_dedicated_saved_path(server_path)
+            if saved_path and saved_path.exists():
+                create_docker_compose_file(server_instance, server_path, saved_path)
+                print(f"Docker Compose fájl létrehozva szerver létrehozásakor: {server_instance.id}")
+            else:
+                print(f"Figyelmeztetés: Saved mappa nem található: {saved_path}")
+        except Exception as e:
+            # Ha hiba van, csak logoljuk, de ne akadályozza a szerver létrehozását
+            print(f"Figyelmeztetés: Docker Compose fájl létrehozása sikertelen: {e}")
+            import traceback
+            traceback.print_exc()
     
     return RedirectResponse(
         url="/ark/servers?success=Szerver+létrehozva",
