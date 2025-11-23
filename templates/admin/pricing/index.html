@@ -27,6 +27,9 @@
             <h3><i class="fas fa-calendar-alt"></i> Periódus Árak (1, 3, 6, 12 hónap)</h3>
         </div>
         <div class="card-body">
+            <div class="alert alert-info" style="background: #e7f3ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+                <strong><i class="fas fa-info-circle"></i> Fontos:</strong> A periódus árak mindkét típusra vonatkoznak: <strong>token igénylésre</strong> és <strong>token hosszabbításra</strong>. Mindkét esetben csak a kijelölt periódusokkal (1, 3, 6, 12 hónap) lehet igényelni vagy hosszabbítani.
+            </div>
             <p style="margin-bottom: 20px; color: #666;">Itt állíthatod be az egyes periódusokhoz tartozó árakat EUR-ban. Az ár automatikusan forintban is megjelenik az aktuális árfolyam alapján.</p>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
@@ -83,77 +86,7 @@
         </div>
     </div>
     
-    <!-- Alapárak (deprecated, csak backward compatibility) -->
-    <div class="card" style="margin-bottom: 30px;">
-        <div class="card-header">
-            <h3><i class="fas fa-dollar-sign"></i> Alapárak (Régi rendszer - csak hosszabbításokhoz)</h3>
-        </div>
-        <div class="card-body">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                <!-- Token igénylés árak -->
-                <div>
-                    <h4>Token Igénylés</h4>
-                    <form method="POST" action="/admin/pricing/base-price" style="margin-bottom: 15px;">
-                        <input type="hidden" name="item_type" value="token_request">
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin Token (EUR centekben):</label>
-                            <input type="number" name="base_price" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 2500 }}" 
-                                   min="0" required style="width: 100%; padding: 8px;">
-                            <small style="color: #666;">Pl. 2500 = 25.00 EUR</small>
-                            <input type="hidden" name="token_type" value="server_admin">
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
-                    </form>
-                    
-                    <form method="POST" action="/admin/pricing/base-price">
-                        <input type="hidden" name="item_type" value="token_request">
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó Token (EUR centekben):</label>
-                            <input type="number" name="base_price" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 1250 }}" 
-                                   min="0" required style="width: 100%; padding: 8px;">
-                            <small style="color: #666;">Pl. 1250 = 12.50 EUR</small>
-                            <input type="hidden" name="token_type" value="user">
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
-                    </form>
-                </div>
-                
-                <!-- Token hosszabbítás árak -->
-                <div>
-                    <h4>Token Hosszabbítás</h4>
-                    <form method="POST" action="/admin/pricing/base-price" style="margin-bottom: 15px;">
-                        <input type="hidden" name="item_type" value="token_extension">
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin (EUR centekben/nap):</label>
-                            <input type="number" name="price_per_day" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 250 }}" 
-                                   min="0" required style="width: 100%; padding: 8px;">
-                            <small style="color: #666;">Pl. 250 = 2.50 EUR/nap</small>
-                            <input type="hidden" name="token_type" value="server_admin">
-                            <input type="hidden" name="base_price" value="0">
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
-                    </form>
-                    
-                    <form method="POST" action="/admin/pricing/base-price">
-                        <input type="hidden" name="item_type" value="token_extension">
-                        <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó (EUR centekben/nap):</label>
-                            <input type="number" name="price_per_day" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 125 }}" 
-                                   min="0" required style="width: 100%; padding: 8px;">
-                            <small style="color: #666;">Pl. 125 = 1.25 EUR/nap</small>
-                            <input type="hidden" name="token_type" value="user">
-                            <input type="hidden" name="base_price" value="0">
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Megjegyzés: A periódus árak mindkét típusra (token igénylés és hosszabbítás) vonatkoznak -->
     
     <!-- Árazási szabályok -->
     <div class="card">
