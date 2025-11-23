@@ -321,15 +321,16 @@ async def list_extension_requests(
     ).order_by(TokenExtensionRequest.created_at.desc()).all()
     
     # Új lejárat számítása minden kéréshez
-    from app.services.pricing_service import period_months_to_days
+    from app.services.pricing_service import period_months_to_days, AVAILABLE_PERIODS
     for req in extension_requests:
-        # Period_months prioritásos, ha nincs, akkor requested_days (backward compatibility)
-        if req.period_months:
+        # Csak period_months-t használunk, backward compatibility nélkül
+        if req.period_months and req.period_months in AVAILABLE_PERIODS:
             days = period_months_to_days(req.period_months)
         elif req.requested_days:
+            # Ha még van régi requested_days (backward compatibility csak megjelenítéshez)
             days = req.requested_days
         else:
-            days = 30  # Alapértelmezett
+            days = 30  # Alapértelmezett (nem kellene előfordulnia)
         
         if req.token.expires_at:
             req.new_expires_at = req.token.expires_at + timedelta(days=days)
@@ -367,14 +368,15 @@ async def process_extension_request(
         if not token:
             raise HTTPException(status_code=404, detail="Token nem található")
         
-        # Period_months prioritásos, ha nincs, akkor requested_days (backward compatibility)
-        from app.services.pricing_service import period_months_to_days
-        if extension_request.period_months:
+        # Csak period_months-t használunk, backward compatibility nélkül
+        from app.services.pricing_service import period_months_to_days, AVAILABLE_PERIODS
+        if extension_request.period_months and extension_request.period_months in AVAILABLE_PERIODS:
             days = period_months_to_days(extension_request.period_months)
         elif extension_request.requested_days:
+            # Ha még van régi requested_days (backward compatibility csak feldolgozáshoz)
             days = extension_request.requested_days
         else:
-            days = 30  # Alapértelmezett
+            raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
         
         if token.expires_at and token.expires_at > datetime.now():
             new_expires_at = token.expires_at + timedelta(days=days)
@@ -511,8 +513,7 @@ async def extend_token(
 async def request_token_extension(
     request: Request,
     token_id: int = Form(...),
-    period_months: int = Form(None),
-    requested_days: int = Form(None),  # Deprecated, backward compatibility
+    period_months: int = Form(...),  # Kötelező, csak a kijelölt periódusok
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -525,18 +526,10 @@ async def request_token_extension(
     if not current_user or current_user.role.value != "server_admin":
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
-    # Periódus ellenőrzése
+    # Periódus ellenőrzése - csak a kijelölt periódusok engedélyezettek
     from app.services.pricing_service import AVAILABLE_PERIODS
-    if period_months and period_months not in AVAILABLE_PERIODS:
+    if period_months not in AVAILABLE_PERIODS:
         raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
-    
-    # Backward compatibility: ha nincs period_months, de van requested_days
-    if not period_months and requested_days:
-        if requested_days < 1 or requested_days > 365:
-            raise HTTPException(status_code=400, detail="A hosszabbítás 1 és 365 nap között lehet")
-    
-    if not period_months and not requested_days:
-        raise HTTPException(status_code=400, detail="Válassz egy periódust vagy add meg a napok számát")
     
     # Token ellenőrzése - csak a saját tokenjeit kérheti
     token = db.query(Token).filter(
@@ -560,13 +553,12 @@ async def request_token_extension(
             status_code=302
         )
     
-    # Kosár elem létrehozása (a régi TokenExtensionRequest helyett)
+    # Kosár elem létrehozása - csak period_months, nincs backward compatibility
     cart_item = CartItem(
         user_id=current_user.id,
         item_type="token_extension",
         token_id=token_id,
         period_months=period_months,
-        requested_days=requested_days if not period_months else None,  # Backward compatibility
         notes=notes
     )
     
