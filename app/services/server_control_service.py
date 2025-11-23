@@ -377,17 +377,22 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                     logger.warning(f"Binaries mappa nem létezik: {binaries_path}")
                     logger.warning(f"  - ShooterGame tartalma: {[item.name for item in shooter_game_path.iterdir()] if shooter_game_path.exists() else 'N/A'}")
                 else:
-                    # Ellenőrizzük a Windows binárist (csak Windows bináris van)
+                    # Ellenőrizzük a Linux binárist
+                    linux_binary = binaries_path / "Linux" / "ShooterGameServer"
+                    # Ellenőrizzük a Windows binárist is
                     win64_binary = binaries_path / "Win64" / "ShooterGameServer.exe"
                     
                     # Nézzük meg, mi van a Binaries mappában
                     binaries_contents = [item.name for item in binaries_path.iterdir()] if binaries_path.exists() else []
                     logger.info(f"Binaries mappa tartalma: {binaries_contents}")
                     
-                    if win64_binary.exists():
+                    if linux_binary.exists():
+                        logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
+                    elif win64_binary.exists():
                         logger.info(f"Windows ShooterGameServer.exe bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
                     else:
-                        logger.warning(f"ShooterGameServer.exe bináris nem található:")
+                        logger.warning(f"ShooterGameServer bináris nem található (sem Linux, sem Windows):")
+                        logger.warning(f"  - Linux: {linux_binary}")
                         logger.warning(f"  - Windows: {win64_binary}")
                         logger.warning(f"  - Binaries mappa tartalma: {binaries_contents}")
                         if binaries_path.exists():
