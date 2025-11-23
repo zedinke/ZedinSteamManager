@@ -9,6 +9,8 @@ ENV ARK_SERVER_DIR=/home/zedin/arkserver
 ENV STEAMCMD_DIR=/home/zedin/steamcmd
 
 # Felhasználó létrehozása (zedin user)
+# UID 1000 használata - ez csak a konténeren belül van, nem ütközik a host felhasználókkal
+# Ha szükséges, módosítható más UID-ra
 RUN useradd -m -u 1000 -s /bin/bash zedin && \
     mkdir -p ${ARK_SERVER_DIR} ${STEAMCMD_DIR} && \
     chown -R zedin:zedin /home/zedin

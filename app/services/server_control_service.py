@@ -291,7 +291,9 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             'services': {
                 'asaserver': {
                     'image': docker_image,
-                    'container_name': f'asa_{server.id}',
+                    # Container név: egyedi kell legyen, szerver ID alapján
+                    # Prefix: 'zedin_asa_' hogy ne ütközzön más rendszerekkel
+                    'container_name': f'zedin_asa_{server.id}',
                     'restart': 'unless-stopped',
                     'ports': [
                         f'{port}:{port}/tcp',
@@ -397,7 +399,7 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             }
         
         # Ellenőrizzük, hogy már fut-e
-        container_name = f"asa_{server.id}"
+        container_name = f"zedin_asa_{server.id}"
         try:
             result = subprocess.run(
                 ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
