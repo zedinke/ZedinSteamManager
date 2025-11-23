@@ -110,22 +110,16 @@ async def install_ark_server_files(
     # Ark Survival Ascended App ID: 2430930
     app_id = "2430930"
     
-    # Platform detektálása - Linux-on Linux verziót, Windows-on Windows verziót töltünk le
-    # Megjegyzés: Linux-on általában nem kell a platform type paraméter, mert a SteamCMD automatikusan
-    # a megfelelő platformot választja, de explicit módon is megadhatjuk
-    platform_type = "linux" if os.name != 'nt' else "windows"
-    
     # SteamCMD parancsok argumentumként
-    # Ark Survival Ascended szerverfájlok telepítése
-    # A parancsokat közvetlenül argumentumként adjuk át, nem script fájlként
-    # Megjegyzés: Teljes telepítés (nem csak validate), hogy biztosan minden fájl letöltődjön
-    # Ha már van telepítés, akkor is újratelepítjük, hogy biztosan teljes legyen
+    # ARK Survival Ascended szerverfájlok telepítése
+    # FONTOS: A force_install_dir-t a login ELŐTT kell megadni!
+    # Linux-on nem kell a platform type paraméter, mert a SteamCMD automatikusan
+    # a megfelelő platformot választja (Linux binárisokat tölt le Linux-on)
     steamcmd_args = [
         str(steamcmd_path),
-        "+login", "anonymous",
-        "+force_install_dir", str(install_path.absolute()),
-        "+@sSteamCmdForcePlatformType", platform_type,  # Platform-specifikus verzió letöltése
-        "+app_update", app_id,  # Teljes telepítés (validate nélkül = minden fájlt letölt)
+        "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
+        "+login", "anonymous",  # Utána a bejelentkezés
+        "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval
         "+quit"
     ]
     
@@ -195,14 +189,12 @@ async def install_ark_server_files(
                         # Újratelepítés
                         await asyncio.sleep(2)
                         # Újratelepítés SteamCMD-vel
-                        # Platform detektálása
-                        platform_type = "linux" if os.name != 'nt' else "windows"
+                        # FONTOS: A force_install_dir-t a login ELŐTT kell megadni!
                         process2 = await asyncio.create_subprocess_exec(
                             str(steamcmd_path),
-                            "+login", "anonymous",
-                            "+force_install_dir", str(install_path.absolute()),
-                            "+@sSteamCmdForcePlatformType", platform_type,  # Platform-specifikus verzió letöltése
-                            "+app_update", app_id,
+                            "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
+                            "+login", "anonymous",  # Utána a bejelentkezés
+                            "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval
                             "+quit",
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.STDOUT,
