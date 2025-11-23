@@ -291,6 +291,92 @@ function showRamPurchaseModal(serverId, currentPurchased) {
     }
 }
 {% endif %}
+
+<!-- Logok Modal -->
+<div id="logsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 90%; max-height: 90vh; overflow: auto; position: relative;">
+        <button onclick="closeLogsModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">
+            <i class="fas fa-times"></i> Bezárás
+        </button>
+        <h3 style="margin-top: 0;"><i class="fas fa-file-alt"></i> Szerver Indítási Logok</h3>
+        <div id="logsContent" style="margin-top: 20px;">
+            <p>Logok betöltése...</p>
+        </div>
+        <div style="margin-top: 10px; display: flex; gap: 10px;">
+            <button onclick="refreshLogs()" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Frissítés
+            </button>
+            <button onclick="closeLogsModal()" class="btn btn-secondary">
+                Bezárás
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentServerId = null;
+let logsModal = document.getElementById('logsModal');
+let logsContent = document.getElementById('logsContent');
+
+function closeLogsModal() {
+    logsModal.style.display = 'none';
+    currentServerId = null;
+}
+
+function refreshLogs() {
+    if (currentServerId) {
+        showServerLogs(currentServerId);
+    }
+}
+
+async function showServerLogs(serverId) {
+    currentServerId = serverId;
+    logsModal.style.display = 'flex';
+    logsContent.innerHTML = '<p>Logok betöltése...</p>';
+    
+    try {
+        const response = await fetch(`/ark/servers/${serverId}/logs`);
+        const data = await response.json();
+        
+        if (data.success) {
+            let html = `<div style="margin-bottom: 10px;">`;
+            html += `<strong>Log fájl:</strong> ${data.log_file}<br>`;
+            html += `<strong>Méret:</strong> ${(data.file_size / 1024).toFixed(2)} KB`;
+            html += `</div>`;
+            html += `<textarea readonly style="width: 100%; height: 500px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; white-space: pre-wrap; background: #1e1e1e; color: #d4d4d4;">${escapeHtml(data.log_content)}</textarea>`;
+            html += `<div style="margin-top: 10px;">`;
+            html += `<button onclick="copyLogs()" class="btn btn-primary"><i class="fas fa-copy"></i> Másolás</button>`;
+            html += `</div>`;
+            logsContent.innerHTML = html;
+        } else {
+            logsContent.innerHTML = `<div class="alert alert-error">${data.message || 'Logok betöltése sikertelen'}</div>`;
+        }
+    } catch (error) {
+        logsContent.innerHTML = `<div class="alert alert-error">Hiba a logok betöltése során: ${error.message}</div>`;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function copyLogs() {
+    const textarea = logsContent.querySelector('textarea');
+    if (textarea) {
+        textarea.select();
+        document.execCommand('copy');
+        alert('Logok másolva a vágólapra!');
+    }
+}
+
+// Modal bezárása kattintásra a háttérre
+logsModal.addEventListener('click', function(e) {
+    if (e.target === logsModal) {
+        closeLogsModal();
+    }
+});
 </script>
 {% endblock %}
 
