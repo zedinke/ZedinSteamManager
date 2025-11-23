@@ -229,7 +229,6 @@ async def create_server(
     rcon_enabled: str = Form(None),
     random_startup_delay: str = Form(None),
     cpu_optimization: str = Form(None),
-    update_server: str = Form(None),
     enable_motd: str = Form(None),
     show_admin_commands_in_chat: str = Form(None),
     motd: str = Form(None),
@@ -350,7 +349,6 @@ async def create_server(
         "RCON_ENABLED": rcon_enabled == "true" if rcon_enabled else True,
         "RANDOM_STARTUP_DELAY": random_startup_delay == "true" if random_startup_delay else True,
         "CPU_OPTIMIZATION": cpu_optimization == "true" if cpu_optimization else True,
-        "UPDATE_SERVER": update_server == "true" if update_server else True,
         "ENABLE_MOTD": enable_motd == "true" if enable_motd else True,
         "SHOW_ADMIN_COMMANDS_IN_CHAT": show_admin_commands_in_chat == "true",
     }
@@ -557,15 +555,11 @@ async def edit_server(
     display_pok_monitor_message: str = Form(None),
     random_startup_delay: str = Form(None),
     cpu_optimization: str = Form(None),
-    update_server: str = Form(None),
     enable_motd: str = Form(None),
     show_admin_commands_in_chat: str = Form(None),
     motd: str = Form(None),
     motd_duration: int = Form(None),
-    check_for_update_interval: int = Form(None),
-    update_window_minimum_time: str = Form(None),
-    update_window_maximum_time: str = Form(None),
-    restart_notice_minutes: int = Form(None),
+    auto_backup_interval: str = Form(None),
     custom_server_args: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -682,8 +676,6 @@ async def edit_server(
         server_config["RANDOM_STARTUP_DELAY"] = random_startup_delay == "true"
     if cpu_optimization:
         server_config["CPU_OPTIMIZATION"] = cpu_optimization == "true"
-    if update_server:
-        server_config["UPDATE_SERVER"] = update_server == "true"
     if enable_motd:
         server_config["ENABLE_MOTD"] = enable_motd == "true"
     if show_admin_commands_in_chat:
@@ -692,14 +684,11 @@ async def edit_server(
         server_config["MOTD"] = motd
     if motd_duration is not None:
         server_config["MOTD_DURATION"] = motd_duration
-    if check_for_update_interval is not None:
-        server_config["CHECK_FOR_UPDATE_INTERVAL"] = check_for_update_interval
-    if update_window_minimum_time:
-        server_config["UPDATE_WINDOW_MINIMUM_TIME"] = update_window_minimum_time
-    if update_window_maximum_time:
-        server_config["UPDATE_WINDOW_MAXIMUM_TIME"] = update_window_maximum_time
-    if restart_notice_minutes is not None:
-        server_config["RESTART_NOTICE_MINUTES"] = restart_notice_minutes
+    if auto_backup_interval is not None:
+        if auto_backup_interval.strip():
+            server_config["AUTO_BACKUP_INTERVAL"] = int(auto_backup_interval)
+        else:
+            server_config.pop("AUTO_BACKUP_INTERVAL", None)
     if custom_server_args:
         server_config["CUSTOM_SERVER_ARGS"] = custom_server_args.strip()
     

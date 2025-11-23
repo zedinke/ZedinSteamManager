@@ -14,6 +14,9 @@
             <a href="/ark/servers/{{ server.id }}/config?config_file=Game" class="btn btn-info">
                 <i class="fas fa-cog"></i> Game.ini Beállítások
             </a>
+            <a href="/ark/servers/{{ server.id }}/backup" class="btn btn-warning">
+                <i class="fas fa-database"></i> Backup Kezelés
+            </a>
         </div>
     </div>
     
@@ -221,10 +224,6 @@
                                 <span>CPU Optimalizálás</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                <input type="checkbox" name="update_server" value="true" {% if config.get('UPDATE_SERVER', True) %}checked{% endif %} style="width: auto;">
-                                <span>Szerver Frissítés</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                 <input type="checkbox" name="enable_motd" value="true" {% if config.get('ENABLE_MOTD', True) %}checked{% endif %} style="width: auto;">
                                 <span>MOTD Engedélyezve</span>
                             </label>
@@ -254,34 +253,22 @@
                         </div>
                     </div>
                     
-                    <!-- Frissítés beállítások -->
-                    <div class="form-group" id="update_settings" style="display: {% if config.get('UPDATE_SERVER', True) %}block{% else %}none{% endif %}; margin-top: 20px;">
-                        <h4 style="margin-bottom: 10px;">Frissítés Beállítások</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label for="check_for_update_interval">Frissítés Ellenőrzés Intervallum (óra)</label>
-                                <input type="number" id="check_for_update_interval" name="check_for_update_interval" value="{{ config.get('CHECK_FOR_UPDATE_INTERVAL', 24) }}" min="1" 
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            </div>
-                            <div>
-                                <label for="update_window_minimum_time">Frissítés Ablak Kezdete</label>
-                                {% set min_time = config.get('UPDATE_WINDOW_MINIMUM_TIME', '03:00 AM') %}
-                                {% set min_time_24 = min_time.split(' ')[0] if ' ' in min_time else min_time %}
-                                <input type="time" id="update_window_minimum_time" name="update_window_minimum_time" value="{{ min_time_24 }}" 
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            </div>
-                            <div>
-                                <label for="update_window_maximum_time">Frissítés Ablak Vége</label>
-                                {% set max_time = config.get('UPDATE_WINDOW_MAXIMUM_TIME', '05:00 AM') %}
-                                {% set max_time_24 = max_time.split(' ')[0] if ' ' in max_time else max_time %}
-                                <input type="time" id="update_window_maximum_time" name="update_window_maximum_time" value="{{ max_time_24 }}" 
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                            </div>
-                        </div>
-                        <div style="margin-top: 10px;">
-                            <label for="restart_notice_minutes">Újraindítás Értesítés (perc)</label>
-                            <input type="number" id="restart_notice_minutes" name="restart_notice_minutes" value="{{ config.get('RESTART_NOTICE_MINUTES', 30) }}" min="0" 
-                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <!-- Backup beállítások -->
+                    <div class="form-group" style="margin-top: 20px;">
+                        <h4 style="margin-bottom: 10px;">Automatikus Backup Beállítások</h4>
+                        <div>
+                            <label for="auto_backup_interval">Automatikus Backup Intervallum</label>
+                            <select id="auto_backup_interval" name="auto_backup_interval" 
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="">Nincs automatikus backup</option>
+                                <option value="3" {% if config.get('AUTO_BACKUP_INTERVAL') == 3 %}selected{% endif %}>3 óra</option>
+                                <option value="6" {% if config.get('AUTO_BACKUP_INTERVAL') == 6 %}selected{% endif %}>6 óra</option>
+                                <option value="12" {% if config.get('AUTO_BACKUP_INTERVAL') == 12 %}selected{% endif %}>12 óra</option>
+                                <option value="24" {% if config.get('AUTO_BACKUP_INTERVAL') == 24 %}selected{% endif %}>24 óra</option>
+                            </select>
+                            <small style="color: #666; display: block; margin-top: 5px;">
+                                A rendszer automatikusan készít backup-ot a Saved mappa teljes tartalmából a megadott időközönként.
+                            </small>
                         </div>
                     </div>
                     
@@ -515,12 +502,6 @@ document.addEventListener('DOMContentLoaded', function() {
         enableMotdCheckbox.addEventListener('change', toggleMotdSettings);
     }
     
-    if (updateServerCheckbox && updateSettings) {
-        function toggleUpdateSettings() {
-            updateSettings.style.display = updateServerCheckbox.checked ? 'block' : 'none';
-        }
-        updateServerCheckbox.addEventListener('change', toggleUpdateSettings);
-    }
 });
 </script>
 {% endblock %}

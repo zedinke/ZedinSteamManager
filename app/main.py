@@ -57,7 +57,7 @@ if not templates_dir.exists():
 templates = Jinja2Templates(directory=str(templates_dir))
 
 # Routers importálása
-from app.routers import auth, dashboard, tokens, admin, notifications, api, notifications_admin, update, system, settings, tickets, tickets_admin, chat, server_management, games_admin, servers, ai_chat, cart, cart_admin, pricing, ark_admin, ark_servers, ark_setup, mods, ark_serverfiles, ark_config
+from app.routers import auth, dashboard, tokens, admin, notifications, api, notifications_admin, update, system, settings, tickets, tickets_admin, chat, server_management, games_admin, servers, ai_chat, cart, cart_admin, pricing, ark_admin, ark_servers, ark_setup, mods, ark_serverfiles, ark_config, ark_backup
 
 # Routers regisztrálása
 app.include_router(auth.router, tags=["Auth"])
@@ -85,6 +85,7 @@ app.include_router(ark_setup.router, tags=["Ark Setup"])
 app.include_router(mods.router, tags=["Mods"])
 app.include_router(ark_serverfiles.router, tags=["Ark Server Files"])
 app.include_router(ark_config.router, tags=["Ark Config"])
+app.include_router(ark_backup.router, tags=["Ark Backup"])
 app.include_router(api.router, prefix="/api", tags=["API"])
 
 # Token lejárat kezelés - háttérben futó task
