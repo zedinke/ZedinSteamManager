@@ -675,26 +675,78 @@ async def delete_server(
     
     # Szerver törlése az adatbázisból (előbb, hogy ellenőrizhessük, van-e még más szerver)
     user_id = server.server_admin_id
-    db.delete(server)
-    db.commit()
     
-    # Ellenőrizzük, hogy van-e még más szerver, ami ezt a felhasználót használja
+    # Ellenőrizzük, hogy van-e még más szerver, ami ezt a felhasználót használja (MEGELŐZŐLEG)
     remaining_servers = db.query(ServerInstance).filter(
         ServerInstance.server_admin_id == user_id
     ).count()
     
+    print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés előtt: {remaining_servers}")
+    
+    # Szerver törlése az adatbázisból
+    db.delete(server)
+    db.commit()
+    
+    # Ellenőrizzük újra, hogy van-e még más szerver
+    remaining_servers_after = db.query(ServerInstance).filter(
+        ServerInstance.server_admin_id == user_id
+    ).count()
+    
+    print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés után: {remaining_servers_after}")
+    
     # Ha nincs már más szerver, töröljük a ServerFiles/user_{user_id} mappát is
-    if remaining_servers == 0:
+    if remaining_servers_after == 0:
         try:
             from app.services.symlink_service import get_user_serverfiles_path
             import shutil
+            import logging
+            logger = logging.getLogger(__name__)
+            
             user_serverfiles_path = get_user_serverfiles_path(user_id)
+            print(f"DEBUG: ServerFiles mappa útvonal: {user_serverfiles_path}")
+            print(f"DEBUG: ServerFiles mappa létezik: {user_serverfiles_path.exists()}")
+            
             if user_serverfiles_path.exists():
-                shutil.rmtree(user_serverfiles_path)
-                print(f"ServerFiles/user_{user_id} mappa törölve: {user_serverfiles_path}")
+                # Próbáljuk meg törölni
+                try:
+                    shutil.rmtree(user_serverfiles_path)
+                    print(f"✓ ServerFiles/user_{user_id} mappa sikeresen törölve: {user_serverfiles_path}")
+                    logger.info(f"ServerFiles/user_{user_id} mappa törölve: {user_serverfiles_path}")
+                except PermissionError as pe:
+                    print(f"✗ Jogosultsági hiba a ServerFiles/user_{user_id} mappa törlésekor: {pe}")
+                    logger.error(f"Jogosultsági hiba a ServerFiles/user_{user_id} mappa törlésekor: {pe}")
+                    # Próbáljuk meg sudo-val (ha lehetséges)
+                    try:
+                        import subprocess
+                        result = subprocess.run(
+                            ["sudo", "rm", "-rf", str(user_serverfiles_path)],
+                            capture_output=True,
+                            text=True,
+                            timeout=30
+                        )
+                        if result.returncode == 0:
+                            print(f"✓ ServerFiles/user_{user_id} mappa törölve sudo-val: {user_serverfiles_path}")
+                            logger.info(f"ServerFiles/user_{user_id} mappa törölve sudo-val: {user_serverfiles_path}")
+                        else:
+                            print(f"✗ ServerFiles/user_{user_id} mappa törlése sudo-val sikertelen: {result.stderr}")
+                            logger.error(f"ServerFiles/user_{user_id} mappa törlése sudo-val sikertelen: {result.stderr}")
+                    except Exception as sudo_e:
+                        print(f"✗ Sudo törlés sikertelen: {sudo_e}")
+                        logger.error(f"Sudo törlés sikertelen: {sudo_e}")
+                except Exception as e:
+                    print(f"✗ ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
+                    logger.error(f"ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print(f"INFO: ServerFiles/user_{user_id} mappa nem létezik: {user_serverfiles_path}")
         except Exception as e:
             # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
-            print(f"Figyelmeztetés: ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
+            print(f"✗ Figyelmeztetés: ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"INFO: Még van {remaining_servers_after} szerver a felhasználónak, ServerFiles mappa megtartva")
     
     return RedirectResponse(
         url="/ark/servers?success=Szerver+törölve",
