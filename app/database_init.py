@@ -1203,15 +1203,15 @@ def init_db():
                     conn.execute(text(f"""
                         CREATE TABLE system_settings (
                             id {users_id_type} NOT NULL AUTO_INCREMENT,
-                            key VARCHAR(100) NOT NULL,
+                            `key` VARCHAR(100) NOT NULL,
                             value TEXT NOT NULL,
                             description TEXT NULL,
                             updated_by_id {users_id_type} NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                             PRIMARY KEY (id),
-                            UNIQUE KEY uq_system_settings_key (key),
-                            INDEX ix_system_settings_key (key),
+                            UNIQUE KEY uq_system_settings_key (`key`),
+                            INDEX ix_system_settings_key (`key`),
                             CONSTRAINT fk_system_settings_updated_by_id
                                 FOREIGN KEY (updated_by_id) REFERENCES users(id) ON DELETE SET NULL
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -1222,7 +1222,7 @@ def init_db():
                     from app.config import settings
                     default_ram = getattr(settings, 'default_ram_limit_gb', 8)
                     conn.execute(text("""
-                        INSERT INTO system_settings (key, value, description) 
+                        INSERT INTO system_settings (`key`, value, description) 
                         VALUES ('default_ram_limit_gb', :value, 'Alapértelmezett RAM limit új szerverekhez (GB)')
                     """), {"value": str(default_ram)})
                     conn.commit()
