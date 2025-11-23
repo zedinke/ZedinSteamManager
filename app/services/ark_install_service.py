@@ -59,6 +59,17 @@ async def install_ark_server_files(
     # Telepítési útvonal létrehozása
     install_path.mkdir(parents=True, exist_ok=True)
     
+    # Log függvény definíciója (korábban kell, hogy használhassuk)
+    log_lines = []
+    
+    async def log(message: str):
+        log_lines.append(message)
+        if progress_callback:
+            if asyncio.iscoroutinefunction(progress_callback):
+                await progress_callback(message)
+            else:
+                progress_callback(message)
+    
     # Ha már van telepítés, de hiányos (pl. csak Saved mappa van), töröljük
     # hogy teljes újratelepítést csinálhassunk
     shooter_game = install_path / "ShooterGame"
@@ -90,16 +101,6 @@ async def install_ark_server_files(
         "+app_update", app_id,  # Teljes telepítés (validate nélkül = minden fájlt letölt)
         "+quit"
     ]
-    
-    log_lines = []
-    
-    async def log(message: str):
-        log_lines.append(message)
-        if progress_callback:
-            if asyncio.iscoroutinefunction(progress_callback):
-                await progress_callback(message)
-            else:
-                progress_callback(message)
     
     await log(f"SteamCMD telepítés indítása...")
     await log(f"Telepítési útvonal: {install_path.absolute()}")
