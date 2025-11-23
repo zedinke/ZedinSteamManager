@@ -372,11 +372,19 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             if not shooter_game_path.exists():
                 logger.warning(f"ShooterGame mappa nem létezik: {shooter_game_path}")
             else:
-                binary_path = shooter_game_path / "Binaries" / "Linux" / "ShooterGameServer"
-                if not binary_path.exists():
-                    logger.warning(f"ShooterGameServer bináris nem létezik: {binary_path}")
+                # Ellenőrizzük a Linux binárist
+                linux_binary = shooter_game_path / "Binaries" / "Linux" / "ShooterGameServer"
+                # Ellenőrizzük a Windows binárist is
+                win64_binary = shooter_game_path / "Binaries" / "Win64" / "ShooterGameServer.exe"
+                
+                if linux_binary.exists():
+                    logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
+                elif win64_binary.exists():
+                    logger.info(f"Windows ShooterGameServer bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
                 else:
-                    logger.info(f"ShooterGameServer bináris megtalálva: {binary_path}")
+                    logger.warning(f"ShooterGameServer bináris nem található (sem Linux, sem Windows):")
+                    logger.warning(f"  - Linux: {linux_binary}")
+                    logger.warning(f"  - Windows: {win64_binary}")
         
         # YAML fájl írása
         with open(compose_file, 'w') as f:
