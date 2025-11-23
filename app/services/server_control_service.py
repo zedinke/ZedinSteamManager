@@ -128,6 +128,51 @@ def get_instance_dir(server: ServerInstance) -> Path:
     logger.info(f"Instance mappa útvonal: {instance_dir}")
     return instance_dir
 
+def get_instance_dir_by_id(server_id: int) -> Path:
+    """
+    Instance mappa útvonala szerver ID alapján (törléshez)
+    
+    Args:
+        server_id: Szerver ID
+    
+    Returns:
+        Path objektum az instance mappához
+    """
+    if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
+        base_dir = Path(settings.ark_serverfiles_base).parent
+    else:
+        base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
+    
+    instance_dir = base_dir / f"Instance_{server_id}"
+    return instance_dir
+
+def remove_instance_dir(server_id: int) -> bool:
+    """
+    Instance mappa törlése (Docker Compose fájlokkal együtt)
+    
+    Args:
+        server_id: Szerver ID
+    
+    Returns:
+        True ha sikeres, False egyébként
+    """
+    try:
+        instance_dir = get_instance_dir_by_id(server_id)
+        
+        if instance_dir.exists():
+            shutil.rmtree(instance_dir)
+            logger.info(f"Instance mappa törölve: {instance_dir}")
+            return True
+        else:
+            logger.info(f"Instance mappa nem létezik: {instance_dir}")
+            return True  # Nincs mit törölni, de ez nem hiba
+        
+    except Exception as e:
+        logger.error(f"Hiba az Instance mappa törlésekor: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def get_docker_compose_file(server: ServerInstance) -> Path:
     """
     Docker Compose fájl útvonala

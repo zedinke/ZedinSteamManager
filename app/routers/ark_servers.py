@@ -544,6 +544,14 @@ async def delete_server(
         # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
         print(f"Figyelmeztetés: Symlink eltávolítása sikertelen: {e}")
     
+    # Instance mappa törlése (Docker Compose fájlokkal együtt)
+    try:
+        from app.services.server_control_service import remove_instance_dir
+        remove_instance_dir(server.id)
+    except Exception as e:
+        # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
+        print(f"Figyelmeztetés: Instance mappa törlése sikertelen: {e}")
+    
     # Szerver törlése
     db.delete(server)
     db.commit()
