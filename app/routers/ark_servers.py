@@ -737,7 +737,9 @@ async def edit_server(
     print(f"DEBUG: AUTO_BACKUP_INTERVAL commit előtt: {server.config.get('AUTO_BACKUP_INTERVAL')}")
     
     # Explicit módon beállítjuk a config-ot újra, hogy biztos legyen
-    server.config = server_config
+    # JSON mező esetén SQLAlchemy-nek szüksége van egy új dict objektumra, hogy észlelje a változást
+    import json
+    server.config = json.loads(json.dumps(server_config))
     
     db.commit()
     
