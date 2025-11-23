@@ -14,7 +14,7 @@ from app.database import (
     Ticket, TicketMessage, TicketRating, TicketStatus,
     ChatRoom, ChatMessage, Game, ServerInstance, TokenExtensionRequest, CartItem, TokenRequest,
     TokenPricingRule, TokenBasePrice, TokenPeriodPrice, Cluster, ArkServerFiles, UserMod, UserServerFiles,
-    RamPricing, RamPurchase
+    RamPricing, RamPurchase, SystemSettings
 )
 from app.services.auth_service import get_password_hash
 from app.config import settings
@@ -1183,6 +1183,52 @@ def init_db():
                 print("✓ ram_purchases tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: ram_purchases tábla: {e}")
+        
+        # System settings tábla létrehozása
+        existing_tables = inspector.get_table_names()
+        if 'system_settings' not in existing_tables:
+            print("system_settings tábla létrehozása...")
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COLUMN_TYPE 
+                        FROM INFORMATION_SCHEMA.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'users' 
+                        AND COLUMN_NAME = 'id'
+                    """))
+                    row = result.fetchone()
+                    users_id_type = row[0] if row else id_type
+                    
+                    conn.execute(text(f"""
+                        CREATE TABLE system_settings (
+                            id {users_id_type} NOT NULL AUTO_INCREMENT,
+                            key VARCHAR(100) NOT NULL,
+                            value TEXT NOT NULL,
+                            description TEXT NULL,
+                            updated_by_id {users_id_type} NULL,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            PRIMARY KEY (id),
+                            UNIQUE KEY uq_system_settings_key (key),
+                            INDEX ix_system_settings_key (key),
+                            CONSTRAINT fk_system_settings_updated_by_id
+                                FOREIGN KEY (updated_by_id) REFERENCES users(id) ON DELETE SET NULL
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """))
+                    conn.commit()
+                    
+                    # Alapértelmezett RAM limit beállítása (8 GB = 8)
+                    from app.config import settings
+                    default_ram = getattr(settings, 'default_ram_limit_gb', 8)
+                    conn.execute(text("""
+                        INSERT INTO system_settings (key, value, description) 
+                        VALUES ('default_ram_limit_gb', :value, 'Alapértelmezett RAM limit új szerverekhez (GB)')
+                    """), {"value": str(default_ram)})
+                    conn.commit()
+                print("✓ system_settings tábla létrehozva")
+            except Exception as e:
+                print(f"  Figyelmeztetés: system_settings tábla: {e}")
         
     except Exception as e:
         print(f"✗ Hiba a táblák létrehozásakor: {e}")

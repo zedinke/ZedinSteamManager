@@ -115,6 +115,31 @@
         </div>
     </div>
     
+    <!-- Rendszer Beállítások -->
+    <div class="card" style="margin-bottom: 30px;">
+        <div class="card-header">
+            <h3><i class="fas fa-cogs"></i> Rendszer Beállítások</h3>
+        </div>
+        <div class="card-body">
+            <p style="margin-bottom: 20px; color: #666;">Itt állíthatod be a rendszer szintű alapértelmezett beállításokat.</p>
+    
+            <form method="POST" action="/admin/pricing/system-settings">
+                <div style="max-width: 400px;">
+                    <div class="form-group">
+                        <label for="default_ram_limit_gb" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                            <i class="fas fa-memory"></i> Alapértelmezett RAM limit új szerverekhez (GB):
+                        </label>
+                        <input type="number" id="default_ram_limit_gb" name="default_ram_limit_gb" min="0"
+                               value="{{ system_settings.default_ram_limit_gb if system_settings.default_ram_limit_gb is not none else 8 }}"
+                               required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        <small style="color: #666;">Ez a RAM mennyiség ingyen jár minden új szerverhez. A meglévő szerverek, amelyeknek még nincs RAM limit beállítva, automatikusan frissülnek erre az értékre.</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Mentés</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <!-- Árazási szabályok -->
     <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">

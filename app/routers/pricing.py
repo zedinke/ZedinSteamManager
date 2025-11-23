@@ -5,7 +5,7 @@ Token árazás kezelő router - Manager Admin
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
-from app.database import get_db, User, TokenPricingRule, TokenBasePrice, TokenPeriodPrice, TokenType, RamPricing
+from app.database import get_db, User, TokenPricingRule, TokenBasePrice, TokenPeriodPrice, TokenType, RamPricing, SystemSettings
 from app.dependencies import require_manager_admin
 from datetime import datetime
 from typing import Optional
@@ -133,6 +133,19 @@ async def pricing_management(
     # RAM árazás lekérése
     ram_pricing = db.query(RamPricing).order_by(RamPricing.updated_at.desc()).first()
     
+    # Rendszer beállítások lekérése
+    system_settings = {}
+    default_ram_setting = db.query(SystemSettings).filter(SystemSettings.key == "default_ram_limit_gb").first()
+    if default_ram_setting:
+        try:
+            system_settings["default_ram_limit_gb"] = int(default_ram_setting.value)
+        except (ValueError, TypeError):
+            from app.config import settings
+            system_settings["default_ram_limit_gb"] = getattr(settings, 'default_ram_limit_gb', 8)
+    else:
+        from app.config import settings
+        system_settings["default_ram_limit_gb"] = getattr(settings, 'default_ram_limit_gb', 8)
+    
     from app.main import get_templates
     templates = get_templates()
     return templates.TemplateResponse(
@@ -144,7 +157,8 @@ async def pricing_management(
             "available_periods": AVAILABLE_PERIODS,
             "exchange_rate": exchange_rate,
             "pricing_rules": pricing_rules,
-            "ram_pricing": ram_pricing
+            "ram_pricing": ram_pricing,
+            "system_settings": system_settings
         }
     )
 
@@ -385,6 +399,48 @@ async def delete_pricing_rule(
     
     return RedirectResponse(
         url="/admin/pricing?success=Szabály+törölve",
+        status_code=302
+    )
+
+@router.post("/admin/pricing/system-settings")
+async def update_system_settings(
+    request: Request,
+    default_ram_limit_gb: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Rendszer beállítások frissítése"""
+    current_user = require_manager_admin(request, db)
+    
+    if default_ram_limit_gb < 0:
+        raise HTTPException(status_code=400, detail="A RAM limit nem lehet negatív")
+    
+    # Meglévő beállítás keresése vagy új létrehozása
+    setting = db.query(SystemSettings).filter(SystemSettings.key == "default_ram_limit_gb").first()
+    
+    if setting:
+        setting.value = str(default_ram_limit_gb)
+        setting.updated_by_id = current_user.id
+        setting.updated_at = datetime.now()
+    else:
+        setting = SystemSettings(
+            key="default_ram_limit_gb",
+            value=str(default_ram_limit_gb),
+            description="Alapértelmezett RAM limit új szerverekhez (GB)",
+            updated_by_id=current_user.id
+        )
+        db.add(setting)
+    
+    db.commit()
+    
+    # Frissítjük a meglévő szervereket is (ha még nincs RAM limit beállítva)
+    from app.database import ServerInstance
+    servers = db.query(ServerInstance).filter(ServerInstance.ram_limit_gb.is_(None)).all()
+    for server in servers:
+        server.ram_limit_gb = default_ram_limit_gb
+    db.commit()
+    
+    return RedirectResponse(
+        url="/admin/pricing?success=Rendszer+beállítások+frissítve",
         status_code=302
     )
 

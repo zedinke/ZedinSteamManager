@@ -362,6 +362,19 @@ async def create_server(
     
     # Symlink-et később hozzuk létre, amikor már van server_id
     
+    # Alapértelmezett RAM limit lekérése
+    from app.database import SystemSettings
+    default_ram_setting = db.query(SystemSettings).filter(SystemSettings.key == "default_ram_limit_gb").first()
+    if default_ram_setting:
+        try:
+            default_ram_limit = int(default_ram_setting.value)
+        except (ValueError, TypeError):
+            from app.config import settings
+            default_ram_limit = getattr(settings, 'default_ram_limit_gb', 8)
+    else:
+        from app.config import settings
+        default_ram_limit = getattr(settings, 'default_ram_limit_gb', 8)
+    
     # Szerver létrehozása
     server_instance = ServerInstance(
         game_id=ark_game.id,
@@ -379,7 +392,9 @@ async def create_server(
         token_used_id=active_token.id,
         token_expires_at=active_token.expires_at,
         scheduled_deletion_date=active_token.expires_at + timedelta(days=30),
-        started_at=None
+        started_at=None,
+        ram_limit_gb=default_ram_limit,
+        purchased_ram_gb=0
     )
     
     db.add(server_instance)
