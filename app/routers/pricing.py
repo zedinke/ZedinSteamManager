@@ -112,6 +112,18 @@ async def pricing_management(
     # Alapárak lekérése
     base_prices = db.query(TokenBasePrice).order_by(TokenBasePrice.token_type, TokenBasePrice.item_type).all()
     
+    # Periódus árak lekérése
+    from app.database import TokenPeriodPrice
+    from app.services.pricing_service import AVAILABLE_PERIODS
+    from app.services.exchange_rate_service import get_huf_eur_exchange_rate
+    period_prices = db.query(TokenPeriodPrice).order_by(
+        TokenPeriodPrice.token_type,
+        TokenPeriodPrice.period_months
+    ).all()
+    
+    # Exchange rate lekérése
+    exchange_rate = get_huf_eur_exchange_rate() or 400.0
+    
     # Árazási szabályok lekérése
     pricing_rules = db.query(TokenPricingRule).order_by(
         TokenPricingRule.priority.desc(),
@@ -125,6 +137,9 @@ async def pricing_management(
         {
             "request": request,
             "base_prices": base_prices,
+            "period_prices": period_prices,
+            "available_periods": AVAILABLE_PERIODS,
+            "exchange_rate": exchange_rate,
             "pricing_rules": pricing_rules
         }
     )
@@ -176,6 +191,56 @@ async def update_base_price(
     
     return RedirectResponse(
         url="/admin/pricing?success=Alapár+frissítve",
+        status_code=302
+    )
+
+@router.post("/admin/pricing/period-price")
+async def update_period_price(
+    request: Request,
+    token_type: str = Form(...),
+    period_months: int = Form(...),
+    price_eur: float = Form(...),  # EUR-ban (pl. 25.50)
+    db: Session = Depends(get_db)
+):
+    """Periódus ár frissítése"""
+    current_user = require_manager_admin(request, db)
+    
+    if token_type not in ["server_admin", "user"]:
+        raise HTTPException(status_code=400, detail="Érvénytelen token típus")
+    
+    from app.services.pricing_service import AVAILABLE_PERIODS
+    if period_months not in AVAILABLE_PERIODS:
+        raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
+    
+    if price_eur < 0:
+        raise HTTPException(status_code=400, detail="Az ár nem lehet negatív")
+    
+    # EUR-ból centekbe konvertálás
+    price_eur_cents = int(price_eur * 100)
+    
+    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    
+    # Meglévő ár keresése vagy új létrehozása
+    period_price_obj = db.query(TokenPeriodPrice).filter(
+        TokenPeriodPrice.token_type == token_type_enum,
+        TokenPeriodPrice.period_months == period_months
+    ).first()
+    
+    if period_price_obj:
+        period_price_obj.price_eur = price_eur_cents
+        period_price_obj.updated_at = datetime.now()
+    else:
+        period_price_obj = TokenPeriodPrice(
+            token_type=token_type_enum,
+            period_months=period_months,
+            price_eur=price_eur_cents
+        )
+        db.add(period_price_obj)
+    
+    db.commit()
+    
+    return RedirectResponse(
+        url="/admin/pricing?success=Periódus+ár+frissítve",
         status_code=302
     )
 

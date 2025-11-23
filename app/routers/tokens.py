@@ -554,7 +554,8 @@ async def request_token(
     request_type: str = Form(...),  # "cart" vagy "free"
     token_type: str = Form(...),
     quantity: int = Form(...),
-    expires_in_days: int = Form(None),
+    period_months: int = Form(None),
+    expires_in_days: int = Form(None),  # Deprecated, backward compatibility
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -573,8 +574,15 @@ async def request_token(
     if quantity < 1 or quantity > 100:
         raise HTTPException(status_code=400, detail="A mennyiség 1 és 100 között lehet")
     
-    if expires_in_days and (expires_in_days < 1 or expires_in_days > 365):
-        raise HTTPException(status_code=400, detail="A lejárat 1 és 365 nap között lehet")
+    # Periódus ellenőrzése
+    from app.services.pricing_service import AVAILABLE_PERIODS
+    if period_months and period_months not in AVAILABLE_PERIODS:
+        raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
+    
+    # Backward compatibility: ha nincs period_months, de van expires_in_days
+    if not period_months and expires_in_days:
+        if expires_in_days < 1 or expires_in_days > 365:
+            raise HTTPException(status_code=400, detail="A lejárat 1 és 365 nap között lehet")
     
     token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
     
@@ -585,7 +593,8 @@ async def request_token(
             item_type="token_request",
             token_type=token_type_enum,
             quantity=quantity,
-            expires_in_days=expires_in_days,
+            period_months=period_months,
+            expires_in_days=expires_in_days if not period_months else None,  # Backward compatibility
             notes=notes
         )
         db.add(cart_item)
@@ -598,11 +607,19 @@ async def request_token(
     
     elif request_type == "free":
         # Ingyenes igénylés manager admintól
+        # Period_months-t napokká konvertáljuk backward compatibility-ért
+        from app.services.pricing_service import period_months_to_days
+        final_expires_in_days = None
+        if period_months:
+            final_expires_in_days = period_months_to_days(period_months)
+        elif expires_in_days:
+            final_expires_in_days = expires_in_days
+        
         token_request = TokenRequest(
             user_id=current_user.id,
             token_type=token_type_enum,
             quantity=quantity,
-            expires_in_days=expires_in_days,
+            expires_in_days=final_expires_in_days,
             notes=notes,
             status="pending"
         )

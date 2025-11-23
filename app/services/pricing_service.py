@@ -5,9 +5,47 @@ Az árak EUR-ban vannak tárolva (centekben)
 
 from sqlalchemy.orm import Session
 from datetime import datetime
-from app.database import TokenPricingRule, TokenBasePrice, TokenType
+from app.database import TokenPricingRule, TokenBasePrice, TokenType, TokenPeriodPrice
 from typing import Optional, Dict, List
 from app.services.exchange_rate_service import get_huf_eur_exchange_rate, eur_to_huf
+
+# Elérhető periódusok (hónapokban)
+AVAILABLE_PERIODS = [1, 3, 6, 12]  # 1 hónap, 3 hónap, 6 hónap, 1 év
+
+def period_months_to_days(period_months: int) -> int:
+    """Periódus hónapokból napokká konvertálása"""
+    period_days_map = {
+        1: 30,   # 1 hónap = 30 nap
+        3: 90,   # 3 hónap = 90 nap
+        6: 180,  # 6 hónap = 180 nap
+        12: 365  # 1 év = 365 nap
+    }
+    return period_days_map.get(period_months, 30)
+
+def get_period_price(db: Session, token_type: TokenType, period_months: int) -> Optional[int]:
+    """
+    Periódus ár lekérése EUR centekben
+    
+    Args:
+        db: Database session
+        token_type: Token típus
+        period_months: Periódus hónapokban (1, 3, 6, vagy 12)
+    
+    Returns:
+        Ár EUR centekben vagy None ha nincs beállítva
+    """
+    if period_months not in AVAILABLE_PERIODS:
+        return None
+    
+    period_price = db.query(TokenPeriodPrice).filter(
+        TokenPeriodPrice.token_type == token_type,
+        TokenPeriodPrice.period_months == period_months
+    ).first()
+    
+    if period_price:
+        return period_price.price_eur
+    
+    return None
 
 def get_base_price(db: Session, token_type: TokenType, item_type: str, days: Optional[int] = None) -> int:
     """
@@ -121,10 +159,37 @@ def calculate_price(
     token_type: TokenType,
     item_type: str,
     quantity: int = 1,
-    days: Optional[int] = None
+    days: Optional[int] = None,
+    period_months: Optional[int] = None
 ) -> Dict:
-    """Ár számítása kedvezményekkel"""
-    base_price = get_base_price(db, token_type, item_type, days)
+    """
+    Ár számítása kedvezményekkel
+    
+    Args:
+        db: Database session
+        token_type: Token típus
+        item_type: "token_request" vagy "token_extension"
+        quantity: Mennyiség
+        days: Napok száma (deprecated, használd period_months helyette)
+        period_months: Periódus hónapokban (1, 3, 6, vagy 12) - prioritásos
+    
+    Returns:
+        Dict az ár információkkal
+    """
+    # Ha van period_months, akkor azt használjuk
+    if period_months and period_months in AVAILABLE_PERIODS:
+        period_price = get_period_price(db, token_type, period_months)
+        if period_price:
+            base_price = period_price
+            # Napok számítása a periódusból (kedvezményekhez)
+            days = period_months_to_days(period_months)
+        else:
+            # Ha nincs periódus ár, akkor a régi módszert használjuk
+            base_price = get_base_price(db, token_type, item_type, days)
+    else:
+        # Régi módszer: napok alapján
+        base_price = get_base_price(db, token_type, item_type, days)
+    
     total_base_price = base_price * quantity
     
     # Aktív szabályok lekérése

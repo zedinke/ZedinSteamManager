@@ -58,13 +58,33 @@
                                 <td>
                                     {% if item.item_type == "token_request" %}
                                         <strong>{{ item.quantity }} db</strong>
-                                        {% if item.expires_in_days %}
+                                        {% if item.period_months %}
+                                            <br><small style="color: #666;">
+                                                {% if item.period_months == 1 %}1 hónap
+                                                {% elif item.period_months == 3 %}3 hónap
+                                                {% elif item.period_months == 6 %}6 hónap
+                                                {% elif item.period_months == 12 %}1 év
+                                                {% else %}{{ item.period_months }} hónap{% endif %}
+                                            </small>
+                                        {% elif item.expires_in_days %}
                                             <br><small style="color: #666;">{{ item.expires_in_days }} napos lejárat</small>
                                         {% else %}
                                             <br><small style="color: #666;">Alapértelmezett lejárat</small>
                                         {% endif %}
                                     {% else %}
-                                        <strong>{{ item.requested_days }} nap</strong>
+                                        {% if item.period_months %}
+                                            <strong>
+                                                {% if item.period_months == 1 %}1 hónap
+                                                {% elif item.period_months == 3 %}3 hónap
+                                                {% elif item.period_months == 6 %}6 hónap
+                                                {% elif item.period_months == 12 %}1 év
+                                                {% else %}{{ item.period_months }} hónap{% endif %}
+                                            </strong>
+                                        {% elif item.requested_days %}
+                                            <strong>{{ item.requested_days }} nap</strong>
+                                        {% else %}
+                                            <strong>-</strong>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 <td>

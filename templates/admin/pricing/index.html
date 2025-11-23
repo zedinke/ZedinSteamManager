@@ -21,10 +21,72 @@
         </div>
     {% endif %}
     
-    <!-- Alapárak -->
+    <!-- Periódus árak -->
     <div class="card" style="margin-bottom: 30px;">
         <div class="card-header">
-            <h3><i class="fas fa-dollar-sign"></i> Alapárak</h3>
+            <h3><i class="fas fa-calendar-alt"></i> Periódus Árak (1, 3, 6, 12 hónap)</h3>
+        </div>
+        <div class="card-body">
+            <p style="margin-bottom: 20px; color: #666;">Itt állíthatod be az egyes periódusokhoz tartozó árakat EUR-ban. Az ár automatikusan forintban is megjelenik az aktuális árfolyam alapján.</p>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                {% for period in available_periods %}
+                    <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+                        <h4 style="margin-bottom: 15px;">
+                            {% if period == 1 %}1 hónap
+                            {% elif period == 3 %}3 hónap
+                            {% elif period == 6 %}6 hónap
+                            {% elif period == 12 %}1 év
+                            {% else %}{{ period }} hónap{% endif %}
+                        </h4>
+                        
+                        <!-- Szerver Admin -->
+                        <form method="POST" action="/admin/pricing/period-price" style="margin-bottom: 15px;">
+                            <input type="hidden" name="token_type" value="server_admin">
+                            <input type="hidden" name="period_months" value="{{ period }}">
+                            <div style="margin-bottom: 10px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin (EUR):</label>
+                                {% set existing_price = period_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('period_months', 'equalto', period)|map(attribute='price_eur')|first %}
+                                <input type="number" name="price_eur" step="0.01" min="0" 
+                                       value="{% if existing_price %}{{ "%.2f"|format(existing_price / 100) }}{% else %}0.00{% endif %}" 
+                                       required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <small style="color: #666;">Pl. 25.50 = 25.50 EUR</small>
+                                {% if existing_price %}
+                                    {% set huf_price = existing_price / 100 * exchange_rate %}
+                                    <br><small style="color: #999;">≈ {{ "{:,.0f}".format(huf_price) }} HUF ({{ "%.2f"|format(exchange_rate) }} HUF/EUR árfolyammal)</small>
+                                {% endif %}
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
+                        </form>
+                        
+                        <!-- Felhasználó -->
+                        <form method="POST" action="/admin/pricing/period-price">
+                            <input type="hidden" name="token_type" value="user">
+                            <input type="hidden" name="period_months" value="{{ period }}">
+                            <div style="margin-bottom: 10px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó (EUR):</label>
+                                {% set existing_price = period_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('period_months', 'equalto', period)|map(attribute='price_eur')|first %}
+                                <input type="number" name="price_eur" step="0.01" min="0" 
+                                       value="{% if existing_price %}{{ "%.2f"|format(existing_price / 100) }}{% else %}0.00{% endif %}" 
+                                       required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <small style="color: #666;">Pl. 12.50 = 12.50 EUR</small>
+                                {% if existing_price %}
+                                    {% set huf_price = existing_price / 100 * exchange_rate %}
+                                    <br><small style="color: #999;">≈ {{ "{:,.0f}".format(huf_price) }} HUF ({{ "%.2f"|format(exchange_rate) }} HUF/EUR árfolyammal)</small>
+                                {% endif %}
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alapárak (deprecated, csak backward compatibility) -->
+    <div class="card" style="margin-bottom: 30px;">
+        <div class="card-header">
+            <h3><i class="fas fa-dollar-sign"></i> Alapárak (Régi rendszer - csak hosszabbításokhoz)</h3>
         </div>
         <div class="card-body">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">

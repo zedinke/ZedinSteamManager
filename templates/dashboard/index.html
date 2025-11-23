@@ -606,12 +606,12 @@ function showExtensionRequestModal(tokenId, currentExpiry) {
         currentExpirySpan.textContent = currentExpiry || 'Nincs lejárat';
     
     // Új lejárat számítása
-    const daysInput = document.getElementById('extensionRequestDays');
-    if (daysInput) {
-            daysInput.value = 30; // Reset to default
-        daysInput.removeEventListener('input', updateNewExpiryRequest);
-        daysInput.addEventListener('input', updateNewExpiryRequest);
-        updateNewExpiryRequest();
+    const periodSelect = document.getElementById('extensionRequestPeriodMonths');
+    if (periodSelect) {
+        periodSelect.value = 1; // Reset to default (1 hónap)
+        periodSelect.removeEventListener('change', updateNewExpiryRequestPeriod);
+        periodSelect.addEventListener('change', updateNewExpiryRequestPeriod);
+        updateNewExpiryRequestPeriod();
     }
     
     // Modal megjelenítése
@@ -691,11 +691,12 @@ function toggleRequestType() {
     }
 }
 
-function updateNewExpiryRequest() {
-    const daysInput = document.getElementById('extensionRequestDays');
-    if (!daysInput) return;
+function updateNewExpiryRequestPeriod() {
+    const periodSelect = document.getElementById('extensionRequestPeriodMonths');
+    if (!periodSelect) return;
     
-    const days = parseInt(daysInput.value) || 0;
+    const periodMonths = parseInt(periodSelect.value) || 1;
+    const days = periodMonths === 1 ? 30 : periodMonths === 3 ? 90 : periodMonths === 6 ? 180 : 365;
     const currentExpiryText = document.getElementById('currentExpiryRequest').textContent;
     
     if (currentExpiryText && currentExpiryText !== 'Nincs lejárat') {
@@ -784,9 +785,14 @@ document.addEventListener('DOMContentLoaded', function() {
         <form method="POST" action="/cart/add-extension-request" id="extensionRequestForm">
             <input type="hidden" name="token_id" id="extensionRequestTokenId">
             <div style="margin-bottom: 15px;">
-                <label for="extensionRequestDays" style="display: block; margin-bottom: 5px; font-weight: bold;">Hány napra szeretnéd meghosszabbítani?</label>
-                <input type="number" class="form-control" id="extensionRequestDays" name="requested_days" min="1" max="365" value="30" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                <small style="color: #666;">1-365 nap között lehet megadni</small>
+                <label for="extensionRequestPeriodMonths" style="display: block; margin-bottom: 5px; font-weight: bold;">Periódus:</label>
+                <select id="extensionRequestPeriodMonths" name="period_months" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;" onchange="updateNewExpiryRequestPeriod()">
+                    <option value="1">1 hónap</option>
+                    <option value="3">3 hónap</option>
+                    <option value="6">6 hónap</option>
+                    <option value="12">1 év</option>
+                </select>
+                <small style="color: #666;">Válassz egy periódust</small>
             </div>
             <div style="margin-bottom: 15px;">
                 <label for="extensionRequestNotes" style="display: block; margin-bottom: 5px; font-weight: bold;">Megjegyzés (opcionális):</label>
@@ -841,9 +847,14 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             
             <div style="margin-bottom: 15px;" id="expiresInDaysContainer">
-                <label for="tokenRequestExpiresInDays" style="display: block; margin-bottom: 5px; font-weight: bold;">Lejárat (napokban, opcionális):</label>
-                <input type="number" id="tokenRequestExpiresInDays" name="expires_in_days" min="1" max="365" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                <small style="color: #666;">Ha nincs megadva, az alapértelmezett lejárati idő kerül használatra</small>
+                <label for="tokenRequestPeriodMonths" style="display: block; margin-bottom: 5px; font-weight: bold;">Periódus:</label>
+                <select id="tokenRequestPeriodMonths" name="period_months" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    <option value="1">1 hónap</option>
+                    <option value="3">3 hónap</option>
+                    <option value="6">6 hónap</option>
+                    <option value="12">1 év</option>
+                </select>
+                <small style="color: #666;">Válassz egy periódust</small>
             </div>
             
             <div style="margin-bottom: 15px;">

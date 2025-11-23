@@ -2,7 +2,7 @@
 Adatbázis kapcsolat és modell
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, Text, ForeignKey, JSON, TypeDecorator
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Enum, Text, ForeignKey, JSON, TypeDecorator, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
@@ -412,8 +412,9 @@ class CartItem(Base):
     item_type = Column(String(20), nullable=False, index=True)  # "token_request" vagy "token_extension"
     token_type = Column(EnumType(TokenType), nullable=True)  # Csak token_request esetén
     quantity = Column(Integer, nullable=False, default=1)  # Token igénylés esetén hány darab
-    requested_days = Column(Integer, nullable=True)  # Token hosszabbítás esetén hány nap
-    expires_in_days = Column(Integer, nullable=True)  # Token igénylés esetén hány napos lejárat
+    requested_days = Column(Integer, nullable=True)  # Token hosszabbítás esetén hány nap (deprecated, használd period_months helyette)
+    expires_in_days = Column(Integer, nullable=True)  # Token igénylés esetén hány napos lejárat (deprecated, használd period_months helyette)
+    period_months = Column(Integer, nullable=True)  # Periódus hónapokban (1, 3, 6, vagy 12) - token_request és token_extension esetén is
     token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=True, index=True)  # Csak token_extension esetén
     notes = Column(Text, nullable=True)  # Opcionális megjegyzés
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
@@ -467,6 +468,22 @@ class TokenBasePrice(Base):
     price_per_day = Column(Integer, nullable=True)  # Napi ár EUR centekben (hosszabbítás esetén, pl. 250 = 2.50 EUR/nap)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+class TokenPeriodPrice(Base):
+    """Token periódus árak (1, 3, 6, 12 hónap)"""
+    __tablename__ = "token_period_prices"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    token_type = Column(EnumType(TokenType), nullable=False, index=True)  # server_admin vagy user
+    period_months = Column(Integer, nullable=False, index=True)  # 1, 3, 6, vagy 12 hónap
+    price_eur = Column(Integer, nullable=False)  # Ár EUR centekben (pl. 2500 = 25.00 EUR)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Unique constraint: egy token_type + period_months kombináció csak egyszer lehet
+    __table_args__ = (
+        UniqueConstraint('token_type', 'period_months', name='uq_token_period'),
+    )
 
 # Dependency
 def get_db():

@@ -45,13 +45,14 @@ async def show_cart(
         try:
             if item.item_type == "token_request":
                 # Token igénylés ár számítása
-                # Ha expires_in_days nincs megadva, akkor None (alapértelmezett lejárat)
+                # Period_months prioritásos, ha nincs, akkor expires_in_days (backward compatibility)
                 pricing = calculate_price(
                     db,
                     item.token_type,
                     "token_request",
                     quantity=item.quantity,
-                    days=item.expires_in_days
+                    period_months=item.period_months,
+                    days=item.expires_in_days if not item.period_months else None
                 )
                 item.pricing = pricing
                 total_base_price += pricing["total_base_price"]
@@ -60,12 +61,14 @@ async def show_cart(
             elif item.item_type == "token_extension":
                 # Token hosszabbítás ár számítása
                 if item.token:
+                    # Period_months prioritásos, ha nincs, akkor requested_days (backward compatibility)
                     pricing = calculate_price(
                         db,
                         item.token.token_type,
                         "token_extension",
                         quantity=1,
-                        days=item.requested_days
+                        period_months=item.period_months,
+                        days=item.requested_days if not item.period_months else None
                     )
                     item.pricing = pricing
                     total_base_price += pricing["total_base_price"]
@@ -99,6 +102,7 @@ async def add_token_request(
     request: Request,
     token_type: str = Form(...),
     quantity: int = Form(...),
+    period_months: int = Form(...),
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -111,6 +115,11 @@ async def add_token_request(
     if quantity < 1 or quantity > 100:
         raise HTTPException(status_code=400, detail="A mennyiség 1 és 100 között lehet")
     
+    # Periódus ellenőrzése
+    from app.services.pricing_service import AVAILABLE_PERIODS
+    if period_months not in AVAILABLE_PERIODS:
+        raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
+    
     token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
     
     # Kosár elem létrehozása
@@ -119,6 +128,7 @@ async def add_token_request(
         item_type="token_request",
         token_type=token_type_enum,
         quantity=quantity,
+        period_months=period_months,
         notes=notes
     )
     
@@ -131,15 +141,17 @@ async def add_token_request(
 async def add_extension_request(
     request: Request,
     token_id: int = Form(...),
-    requested_days: int = Form(...),
+    period_months: int = Form(...),
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Server Admin: Token hosszabbítási kérés hozzáadása a kosárhoz"""
     current_user = require_server_admin(request, db)
     
-    if requested_days < 1 or requested_days > 365:
-        raise HTTPException(status_code=400, detail="A hosszabbítás 1 és 365 nap között lehet")
+    # Periódus ellenőrzése
+    from app.services.pricing_service import AVAILABLE_PERIODS
+    if period_months not in AVAILABLE_PERIODS:
+        raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
     
     # Token ellenőrzése - csak a saját tokenjeit kérheti
     token = db.query(Token).filter(
@@ -165,7 +177,7 @@ async def add_extension_request(
         user_id=current_user.id,
         item_type="token_extension",
         token_id=token_id,
-        requested_days=requested_days,
+        period_months=period_months,
         notes=notes
     )
     
