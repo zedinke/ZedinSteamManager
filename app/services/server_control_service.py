@@ -275,17 +275,12 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         rcon_port = server.rcon_port or settings.ark_default_rcon_port
         
         # Docker image és útvonalak meghatározása
-        use_custom_image = getattr(settings, 'ark_docker_use_custom', False)
-        docker_image = getattr(settings, 'ark_docker_image', 'acekorneya/asa_server:2_1_latest')
+        # Csak saját Docker image-t használunk: zedinarkmanager/ark-server:latest
+        docker_image = getattr(settings, 'ark_docker_image', 'zedinarkmanager/ark-server:latest')
         
-        if use_custom_image:
-            # Saját Docker image: /home/zedin/arkserver struktúra
-            container_work_dir = '/home/zedin/arkserver'
-            container_saved_path = '/home/zedin/arkserver/ShooterGame/Saved'
-        else:
-            # POK Docker image: /home/pok/arkserver struktúra
-            container_work_dir = '/home/pok/arkserver'
-            container_saved_path = '/home/pok/arkserver/ShooterGame/Saved'
+        # Saját Docker image: /home/zedin/arkserver struktúra
+        container_work_dir = '/home/zedin/arkserver'
+        container_saved_path = '/home/zedin/arkserver/ShooterGame/Saved'
         
         # Docker Compose YAML összeállítása
         compose_data = {
@@ -318,6 +313,8 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         f'RCON_ENABLED={"True" if config_values.get("RCON_ENABLED", True) else "False"}',
                         f'BATTLEEYE={"True" if config_values.get("BATTLEEYE", False) else "False"}',
                         f'API={"True" if config_values.get("API", False) else "False"}',
+                        f'ARK_SERVER_DIR={container_work_dir}',
+                        f'UPDATE_SERVER=False',  # Ne telepítsen újra, ha a fájlok már a hoston vannak
                     ],
                 }
             }
