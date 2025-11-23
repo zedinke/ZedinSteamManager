@@ -255,6 +255,7 @@ def get_setting_category(section: str, key: str) -> str:
 def parse_ini_file(file_path: Path) -> Dict[str, Dict[str, Any]]:
     """
     INI fájl beolvasása és feldolgozása
+    Ark specifikus formátumot is kezeli (nincs section header esetén)
     
     Args:
         file_path: INI fájl útvonala
@@ -263,24 +264,70 @@ def parse_ini_file(file_path: Path) -> Dict[str, Dict[str, Any]]:
         Dict: {section: {key: value}}
     """
     if not file_path.exists():
+        print(f"Config fájl nem létezik: {file_path}")
         return {}
     
-    config = configparser.ConfigParser()
-    config.optionxform = str  # Case-sensitive kulcsok
+    result = {}
+    current_section = None
     
     try:
-        config.read(file_path, encoding='utf-8')
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
         
-        result = {}
-        for section in config.sections():
-            result[section] = {}
-            for key, value in config.items(section):
-                # Próbáljuk meg konvertálni a típusokat
-                result[section][key] = convert_value(value)
+        # Először próbáljuk meg a standard configparser-rel
+        try:
+            config = configparser.ConfigParser()
+            config.optionxform = str  # Case-sensitive kulcsok
+            config.read(file_path, encoding='utf-8')
+            
+            for section in config.sections():
+                result[section] = {}
+                for key, value in config.items(section):
+                    result[section][key] = convert_value(value)
+            
+            if result:
+                return result
+        except Exception as e:
+            print(f"ConfigParser hiba, manuális parsing: {e}")
+        
+        # Ha a configparser nem működik, manuális parsing
+        for line_num, line in enumerate(lines, 1):
+            line = line.strip()
+            
+            # Üres sor vagy komment
+            if not line or line.startswith('#'):
+                continue
+            
+            # Section header: [SectionName]
+            if line.startswith('[') and line.endswith(']'):
+                current_section = line[1:-1].strip()
+                if current_section not in result:
+                    result[current_section] = {}
+                continue
+            
+            # Key=Value pár
+            if '=' in line:
+                try:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # Ha nincs section, akkor "DEFAULT" section-t használunk
+                    if current_section is None:
+                        current_section = "ServerSettings"
+                        if current_section not in result:
+                            result[current_section] = {}
+                    
+                    result[current_section][key] = convert_value(value)
+                except Exception as e:
+                    print(f"Hiba a sor feldolgozásakor (sor {line_num}): {line} - {e}")
+                    continue
         
         return result
     except Exception as e:
         print(f"Hiba az INI fájl beolvasásakor: {e}")
+        import traceback
+        traceback.print_exc()
         return {}
 
 def convert_value(value: str) -> Any:
