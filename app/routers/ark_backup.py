@@ -7,13 +7,40 @@ from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
 from app.database import get_db, ServerInstance
-from app.routers.auth import require_server_admin
 from app.services.backup_service import (
     create_backup, list_backups, restore_backup, delete_backup, upload_backup,
     get_server_backup_path
 )
 from app.services.symlink_service import get_server_path
 from sqlalchemy import and_
+
+# require_server_admin import az ark_servers.py-ból
+def require_server_admin(request: Request, db: Session = Depends(get_db)):
+    """Server Admin jogosultság ellenőrzése"""
+    from app.database import User
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=302,
+            detail="Nincs bejelentkezve",
+            headers={"Location": "/login"}
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=302,
+            detail="Felhasználó nem található",
+            headers={"Location": "/login"}
+        )
+    
+    if user.role != "server_admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Nincs jogosultsága ehhez a művelethez"
+        )
+    
+    return user
 
 router = APIRouter(prefix="/ark/servers", tags=["ark_backup"])
 
