@@ -211,10 +211,10 @@ async def install_ark_server_files(
                 except Exception as e:
                     await log(f"⚠️ Újratelepítés sikertelen: {e}")
             
-            # Ellenőrizzük, hogy a bináris létezik-e
-            binary_path = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            # Ellenőrizzük, hogy a Windows bináris létezik-e (csak Windows bináris van)
+            binary_path = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             if not binary_path.exists():
-                error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer bináris nem található: {binary_path}"
+                error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer.exe bináris nem található: {binary_path}"
                 await log(f"✗ {error_msg}")
                 await log("Ellenőrzés:")
                 await log(f"  - Install path létezik: {install_path.exists()}")
