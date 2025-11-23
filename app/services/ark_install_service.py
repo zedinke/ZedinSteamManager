@@ -56,9 +56,6 @@ async def install_ark_server_files(
             progress_callback(error_msg)
         return False, error_msg
     
-    # Telepítési útvonal létrehozása
-    install_path.mkdir(parents=True, exist_ok=True)
-    
     # Log függvény definíciója (korábban kell, hogy használhassuk)
     log_lines = []
     
@@ -70,48 +67,58 @@ async def install_ark_server_files(
             else:
                 progress_callback(message)
     
-    # FONTOS: Jogosultságok beállítása a SteamCMD telepítés előtt (0x602 hiba elkerülésére)
-    # A POK-manager.sh script is ezt csinálja: "Ensure ServerFiles directory has correct permissions to prevent SteamCMD error 0x602"
-    await log("Jogosultságok beállítása a telepítési útvonalra (0x602 hiba elkerülésére)...")
+    # Telepítési útvonal létrehozása JOGOSULTSÁGOKKAL együtt
+    await log("Telepítési mappa létrehozása...")
     try:
         import stat
-        import subprocess
         current_uid = os.getuid()
         current_gid = os.getgid()
         
-        # Mappa jogosultságok beállítása: 755 (rwxr-xr-x)
+        # Mappa létrehozása
+        install_path.mkdir(parents=True, exist_ok=True)
+        
+        # AZONNAL beállítjuk a jogosultságokat (0x602 hiba elkerülésére)
+        # FONTOS: A mappa létrehozása után azonnal kell beállítani!
+        try:
+            # Jogosultságok: 755 (rwxr-xr-x)
+            os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+            # Tulajdonjog: aktuális felhasználó
+            os.chown(install_path, current_uid, current_gid)
+            await log("✓ Telepítési mappa létrehozva megfelelő jogosultságokkal")
+        except (PermissionError, OSError) as e:
+            await log(f"⚠️ Jogosultságok beállítása sikertelen: {e}")
+            await log("ℹ️ Folytatjuk a telepítést...")
+    except Exception as e:
+        await log(f"⚠️ Mappa létrehozása sikertelen: {e}")
+        # Próbáljuk meg úgyis létrehozni
+        install_path.mkdir(parents=True, exist_ok=True)
+    
+    # FONTOS: Jogosultságok beállítása a SteamCMD telepítés előtt (0x602 hiba elkerülésére)
+    # A POK-manager.sh script is ezt csinálja: "Ensure ServerFiles directory has correct permissions to prevent SteamCMD error 0x602"
+    # MEGJEGYZÉS: Nem használunk sudo-t, mert a felhasználók nem tudják minden telepítésnél megadni
+    # Csak akkor próbáljuk meg beállítani a jogosultságokat, ha közvetlenül lehetséges
+    await log("Jogosultságok beállítása a telepítési útvonalra (0x602 hiba elkerülésére)...")
+    try:
+        import stat
+        current_uid = os.getuid()
+        current_gid = os.getgid()
+        
+        # Mappa jogosultságok beállítása: 755 (rwxr-xr-x) - csak akkor, ha lehetséges
         try:
             os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
         except (PermissionError, OSError):
-            # Ha nincs jogosultság, próbáljuk meg sudo-val
-            try:
-                subprocess.run(
-                    ["sudo", "chmod", "755", str(install_path)],
-                    capture_output=True,
-                    timeout=10
-                )
-            except Exception:
-                pass
+            pass  # Ha nincs jogosultság, folytatjuk
         
-        # Tulajdonjog beállítása (ha lehetséges)
+        # Tulajdonjog beállítása (ha lehetséges) - csak akkor, ha lehetséges
         try:
             os.chown(install_path, current_uid, current_gid)
         except (PermissionError, OSError):
-            # Ha nincs jogosultság, próbáljuk meg sudo-val
-            try:
-                subprocess.run(
-                    ["sudo", "chown", "-R", f"{current_uid}:{current_gid}", str(install_path)],
-                    capture_output=True,
-                    timeout=30
-                )
-            except Exception:
-                pass
+            pass  # Ha nincs jogosultság, folytatjuk
         
-        # Ha van már tartalom, akkor az összes mappát és fájlt is beállítjuk
+        # Ha van már tartalom, akkor az összes mappát és fájlt is beállítjuk - csak akkor, ha lehetséges
         if install_path.exists():
-            # Próbáljuk meg sudo-val is, ha van jogosultsági probléma
             try:
-                # Először próbáljuk meg közvetlenül
+                # Próbáljuk meg közvetlenül, de ne blokkoljuk a telepítést, ha nem sikerül
                 for root, dirs, files in os.walk(install_path):
                     for d in dirs:
                         try:
@@ -119,7 +126,7 @@ async def install_ark_server_files(
                             os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)  # 755
                             os.chown(dir_path, current_uid, current_gid)
                         except (PermissionError, OSError):
-                            pass
+                            pass  # Ha nincs jogosultság, folytatjuk
                     
                     for f in files:
                         try:
@@ -127,24 +134,11 @@ async def install_ark_server_files(
                             os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)  # 644
                             os.chown(file_path, current_uid, current_gid)
                         except (PermissionError, OSError):
-                            pass
+                            pass  # Ha nincs jogosultság, folytatjuk
             except Exception:
-                # Ha közvetlenül nem sikerült, próbáljuk meg sudo-val
-                try:
-                    subprocess.run(
-                        ["sudo", "chmod", "-R", "755", str(install_path)],
-                        capture_output=True,
-                        timeout=30
-                    )
-                    subprocess.run(
-                        ["sudo", "chown", "-R", f"{current_uid}:{current_gid}", str(install_path)],
-                        capture_output=True,
-                        timeout=30
-                    )
-                except Exception:
-                    pass
+                pass  # Ha bármi hiba van, folytatjuk
         
-        await log("✓ Jogosultságok beállítva")
+        await log("✓ Jogosultságok beállítva (ahol lehetséges volt)")
     except Exception as e:
         await log(f"⚠️ Jogosultságok beállítása részben sikertelen: {e}")
         await log("ℹ️ Folytatjuk a telepítést - a SteamCMD próbálja meg felülírni a fájlokat")
@@ -194,12 +188,13 @@ async def install_ark_server_files(
     # FONTOS: A force_install_dir-t a login ELŐTT kell megadni!
     # Linux-on nem kell a platform type paraméter, mert a SteamCMD automatikusan
     # a megfelelő platformot választja (Linux binárisokat tölt le Linux-on)
-    # FONTOS: A validate opciót használjuk, mert vannak mappák, amelyek csak validate után jönnek létre
+    # FONTOS: NEM használunk validate opciót az első telepítésnél, mert az verify fázist indít,
+    # ami 0x602 hibát okozhat. A validate-t csak újratelepítésnél használjuk.
     steamcmd_args = [
         str(steamcmd_path),
         "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
         "+login", "anonymous",  # Utána a bejelentkezés
-        "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval (minden mappa létrejön)
+        "+app_update", app_id,  # Teljes telepítés (validate NÉLKÜL - 0x602 hiba elkerülésére)
         "+quit"
     ]
     
@@ -273,21 +268,17 @@ async def install_ark_server_files(
                 await log("⚠️ A letöltés nem fejeződött be teljesen. Újratelepítés indítása...")
                 # Újratelepítés indítása, mert a letöltés nem fejeződött be
                 try:
-                    import subprocess
+                    import shutil
                     shooter_game = install_path / "ShooterGame"
                     if shooter_game.exists():
-                        # Töröljük a hiányos telepítést
+                        # Töröljük a hiányos telepítést - csak akkor, ha lehetséges (sudo nélkül)
                         await log("Hiányos telepítés törlése...")
-                        result = subprocess.run(
-                            ["sudo", "rm", "-rf", str(shooter_game)],
-                            capture_output=True,
-                            text=True,
-                            timeout=30
-                        )
-                        if result.returncode == 0:
+                        try:
+                            shutil.rmtree(shooter_game)
                             await log("✓ Hiányos telepítés törölve")
-                        else:
-                            await log(f"⚠️ Hiányos telepítés törlése sikertelen: {result.stderr}")
+                        except (PermissionError, OSError) as e:
+                            await log(f"⚠️ Nincs jogosultság a hiányos telepítés törléséhez: {e}")
+                            await log("ℹ️ Folytatjuk a telepítést - a SteamCMD felülírja a fájlokat")
                     # Újratelepítés
                     await asyncio.sleep(2)
                     await log("Újratelepítés indítása SteamCMD-vel...")
@@ -295,7 +286,7 @@ async def install_ark_server_files(
                         str(steamcmd_path),
                         "+force_install_dir", str(install_path.absolute()),
                         "+login", "anonymous",
-                        "+app_update", app_id, "validate",  # Validate opcióval (minden mappa létrejön)
+                        "+app_update", app_id,  # Teljes telepítés (validate NÉLKÜL - 0x602 hiba elkerülésére)
                         "+quit",
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.STDOUT,
@@ -330,48 +321,42 @@ async def install_ark_server_files(
                 await log("⚠️ SteamCMD 'already up to date' üzenetet adott, de nincs Binaries mappa!")
                 await log("⚠️ Töröljük a ShooterGame mappát és újratelepítjük...")
                 try:
-                    import subprocess
-                    # Jogosultságok javítása
-                    subprocess.run(
-                        ["sudo", "chown", "-R", f"{os.getuid()}:{os.getgid()}", str(shooter_game)],
-                        capture_output=True,
-                        timeout=10
+                    import shutil
+                    # Törlés - csak akkor, ha lehetséges (sudo nélkül)
+                    törlés_sikeres = False
+                    try:
+                        shutil.rmtree(shooter_game)
+                        await log("✓ ShooterGame mappa törölve")
+                        törlés_sikeres = True
+                    except (PermissionError, OSError) as e:
+                        await log(f"⚠️ Nincs jogosultság a ShooterGame mappa törléséhez: {e}")
+                        await log("ℹ️ Folytatjuk a telepítést - a SteamCMD felülírja a fájlokat")
+                    
+                    # Újratelepítés (akkor is, ha a törlés nem sikerült)
+                    await log("Újratelepítés indítása SteamCMD-vel...")
+                    await asyncio.sleep(2)
+                    # Újratelepítés SteamCMD-vel
+                    # FONTOS: A force_install_dir-t a login ELŐTT kell megadni!
+                    process2 = await asyncio.create_subprocess_exec(
+                        str(steamcmd_path),
+                        "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
+                        "+login", "anonymous",  # Utána a bejelentkezés
+                        "+app_update", app_id,  # Teljes telepítés (validate NÉLKÜL - 0x602 hiba elkerülésére)
+                        "+quit",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                        cwd=str(install_path.parent),
+                        bufsize=0
                     )
-                    # Törlés
-                    result = subprocess.run(
-                        ["sudo", "rm", "-rf", str(shooter_game)],
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-                    if result.returncode == 0:
-                        await log("✓ ShooterGame mappa törölve, újratelepítés indítása...")
-                        # Újratelepítés
-                        await asyncio.sleep(2)
-                        # Újratelepítés SteamCMD-vel
-                        # FONTOS: A force_install_dir-t a login ELŐTT kell megadni!
-                        process2 = await asyncio.create_subprocess_exec(
-                            str(steamcmd_path),
-                            "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
-                            "+login", "anonymous",  # Utána a bejelentkezés
-                            "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval (minden mappa létrejön)
-                            "+quit",
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.STDOUT,
-                            cwd=str(install_path.parent),
-                            bufsize=0
-                        )
-                        while True:
-                            line = await process2.stdout.readline()
-                            if not line:
-                                break
-                            line_text = line.decode('utf-8', errors='ignore').strip()
-                            if line_text:
-                                await log(line_text)
-                        return_code = await process2.wait()
-                        await asyncio.sleep(3)  # Várunk, hogy a fájlrendszer frissüljön
-                    else:
-                        await log(f"⚠️ ShooterGame mappa törlése sikertelen: {result.stderr}")
+                    while True:
+                        line = await process2.stdout.readline()
+                        if not line:
+                            break
+                        line_text = line.decode('utf-8', errors='ignore').strip()
+                        if line_text:
+                            await log(line_text)
+                    return_code = await process2.wait()
+                    await asyncio.sleep(3)  # Várunk, hogy a fájlrendszer frissüljön
                 except Exception as e:
                     await log(f"⚠️ Újratelepítés sikertelen: {e}")
             
@@ -562,9 +547,9 @@ async def check_for_updates(
         # Ha van frissítés, akkor a SteamCMD jelezni fogja
         process = await asyncio.create_subprocess_exec(
             str(steamcmd_path),
+            "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
             "+login", "anonymous",
-            "+force_install_dir", str(install_path.absolute()),
-            "+app_update", app_id, "validate",
+            "+app_update", app_id,  # Frissítés ellenőrzés (validate NÉLKÜL - 0x602 hiba elkerülésére)
             "+quit",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
