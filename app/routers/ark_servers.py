@@ -613,6 +613,40 @@ async def edit_server(
         except (json.JSONDecodeError, ValueError):
             passive_mods_list = None
     
+    # Port ellenőrzés és frissítés, ha szükséges
+    port_changed = False
+    original_port = server.port
+    original_query_port = server.query_port
+    original_rcon_port = server.rcon_port
+    
+    # Ellenőrizzük, hogy a jelenlegi portok elérhetőek-e
+    from app.services.port_service import check_port_available, get_query_port, get_rcon_port
+    
+    # Game port ellenőrzése
+    if server.port and not check_port_available(server.port):
+        # Ha foglalt, keressünk egy szabad portot
+        new_port = find_available_port(start_port=server.port, db=db)
+        if new_port:
+            server.port = new_port
+            port_changed = True
+            print(f"Port foglalt volt ({original_port}), új port: {new_port}")
+    
+    # Query port ellenőrzése és frissítése (game port alapján)
+    if server.port:
+        new_query_port = get_query_port(server.port, db)
+        if new_query_port != server.query_port:
+            server.query_port = new_query_port
+            port_changed = True
+            print(f"Query port frissítve: {original_query_port} -> {new_query_port}")
+    
+    # RCON port ellenőrzése és frissítése (game port alapján)
+    if server.port:
+        new_rcon_port = get_rcon_port(server.port, db)
+        if new_rcon_port != server.rcon_port:
+            server.rcon_port = new_rcon_port
+            port_changed = True
+            print(f"RCON port frissítve: {original_rcon_port} -> {new_rcon_port}")
+    
     # Frissítés
     old_cluster_id = server.cluster_id
     server.cluster_id = cluster.id
