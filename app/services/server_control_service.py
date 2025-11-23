@@ -32,6 +32,7 @@ def find_server_executable(server_path: Path) -> Optional[Path]:
     if server_path.is_symlink():
         try:
             real_path = server_path.resolve()
+            logger.info(f"Symlink követve: {server_path} -> {real_path}")
         except Exception as e:
             logger.warning(f"Symlink követése sikertelen: {e}")
             real_path = server_path
@@ -40,38 +41,72 @@ def find_server_executable(server_path: Path) -> Optional[Path]:
     # Linux: ShooterGameServer
     possible_names = ["ShooterGameServer.exe", "ShooterGameServer"]
     
-    # Lehetséges útvonalak
+    # Lehetséges útvonalak (Ark Survival Ascended struktúra)
     possible_paths = [
-        # Standard Ark Survival Ascended struktúra
+        # Standard Ark Survival Ascended struktúra (Windows)
         real_path / "ShooterGame" / "Binaries" / "Win64",
+        # Standard Ark Survival Ascended struktúra (Linux)
         real_path / "ShooterGame" / "Binaries" / "Linux",
         # Alternatív struktúrák
         real_path / "Binaries" / "Win64",
         real_path / "Binaries" / "Linux",
+        # SteamCMD telepítés struktúra
+        real_path / "ShooterGame" / "Binaries" / "ThirdParty" / "SteamCMD" / "Win64",
+        real_path / "ShooterGame" / "Binaries" / "ThirdParty" / "SteamCMD" / "Linux",
         # Közvetlenül a szerver mappában
         real_path,
     ]
     
+    # Debug: listázzuk a mappa tartalmát
+    logger.info(f"Keresés az útvonalon: {real_path}")
+    if real_path.exists():
+        try:
+            dir_contents = list(real_path.iterdir())[:10]  # Első 10 elem
+            logger.info(f"Mappa tartalma (első 10): {[str(p.name) for p in dir_contents]}")
+        except Exception as e:
+            logger.warning(f"Mappa tartalmának listázása sikertelen: {e}")
+    
     # Keresés minden lehetséges útvonalon
     for base_path in possible_paths:
         if not base_path.exists():
+            logger.debug(f"Útvonal nem létezik: {base_path}")
             continue
         
         for name in possible_names:
             exe_path = base_path / name
+            logger.debug(f"Ellenőrzés: {exe_path}")
             if exe_path.exists() and exe_path.is_file():
-                logger.info(f"Executable található: {exe_path}")
+                logger.info(f"✅ Executable található: {exe_path}")
                 return exe_path
     
-    # Ha nem találtuk, próbáljuk meg rekurzívan keresni
+    # Ha nem találtuk, próbáljuk meg rekurzívan keresni (de csak bizonyos mélységig)
     logger.warning(f"Executable nem található a szabványos útvonalakon, rekurzív keresés...")
     for name in possible_names:
-        for exe_path in real_path.rglob(name):
-            if exe_path.is_file():
-                logger.info(f"Executable található rekurzív kereséssel: {exe_path}")
-                return exe_path
+        try:
+            # Rekurzív keresés, de csak max 3 szint mélységig
+            for depth in range(1, 4):
+                pattern = "*/" * depth + name
+                matches = list(real_path.glob(pattern))
+                if matches:
+                    for exe_path in matches:
+                        if exe_path.is_file():
+                            logger.info(f"✅ Executable található rekurzív kereséssel: {exe_path}")
+                            return exe_path
+        except Exception as e:
+            logger.warning(f"Rekurzív keresés hiba: {e}")
     
-    logger.error(f"Executable nem található a következő útvonalon: {real_path}")
+    # Végül próbáljuk meg a teljes rekurzív keresést (lassabb, de biztosan megtalálja)
+    logger.warning(f"Teljes rekurzív keresés indítása...")
+    for name in possible_names:
+        try:
+            for exe_path in real_path.rglob(name):
+                if exe_path.is_file():
+                    logger.info(f"✅ Executable található teljes rekurzív kereséssel: {exe_path}")
+                    return exe_path
+        except Exception as e:
+            logger.error(f"Teljes rekurzív keresés hiba: {e}")
+    
+    logger.error(f"❌ Executable nem található a következő útvonalon: {real_path}")
     return None
 
 def build_start_command(server: ServerInstance, server_path: Path, exe_path: Path) -> list:
