@@ -74,36 +74,14 @@ async def install_ark_server_files(
         current_uid = os.getuid()
         current_gid = os.getgid()
         
-        # FONTOS: Ha root-ként futunk, próbáljuk meg megtalálni a megfelelő felhasználót
+        # FONTOS: SOHA ne fussunk root-ként! Ha root-ként futunk, hibát dobunk
         if current_uid == 0 and os.name != 'nt':
-            # Root-ként futunk, próbáljuk meg megtalálni a SUDO_USER vagy a tényleges felhasználót
-            target_uid = current_uid
-            target_gid = current_gid
-            sudo_user = os.environ.get('SUDO_USER')
-            if sudo_user:
-                try:
-                    import pwd
-                    user_info = pwd.getpwnam(sudo_user)
-                    target_uid = user_info.pw_uid
-                    target_gid = user_info.pw_gid
-                    await log(f"Root-ként futunk, SUDO_USER alapján: {sudo_user} (UID: {target_uid})")
-                except (KeyError, ImportError):
-                    pass
-            else:
-                # Ha nincs SUDO_USER, próbáljuk meg a $USER-t
-                user_name = os.environ.get('USER') or os.environ.get('USERNAME')
-                if user_name and user_name != 'root':
-                    try:
-                        import pwd
-                        user_info = pwd.getpwnam(user_name)
-                        target_uid = user_info.pw_uid
-                        target_gid = user_info.pw_gid
-                        await log(f"Root-ként futunk, USER alapján: {user_name} (UID: {target_uid})")
-                    except (KeyError, ImportError):
-                        pass
-        else:
-            target_uid = current_uid
-            target_gid = current_gid
+            error_msg = "HIBA: A manager NEM futhat root jogosultságokkal! Futtasd ai_developer felhasználóként!"
+            await log(error_msg)
+            raise RuntimeError(error_msg)
+        
+        target_uid = current_uid
+        target_gid = current_gid
         
         # FONTOS: Lépésenként hozzuk létre a mappákat, hogy minden lépés után beállíthassuk a jogosultságokat!
         # Így elkerüljük, hogy root jogosultságokkal jöjjenek létre
@@ -190,8 +168,11 @@ async def install_ark_server_files(
             import stat
             current_uid = os.getuid()
             current_gid = os.getgid()
+            # FONTOS: SOHA ne fussunk root-ként!
+            if current_uid == 0 and os.name != 'nt':
+                raise RuntimeError("HIBA: A manager NEM futhat root jogosultságokkal!")
             os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-            if current_uid != 0 and os.name != 'nt':
+            if os.name != 'nt':
                 os.chown(install_path, current_uid, current_gid)
         except (PermissionError, OSError):
             pass
@@ -205,6 +186,11 @@ async def install_ark_server_files(
         import stat
         current_uid = os.getuid()
         current_gid = os.getgid()
+        # FONTOS: SOHA ne fussunk root-ként!
+        if current_uid == 0 and os.name != 'nt':
+            error_msg = "HIBA: A manager NEM futhat root jogosultságokkal! Futtasd ai_developer felhasználóként!"
+            await log(error_msg)
+            raise RuntimeError(error_msg)
         
         # Mappa jogosultságok beállítása: 755 (rwxr-xr-x) - csak akkor, ha lehetséges
         try:
@@ -413,6 +399,11 @@ async def install_ark_server_files(
         # FONTOS: SteamCMD után AZONNAL beállítjuk a jogosultságokat (SteamCMD root-ként hozhatja létre a mappákat!)
         await log("Jogosultságok beállítása a SteamCMD által létrehozott mappákra...")
         try:
+            # FONTOS: SOHA ne fussunk root-ként!
+            current_uid = os.getuid()
+            if current_uid == 0 and os.name != 'nt':
+                raise RuntimeError("HIBA: A manager NEM futhat root jogosultságokkal!")
+            
             from app.services.symlink_service import ensure_permissions
             # Rekurzívan beállítjuk az összes mappa és fájl jogosultságát
             ensure_permissions(install_path, recursive=True)
@@ -424,6 +415,9 @@ async def install_ark_server_files(
                 import stat
                 current_uid = os.getuid()
                 current_gid = os.getgid()
+                # FONTOS: SOHA ne fussunk root-ként!
+                if current_uid == 0 and os.name != 'nt':
+                    raise RuntimeError("HIBA: A manager NEM futhat root jogosultságokkal!")
                 for root, dirs, files in os.walk(install_path):
                     for d in dirs:
                         try:

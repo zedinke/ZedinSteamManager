@@ -712,6 +712,12 @@ async def delete_server(
             try:
                 current_uid = os.getuid()
                 current_gid = os.getgid()
+                # FONTOS: SOHA ne fussunk root-ként!
+                if current_uid == 0 and os.name != 'nt':
+                    print(f"HIBA: A manager NEM futhat root jogosultságokkal!")
+                    logger.error("HIBA: A manager NEM futhat root jogosultságokkal!")
+                    # Folytatjuk, de nem próbáljuk meg beállítani a jogosultságokat
+                    raise RuntimeError("HIBA: A manager NEM futhat root jogosultságokkal!")
                 # Jogosultságok javítása rekurzívan
                 for root, dirs, files in os.walk(user_serverfiles_path):
                     for d in dirs:
