@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Szerver Konfiguráció - {{ config_file_name }} - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-cog"></i> Szerver Konfiguráció</h2>
+        <p>{{ server.name }} - {{ config_file_name }}</p>
+        <div style="margin-top: 10px;">
+            <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Vissza a szerver szerkesztéshez
+            </a>
+            <a href="/ark/servers/{{ server.id }}/config?config_file=GameUserSettings" 
+               class="btn {% if config_file == 'GameUserSettings' %}btn-primary{% else %}btn-info{% endif %}">
+                <i class="fas fa-file-ini"></i> GameUserSettings.ini
+            </a>
+            <a href="/ark/servers/{{ server.id }}/config?config_file=Game" 
+               class="btn {% if config_file == 'Game' %}btn-primary{% else %}btn-info{% endif %}">
+                <i class="fas fa-file-ini"></i> Game.ini
+            </a>
+        </div>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-file-code"></i> {{ config_file_name }} Szerkesztése</h3>
+        </div>
+        <div class="card-body">
+            {% if not formatted_settings %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> A konfigurációs fájl még nem létezik vagy üres.
+                    <br>Az első mentéskor létrejön a fájl az alapértelmezett beállításokkal.
+                </div>
+            {% endif %}
+            
+            <form method="POST" action="/ark/servers/{{ server.id }}/config/{{ config_file }}/save" id="configForm">
+                {% if formatted_settings %}
+                    {% set current_section = "" %}
+                    {% for setting in formatted_settings %}
+                        {% if setting.section != current_section %}
+                            {% if current_section != "" %}
+                                </div>
+                            {% endif %}
+                            {% set current_section = setting.section %}
+                            <div class="config-section" style="margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 20px;">
+                                <h4 style="color: #007bff; margin-bottom: 15px;">
+                                    <i class="fas fa-folder"></i> [{{ setting.section }}]
+                                </h4>
+                        {% endif %}
+                        
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label for="{{ setting.field_name }}" style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
+                                {% if setting.is_boolean %}
+                                    <input type="hidden" name="{{ setting.field_name }}" value="false">
+                                    <input type="checkbox" 
+                                           id="{{ setting.field_name }}" 
+                                           name="{{ setting.field_name }}" 
+                                           value="true"
+                                           {% if setting.value == True or setting.value == 'True' or setting.value == 'true' or setting.value == '1' %}checked{% endif %}
+                                           style="width: auto; margin-right: 5px;">
+                                    <span>{{ setting.key }}</span>
+                                {% else %}
+                                    <span>{{ setting.key }}</span>
+                                {% endif %}
+                            </label>
+                            
+                            {% if not setting.is_boolean %}
+                                <input type="text" 
+                                       id="{{ setting.field_name }}" 
+                                       name="{{ setting.field_name }}" 
+                                       value="{{ setting.value }}" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; margin-top: 5px;">
+                            {% endif %}
+                            
+                            {% if setting.description %}
+                                <small style="display: block; color: #666; margin-top: 5px; font-style: italic;">
+                                    <i class="fas fa-info-circle"></i> {{ setting.description }}
+                                </small>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    {% if current_section != "" %}
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Nincs beállítás a fájlban. Az első mentéskor létrejönnek az alapértelmezett beállítások.
+                    </div>
+                {% endif %}
+                
+                <div style="display: flex; gap: 10px; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Konfiguráció Mentése
+                    </button>
+                    <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.config-section {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    background-color: white;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+.form-group label {
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.form-group input[type="text"] {
+    font-family: 'Courier New', monospace;
+}
+
+.form-group small {
+    padding-left: 20px;
+}
+</style>
+{% endblock %}
+

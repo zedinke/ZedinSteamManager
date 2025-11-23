@@ -7,6 +7,14 @@
     <div class="page-header">
         <h2><i class="fas fa-edit"></i> Ark Szerver Szerkesztése</h2>
         <p>{{ server.name }} szerver beállításainak módosítása</p>
+        <div style="margin-top: 10px;">
+            <a href="/ark/servers/{{ server.id }}/config?config_file=GameUserSettings" class="btn btn-info">
+                <i class="fas fa-cog"></i> GameUserSettings.ini Beállítások
+            </a>
+            <a href="/ark/servers/{{ server.id }}/config?config_file=Game" class="btn btn-info">
+                <i class="fas fa-cog"></i> Game.ini Beállítások
+            </a>
+        </div>
     </div>
     
     {% if request.query_params.get("error") %}
