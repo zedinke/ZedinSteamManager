@@ -432,27 +432,20 @@ async def create_server(
     db.refresh(server_instance)
     
     # Most már frissíthetjük a server_path-et
-    # Ellenőrizzük, hogy van-e aktív cluster szerverfájl
-    active_cluster_files = db.query(ClusterServerFiles).filter(
+    # Ellenőrizzük, hogy van-e aktív felhasználó szerverfájl
+    active_user_files = db.query(UserServerFiles).filter(
         and_(
-            ClusterServerFiles.cluster_id == cluster.id,
-            ClusterServerFiles.is_active == True,
-            ClusterServerFiles.installation_status == "completed"
+            UserServerFiles.user_id == current_user.id,
+            UserServerFiles.is_active == True,
+            UserServerFiles.installation_status == "completed"
         )
     ).first()
     
-    if active_cluster_files:
-        # Cluster szerverfájlok használata
-        server_path = create_server_symlink(server_instance.id, cluster.cluster_id, db)
-        if server_path:
-            server_instance.server_path = str(server_path)
-            db.commit()
-    else:
-        # Fallback: Manager Admin szerverfájlok
-        server_path = create_server_symlink(server_instance.id, cluster.cluster_id, db)
-        if server_path:
-            server_instance.server_path = str(server_path)
-            db.commit()
+    # Szerverfájlok használata (felhasználó vagy Manager Admin)
+    server_path = create_server_symlink(server_instance.id, cluster.cluster_id, db)
+    if server_path:
+        server_instance.server_path = str(server_path)
+        db.commit()
     
     return RedirectResponse(
         url="/ark/servers?success=Szerver+létrehozva",
