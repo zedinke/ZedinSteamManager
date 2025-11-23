@@ -278,9 +278,9 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         # Csak saját Docker image-t használunk: zedinarkmanager/ark-server:latest
         docker_image = getattr(settings, 'ark_docker_image', 'zedinarkmanager/ark-server:latest')
         
-        # Saját Docker image: /home/zedin/arkserver struktúra
-        container_work_dir = '/home/zedin/arkserver'
-        container_saved_path = '/home/zedin/arkserver/ShooterGame/Saved'
+        # Saját Docker image: /home/ai_developer/arkserver struktúra
+        container_work_dir = '/home/ai_developer/arkserver'
+        container_saved_path = '/home/ai_developer/arkserver/ShooterGame/Saved'
         
         # Docker Compose YAML összeállítása
         compose_data = {

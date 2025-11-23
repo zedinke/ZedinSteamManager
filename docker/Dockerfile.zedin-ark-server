@@ -1,19 +1,18 @@
 # ZedinArkManager - ARK Survival Ascended Server Docker Image
-# Saját struktúrát használ: /home/zedin/arkserver
+# Saját struktúrát használ: /home/ai_developer/arkserver
 
 FROM debian:12
 
 # Környezeti változók
 ENV DEBIAN_FRONTEND=noninteractive
-ENV ARK_SERVER_DIR=/home/zedin/arkserver
-ENV STEAMCMD_DIR=/home/zedin/steamcmd
+ENV ARK_SERVER_DIR=/home/ai_developer/arkserver
+ENV STEAMCMD_DIR=/home/ai_developer/steamcmd
 
-# Felhasználó létrehozása (zedin user)
+# Felhasználó létrehozása (ai_developer user)
 # UID 1000 használata - ez csak a konténeren belül van, nem ütközik a host felhasználókkal
-# Ha szükséges, módosítható más UID-ra
-RUN useradd -m -u 1000 -s /bin/bash zedin && \
+RUN useradd -m -u 1000 -s /bin/bash ai_developer && \
     mkdir -p ${ARK_SERVER_DIR} ${STEAMCMD_DIR} && \
-    chown -R zedin:zedin /home/zedin
+    chown -R ai_developer:ai_developer /home/ai_developer
 
 # Wine repository hozzáadása (Debian 12)
 RUN dpkg --add-architecture i386 && \
@@ -49,7 +48,7 @@ RUN wget -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetric
 # SteamCMD letöltése és telepítése
 RUN cd ${STEAMCMD_DIR} && \
     curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
-    chown -R zedin:zedin ${STEAMCMD_DIR} && \
+    chown -R ai_developer:ai_developer ${STEAMCMD_DIR} && \
     chmod +x ${STEAMCMD_DIR}/steamcmd.sh && \
     # Ellenőrizzük, hogy a SteamCMD telepítve van-e
     test -f ${STEAMCMD_DIR}/steamcmd.sh || (echo "HIBA: SteamCMD telepítése sikertelen!" && exit 1)
@@ -63,7 +62,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 WORKDIR ${ARK_SERVER_DIR}
 
 # Felhasználó váltás
-USER zedin
+USER ai_developer
 
 # Entrypoint beállítása
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

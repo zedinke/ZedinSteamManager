@@ -4,8 +4,8 @@
 # set -e kikapcsolva, hogy jobban kezeljük a hibákat
 set +e
 
-ARK_SERVER_DIR="${ARK_SERVER_DIR:-/home/zedin/arkserver}"
-STEAMCMD_DIR="${STEAMCMD_DIR:-/home/zedin/steamcmd}"
+ARK_SERVER_DIR="${ARK_SERVER_DIR:-/home/ai_developer/arkserver}"
+STEAMCMD_DIR="${STEAMCMD_DIR:-/home/ai_developer/steamcmd}"
 STEAMCMD_BIN="${STEAMCMD_DIR}/steamcmd.sh"
 ARK_APP_ID="2430930"  # ARK Survival Ascended App ID
 
