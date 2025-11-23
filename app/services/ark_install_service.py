@@ -120,7 +120,7 @@ async def install_ark_server_files(
         str(steamcmd_path),
         "+login", "anonymous",
         "+force_install_dir", str(install_path.absolute()),
-        "+app_update", app_id, "validate",  # Teljes telepítés validate-dal
+        "+app_update", app_id,  # Teljes telepítés (validate nélkül = minden fájlt letölt)
         "+quit"
     ]
     
