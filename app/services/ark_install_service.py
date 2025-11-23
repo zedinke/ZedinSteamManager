@@ -70,6 +70,49 @@ async def install_ark_server_files(
             else:
                 progress_callback(message)
     
+    # FONTOS: Jogosultságok beállítása a SteamCMD telepítés előtt (0x602 hiba elkerülésére)
+    # A POK-manager.sh script is ezt csinálja: "Ensure ServerFiles directory has correct permissions to prevent SteamCMD error 0x602"
+    await log("Jogosultságok beállítása a telepítési útvonalra (0x602 hiba elkerülésére)...")
+    try:
+        import stat
+        current_uid = os.getuid()
+        current_gid = os.getgid()
+        
+        # Mappa jogosultságok beállítása: 755 (rwxr-xr-x)
+        os.chmod(install_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        
+        # Ha van már tartalom, akkor az összes mappát és fájlt is beállítjuk
+        if install_path.exists():
+            for root, dirs, files in os.walk(install_path):
+                for d in dirs:
+                    try:
+                        dir_path = os.path.join(root, d)
+                        os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)  # 755
+                        # Tulajdonjog beállítása (ha lehetséges)
+                        try:
+                            os.chown(dir_path, current_uid, current_gid)
+                        except (PermissionError, OSError):
+                            pass  # Ha nincs jogosultság, folytatjuk
+                    except (PermissionError, OSError):
+                        pass  # Ha nincs jogosultság, folytatjuk
+                
+                for f in files:
+                    try:
+                        file_path = os.path.join(root, f)
+                        os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)  # 644
+                        # Tulajdonjog beállítása (ha lehetséges)
+                        try:
+                            os.chown(file_path, current_uid, current_gid)
+                        except (PermissionError, OSError):
+                            pass  # Ha nincs jogosultság, folytatjuk
+                    except (PermissionError, OSError):
+                        pass  # Ha nincs jogosultság, folytatjuk
+        
+        await log("✓ Jogosultságok beállítva")
+    except Exception as e:
+        await log(f"⚠️ Jogosultságok beállítása részben sikertelen: {e}")
+        await log("ℹ️ Folytatjuk a telepítést - a SteamCMD próbálja meg felülírni a fájlokat")
+    
     # Ha már van telepítés, de hiányos (pl. csak Saved mappa van), töröljük
     # hogy teljes újratelepítést csinálhassunk
     shooter_game = install_path / "ShooterGame"
