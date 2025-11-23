@@ -119,9 +119,9 @@ if [ ! -f "${SERVER_BINARY}" ]; then
         if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries" ]; then
             echo "Binaries mappa tartalma:"
             ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries" || true
-            if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" ]; then
-                echo "Linux mappa tartalma:"
-                ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" || true
+            if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64" ]; then
+                echo "Win64 mappa tartalma:"
+                ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64" || true
             fi
         fi
     fi
