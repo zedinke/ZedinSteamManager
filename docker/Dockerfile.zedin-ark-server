@@ -31,9 +31,10 @@ RUN cd ${STEAMCMD_DIR} && \
     curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
     chown -R zedin:zedin ${STEAMCMD_DIR}
 
-# Entrypoint script másolása
+# Entrypoint script másolása (root-ként, mert még nem váltottunk felhasználót)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    chown root:root /usr/local/bin/entrypoint.sh
 
 # Munkakönyvtár beállítása
 WORKDIR ${ARK_SERVER_DIR}

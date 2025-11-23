@@ -5,6 +5,8 @@ set -e
 
 ARK_SERVER_DIR="${ARK_SERVER_DIR:-/home/zedin/arkserver}"
 STEAMCMD_DIR="${STEAMCMD_DIR:-/home/zedin/steamcmd}"
+STEAMCMD_BIN="${STEAMCMD_DIR}/steamcmd.sh"
+ARK_APP_ID="2430930"  # ARK Survival Ascended App ID
 
 # Environment változók beolvasása
 INSTANCE_NAME="${INSTANCE_NAME:-1}"
@@ -21,6 +23,40 @@ SERVER_ADMIN_PASSWORD="${SERVER_ADMIN_PASSWORD:-}"
 SERVER_PASSWORD="${SERVER_PASSWORD:-}"
 MOD_IDS="${MOD_IDS:-}"
 CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
+UPDATE_SERVER="${UPDATE_SERVER:-True}"
+
+# Ellenőrizzük, hogy a szerverfájlok léteznek-e
+SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+
+# Ha a szerver nincs telepítve és UPDATE_SERVER=True, akkor telepítjük
+if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
+    echo "ARK szerver nincs telepítve. Telepítés indítása SteamCMD-vel..."
+    
+    if [ ! -f "${STEAMCMD_BIN}" ]; then
+        echo "HIBA: SteamCMD nem található: ${STEAMCMD_BIN}"
+        exit 1
+    fi
+    
+    # ARK szerver telepítése/frissítése
+    "${STEAMCMD_BIN}" +force_install_dir "${ARK_SERVER_DIR}" \
+        +login anonymous \
+        +app_update ${ARK_APP_ID} validate \
+        +quit
+    
+    if [ ! -f "${SERVER_BINARY}" ]; then
+        echo "HIBA: ARK szerver telepítése sikertelen!"
+        exit 1
+    fi
+    
+    echo "ARK szerver telepítve!"
+fi
+
+# Ha a szerverfájlok még mindig nem léteznek, hiba
+if [ ! -f "${SERVER_BINARY}" ]; then
+    echo "HIBA: ARK szerver bináris nem található: ${SERVER_BINARY}"
+    echo "Ellenőrizd, hogy a szerverfájlok telepítve vannak-e a volume-on!"
+    exit 1
+fi
 
 # Szerver indítási parancs összeállítása
 cd "${ARK_SERVER_DIR}"
@@ -70,6 +106,20 @@ if [ -n "${CUSTOM_SERVER_ARGS}" ]; then
 fi
 
 # Szerver indítása
-echo "Starting ARK Server with args: ${SERVER_ARGS}"
-exec ./ShooterGame/Binaries/Linux/ShooterGameServer ${SERVER_ARGS}
+echo "=========================================="
+echo "ZedinArkManager - ARK Server Starting"
+echo "=========================================="
+echo "Instance: ${INSTANCE_NAME}"
+echo "Map: ${MAP_NAME}"
+echo "Port: ${ASA_PORT}"
+echo "Query Port: ${QUERY_PORT}"
+echo "RCON Port: ${RCON_PORT}"
+echo "Session: ${SESSION_NAME}"
+echo "Max Players: ${MAX_PLAYERS}"
+echo "=========================================="
+echo "Starting ARK Server..."
+echo "Command: ${SERVER_BINARY} ${SERVER_ARGS}"
+echo "=========================================="
+
+exec "${SERVER_BINARY}" ${SERVER_ARGS}
 
