@@ -51,8 +51,9 @@
                     {% for category in sorted_categories %}
                         {% if settings_by_category[category] %}
                             <div class="config-category" style="margin-bottom: 40px; border: 2px solid #007bff; border-radius: 8px; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
-                                <h3 style="color: #007bff; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #007bff;">
-                                    <i class="fas fa-tags"></i> {{ category }}
+                                <h3 style="color: #007bff; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #007bff; font-size: 22px; font-weight: bold; display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-tags" style="font-size: 24px;"></i> 
+                                    <span>{{ category }}</span>
                                 </h3>
                                 
                                 {% for setting in settings_by_category[category] %}

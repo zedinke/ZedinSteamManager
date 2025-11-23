@@ -286,6 +286,7 @@ def parse_ini_file(file_path: Path) -> Dict[str, Dict[str, Any]]:
 def convert_value(value: str) -> Any:
     """
     String érték konvertálása megfelelő típusra
+    Csak explicit true/false értékeket konvertál boolean-ná, nem számokat
     
     Args:
         value: String érték
@@ -294,14 +295,16 @@ def convert_value(value: str) -> Any:
         Konvertált érték (bool, int, float, vagy string)
     """
     value = value.strip()
+    value_lower = value.lower()
     
-    # Boolean értékek
-    if value.lower() in ('true', '1', 'yes', 'on'):
-        return True
-    if value.lower() in ('false', '0', 'no', 'off'):
-        return False
+    # Boolean értékek - csak explicit true/false, NEM számok (1, 0)
+    if value_lower in ('true', 'false', 'yes', 'no', 'on', 'off'):
+        if value_lower in ('true', 'yes', 'on'):
+            return True
+        if value_lower in ('false', 'no', 'off'):
+            return False
     
-    # Szám értékek
+    # Szám értékek - először próbáljuk meg számként értelmezni
     try:
         if '.' in value:
             return float(value)
@@ -369,6 +372,7 @@ def get_setting_description(section: str, key: str) -> str:
 def is_boolean_setting(section: str, key: str, value: Any) -> bool:
     """
     Ellenőrzi, hogy a beállítás boolean típusú-e
+    Csak akkor True, ha ténylegesen True/False értéket vesz fel (nem szám)
     
     Args:
         section: INI section neve
@@ -378,18 +382,21 @@ def is_boolean_setting(section: str, key: str, value: Any) -> bool:
     Returns:
         True ha boolean, False egyébként
     """
-    # Ha a leírás tartalmazza a "true/false" szöveget, akkor boolean
-    description = get_setting_description(section, key)
-    if "true/false" in description.lower() or "ha true" in description.lower():
-        return True
-    
-    # Ha az érték boolean típusú
+    # Ha az érték boolean típusú (Python bool)
     if isinstance(value, bool):
         return True
     
-    # Ha az érték string és boolean értékeket tartalmaz
+    # Ha az érték string, akkor ellenőrizzük
     if isinstance(value, str):
-        return value.lower() in ('true', 'false', '1', '0', 'yes', 'no', 'on', 'off')
+        value_lower = value.strip().lower()
+        # Csak akkor boolean, ha explicit true/false értékeket tartalmaz
+        # NEM számokat (1, 0 nem számít boolean-nak, mert lehet szám is)
+        if value_lower in ('true', 'false', 'yes', 'no', 'on', 'off'):
+            return True
+    
+    # Ha szám típusú (int vagy float), akkor NEM boolean
+    if isinstance(value, (int, float)):
+        return False
     
     return False
 
