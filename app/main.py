@@ -193,6 +193,46 @@ async def startup_event():
     from app.tasks.token_expiry_task import token_expiry_worker
     asyncio.create_task(token_expiry_worker())
     logging.info("Token lejárat ellenőrzés elindítva")
+    
+    # FONTOS: Végül ismét ellenőrizzük, hogy ne jöjjön létre root jogosultságokkal mappa
+    # (valami más folyamat hozhatja létre a startup event után)
+    try:
+        base_path = Path(settings.ark_serverfiles_base)
+        current_uid = os.getuid()
+        current_gid = os.getgid()
+        
+        if base_path.exists():
+            try:
+                user_dirs = list(base_path.glob("user_*"))
+            except (PermissionError, OSError):
+                user_dirs = []
+            
+            for user_dir in user_dirs:
+                if user_dir.is_dir():
+                    try:
+                        stat_info = user_dir.stat()
+                        if stat_info.st_uid == 0 and current_uid != 0:
+                            logging.warning(f"⚠️ Root jogosultságokkal létező mappa észlelve startup után: {user_dir}")
+                            # Próbáljuk meg javítani
+                            try:
+                                os.chmod(user_dir, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                                os.chown(user_dir, current_uid, current_gid)
+                                logging.info(f"✓ Jogosultságok javítva: {user_dir}")
+                            except (PermissionError, OSError):
+                                # Ha nem sikerül, próbáljuk meg átnevezni
+                                try:
+                                    backup_path = base_path / f"{user_dir.name}.root_backup"
+                                    if backup_path.exists():
+                                        import shutil
+                                        shutil.rmtree(backup_path)
+                                    user_dir.rename(backup_path)
+                                    logging.warning(f"⚠️ Mappa átnevezve: {backup_path}")
+                                except (PermissionError, OSError):
+                                    pass
+                    except (PermissionError, OSError):
+                        pass
+    except Exception as e:
+        logging.warning(f"Végső ellenőrzés során hiba: {e}")
 
 # Updating oldal router
 from fastapi.responses import HTMLResponse
