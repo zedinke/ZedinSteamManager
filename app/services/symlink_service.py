@@ -176,6 +176,9 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
                 shutil.rmtree(serverfiles_link)
         serverfiles_link.symlink_to(install_path)
         
+        # Jogosultságok beállítása a szerver mappára
+        _fix_permissions(server_path)
+        
         # Dedikált Saved mappa létrehozása és symlink
         # A server_path most már a Servers/server_{server_id}/ mappa
         # A Saved mappa közvetlenül ebben lesz: Servers/server_{server_id}/Saved/
