@@ -79,6 +79,17 @@ async def show_backup(
     # Backup lista
     backups = list_backups(server_path)
     
+    # Debug: backup lista és útvonal ellenőrzése
+    print(f"DEBUG: Backup lista hossza: {len(backups)}")
+    print(f"DEBUG: Szerver útvonal: {server_path}")
+    if server_path:
+        from app.services.backup_service import get_server_backup_path
+        backup_dir = get_server_backup_path(server_path)
+        print(f"DEBUG: Backup mappa útvonal: {backup_dir}")
+        print(f"DEBUG: Backup mappa létezik: {backup_dir.exists() if backup_dir else False}")
+        if backup_dir and backup_dir.exists():
+            print(f"DEBUG: Backup mappa tartalma: {list(backup_dir.iterdir())}")
+    
     # Backup beállítások a config-ból
     server_config = server.config if server.config else {}
     auto_backup_interval = server_config.get("AUTO_BACKUP_INTERVAL", None)  # 3, 6, 12, 24 óra

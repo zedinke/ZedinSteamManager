@@ -87,16 +87,22 @@ def list_backups(server_path: Path) -> List[Dict]:
             return []
         
         backups = []
+        allowed_extensions = ['.tar.gz', '.tar', '.zip']
         for backup_file in backup_dir.iterdir():
-            if backup_file.is_file() and (backup_file.suffix in ['.tar.gz', '.zip', '.tar']):
-                stat = backup_file.stat()
-                backups.append({
-                    "name": backup_file.name,
-                    "path": str(backup_file),
-                    "size": stat.st_size,
-                    "created": datetime.fromtimestamp(stat.st_mtime),
-                    "size_mb": round(stat.st_size / (1024 * 1024), 2)
-                })
+            if backup_file.is_file():
+                # Ellenőrizzük, hogy a fájl neve valamelyik engedélyezett kiterjesztéssel végződik-e
+                file_name_lower = backup_file.name.lower()
+                is_valid_backup = any(file_name_lower.endswith(ext) for ext in allowed_extensions)
+                
+                if is_valid_backup:
+                    stat = backup_file.stat()
+                    backups.append({
+                        "name": backup_file.name,
+                        "path": str(backup_file),
+                        "size": stat.st_size,
+                        "created": datetime.fromtimestamp(stat.st_mtime),
+                        "size_mb": round(stat.st_size / (1024 * 1024), 2)
+                    })
         
         # Dátum szerint rendezés (legújabb először)
         backups.sort(key=lambda x: x["created"], reverse=True)
