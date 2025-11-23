@@ -197,9 +197,21 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
         # Telepítési útvonal
         install_path = Path(serverfiles.install_path)
         
-        # Státusz frissítése
+        # Státusz frissítése (commit előtt)
         serverfiles.installation_status = "installing"
-        db.commit()
+        try:
+            db.commit()
+        except Exception as commit_error:
+            # Ha a commit sikertelen, próbáljuk újra egy új session-nel
+            db.rollback()
+            db.close()
+            db = SessionLocal()
+            serverfiles = db.query(UserServerFiles).filter(
+                UserServerFiles.id == serverfiles_id
+            ).first()
+            if serverfiles:
+                serverfiles.installation_status = "installing"
+                db.commit()
         
         # Progress callback
         log_lines = []
