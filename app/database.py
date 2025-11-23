@@ -16,11 +16,16 @@ DATABASE_URL = f"mysql+pymysql://{settings.db_user}:{settings.db_pass}@{settings
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=300,
+    pool_pre_ping=True,  # Ellenőrzi a kapcsolatot használat előtt
+    pool_recycle=3600,  # 1 óra után újrahasznosítja a kapcsolatokat (MySQL wait_timeout általában 8 óra)
     pool_size=20,  # Növelt pool méret
     max_overflow=40,  # Növelt overflow
     pool_timeout=60,  # Növelt timeout
+    connect_args={
+        "connect_timeout": 10,  # Kapcsolódási timeout
+        "read_timeout": 30,  # Olvasási timeout
+        "write_timeout": 30,  # Írási timeout
+    },
     echo=False
 )
 

@@ -542,11 +542,34 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                     "message": f"A konténer nem indult el. Docker Compose kimenet: {result.stdout}"
                 }
         
-        # Státusz frissítése
-        server.status = ServerStatus.RUNNING
-        from datetime import datetime
-        server.started_at = datetime.now()
-        db.commit()
+        # Státusz frissítése - újrapróbálás kapcsolat hiba esetén
+        try:
+            server.status = ServerStatus.RUNNING
+            from datetime import datetime
+            server.started_at = datetime.now()
+            db.commit()
+        except Exception as db_error:
+            # Ha a kapcsolat megszakadt, újrapróbáljuk új session-nel
+            logger.warning(f"Adatbázis kapcsolat hiba a szerver indításakor: {db_error}, újrapróbálás...")
+            try:
+                db.rollback()
+                # Új session létrehozása
+                from app.database import SessionLocal
+                new_db = SessionLocal()
+                try:
+                    # Szerver újratöltése az új session-ből
+                    server = new_db.query(ServerInstance).filter(ServerInstance.id == server.id).first()
+                    if server:
+                        server.status = ServerStatus.RUNNING
+                        from datetime import datetime
+                        server.started_at = datetime.now()
+                        new_db.commit()
+                        logger.info(f"Szerver {server.id} státusza frissítve új session-nel")
+                finally:
+                    new_db.close()
+            except Exception as retry_error:
+                logger.error(f"Adatbázis frissítés sikertelen újrapróbálás után is: {retry_error}")
+                # Folytatjuk, mert a Docker indítás sikeres volt
         
         logger.info(f"Szerver {server.id} indítva Docker-rel")
         
@@ -584,9 +607,27 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         compose_file = get_docker_compose_file(server)
         if not compose_file.exists():
             # Ha nincs compose fájl, akkor nincs mit leállítani
-            server.status = ServerStatus.STOPPED
-            server.started_at = None
-            db.commit()
+            try:
+                server.status = ServerStatus.STOPPED
+                server.started_at = None
+                db.commit()
+            except Exception as db_error:
+                # Ha a kapcsolat megszakadt, újrapróbáljuk új session-nel
+                logger.warning(f"Adatbázis kapcsolat hiba: {db_error}, újrapróbálás...")
+                try:
+                    db.rollback()
+                    from app.database import SessionLocal
+                    new_db = SessionLocal()
+                    try:
+                        server = new_db.query(ServerInstance).filter(ServerInstance.id == server.id).first()
+                        if server:
+                            server.status = ServerStatus.STOPPED
+                            server.started_at = None
+                            new_db.commit()
+                    finally:
+                        new_db.close()
+                except Exception as retry_error:
+                    logger.error(f"Adatbázis frissítés sikertelen: {retry_error}")
             return {
                 "success": True,
                 "message": "A szerver nem futott"
@@ -602,10 +643,32 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             timeout=30
         )
         
-        # Státusz frissítése
-        server.status = ServerStatus.STOPPED
-        server.started_at = None
-        db.commit()
+        # Státusz frissítése - újrapróbálás kapcsolat hiba esetén
+        try:
+            server.status = ServerStatus.STOPPED
+            server.started_at = None
+            db.commit()
+        except Exception as db_error:
+            # Ha a kapcsolat megszakadt, újrapróbáljuk új session-nel
+            logger.warning(f"Adatbázis kapcsolat hiba a szerver leállításakor: {db_error}, újrapróbálás...")
+            try:
+                db.rollback()
+                # Új session létrehozása
+                from app.database import SessionLocal
+                new_db = SessionLocal()
+                try:
+                    # Szerver újratöltése az új session-ből
+                    server = new_db.query(ServerInstance).filter(ServerInstance.id == server.id).first()
+                    if server:
+                        server.status = ServerStatus.STOPPED
+                        server.started_at = None
+                        new_db.commit()
+                        logger.info(f"Szerver {server.id} státusza frissítve új session-nel")
+                finally:
+                    new_db.close()
+            except Exception as retry_error:
+                logger.error(f"Adatbázis frissítés sikertelen újrapróbálás után is: {retry_error}")
+                # Folytatjuk, mert a Docker leállítás sikeres volt
         
         logger.info(f"Szerver {server.id} leállítva Docker-rel")
         
