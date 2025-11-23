@@ -342,11 +342,27 @@ async def delete_serverfiles(
     if serverfiles.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
+    # Ha aktív verzió, ellenőrizzük, hogy van-e másik completed verzió
     if serverfiles.is_active:
-        return RedirectResponse(
-            url=f"/ark/serverfiles?error=Az+aktív+verzió+nem+törölhető.+Először+aktiválj+egy+másik+verziót!",
-            status_code=302
-        )
+        # Ellenőrizzük, hogy van-e másik completed verzió
+        other_completed = db.query(UserServerFiles).filter(
+            and_(
+                UserServerFiles.user_id == current_user.id,
+                UserServerFiles.id != serverfiles.id,
+                UserServerFiles.installation_status == "completed"
+            )
+        ).order_by(UserServerFiles.installed_at.desc()).first()
+        
+        if not other_completed:
+            return RedirectResponse(
+                url=f"/ark/serverfiles?error=Az+aktív+verzió+nem+törölhető,+mert+nincs+másik+telepített+verzió.+Először+telepíts+egy+másik+verziót!",
+                status_code=302
+            )
+        
+        # Ha van másik completed verzió, aktiváljuk azt
+        other_completed.is_active = True
+        serverfiles.is_active = False
+        db.commit()
     
     # Fájlok törlése
     install_path = Path(serverfiles.install_path)
