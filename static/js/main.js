@@ -74,14 +74,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize mobile menu
     initMobileMenu();
     
-    // Auto-hide alerts after 5 seconds
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            alert.style.opacity = '0';
-            setTimeout(() => alert.remove(), 300);
-        }, 5000);
-    });
+    // Auto-hide alerts disabled - alerts will remain visible until manually closed
+    // (Commented out to keep alert messages visible)
+    // const alerts = document.querySelectorAll('.alert');
+    // alerts.forEach(alert => {
+    //     setTimeout(() => {
+    //         alert.style.opacity = '0';
+    //         setTimeout(() => alert.remove(), 300);
+    //     }, 5000);
+    // });
     
     // Form validation
     const forms = document.querySelectorAll('form');
