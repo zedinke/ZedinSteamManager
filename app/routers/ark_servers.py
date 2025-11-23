@@ -684,20 +684,37 @@ async def edit_server(
         server_config["MOTD"] = motd
     if motd_duration is not None:
         server_config["MOTD_DURATION"] = motd_duration
+    # Automatikus backup intervallum kezelése
+    print(f"DEBUG: auto_backup_interval értéke: {auto_backup_interval}, típus: {type(auto_backup_interval)}")
     if auto_backup_interval is not None:
-        if auto_backup_interval and auto_backup_interval.strip():
+        # Ha van érték és nem üres string
+        if auto_backup_interval and str(auto_backup_interval).strip():
             try:
-                server_config["AUTO_BACKUP_INTERVAL"] = int(auto_backup_interval.strip())
-            except (ValueError, AttributeError):
+                interval_value = int(str(auto_backup_interval).strip())
+                server_config["AUTO_BACKUP_INTERVAL"] = interval_value
+                print(f"DEBUG: AUTO_BACKUP_INTERVAL beállítva: {interval_value}")
+            except (ValueError, AttributeError) as e:
                 # Ha nem lehet int-té konvertálni, akkor töröljük
+                print(f"DEBUG: AUTO_BACKUP_INTERVAL konverzió hiba: {e}")
                 server_config.pop("AUTO_BACKUP_INTERVAL", None)
         else:
             # Üres string esetén töröljük
+            print(f"DEBUG: AUTO_BACKUP_INTERVAL törölve (üres string)")
             server_config.pop("AUTO_BACKUP_INTERVAL", None)
+    else:
+        print(f"DEBUG: auto_backup_interval None, nem változtatunk")
+    
+    print(f"DEBUG: Végleges server_config AUTO_BACKUP_INTERVAL: {server_config.get('AUTO_BACKUP_INTERVAL')}")
     if custom_server_args:
         server_config["CUSTOM_SERVER_ARGS"] = custom_server_args.strip()
     
     server.config = server_config
+    
+    # Debug: ellenőrizzük, hogy mentődött-e a config
+    print(f"DEBUG: Server config mentés előtt: {server.config}")
+    db.commit()
+    db.refresh(server)
+    print(f"DEBUG: Server config mentés után: {server.config}")
     
     # Ha változott a cluster, akkor újra kell hozni a symlink-et
     if old_cluster_id != cluster.id:
