@@ -97,10 +97,21 @@ async def show_config(
     else:
         print(f"DEBUG: Config fájl nem létezik: {config_file_path}")
     
+    # Beállítások, amik a szerver szerkesztés oldalon vannak - ezeket ne jelenítsük meg itt
+    # (mert automatikusan frissülnek a szerver szerkesztésnél)
+    excluded_settings = {
+        "ServerSettings": ["SessionName", "ServerAdminPassword", "ServerPassword", "MaxPlayers", "RCONEnabled", "MessageOfTheDay", "MOTDDuration"],
+        "SessionSettings": ["SessionName", "ServerAdminPassword", "ServerPassword", "MaxPlayers", "RCONEnabled"]
+    }
+    
     # Beállítások formázása a template-hez - kategóriák szerint csoportosítva
     settings_by_category = {}
     for section, items in config_data.items():
         for key, value in items.items():
+            # Kihagyjuk azokat a beállításokat, amik a szerver szerkesztés oldalon vannak
+            if section in excluded_settings and key in excluded_settings[section]:
+                continue
+            
             is_bool = is_boolean_setting(section, key, value)
             description = get_setting_description(section, key)
             category = get_setting_category(section, key)
@@ -240,9 +251,19 @@ async def save_config(
             else:
                 form_dict[field_name] = value
     
+    # Beállítások, amik a szerver szerkesztés oldalon vannak - ezeket ne mentjük itt
+    excluded_settings = {
+        "ServerSettings": ["SessionName", "ServerAdminPassword", "ServerPassword", "MaxPlayers", "RCONEnabled", "MessageOfTheDay", "MOTDDuration"],
+        "SessionSettings": ["SessionName", "ServerAdminPassword", "ServerPassword", "MaxPlayers", "RCONEnabled"]
+    }
+    
     for field_name, value in form_dict.items():
         if "__" in field_name:
             section, key = field_name.split("__", 1)
+            
+            # Kihagyjuk azokat a beállításokat, amik a szerver szerkesztés oldalon vannak
+            if section in excluded_settings and key in excluded_settings[section]:
+                continue
             
             if section not in config_data:
                 config_data[section] = {}

@@ -12,16 +12,18 @@ from app.services.symlink_service import get_server_dedicated_config_path
 # Beállítások kategóriák szerinti csoportosítása
 SETTING_CATEGORIES = {
     # GameUserSettings.ini kategóriák
+    # Megjegyzés: SessionName, ServerAdminPassword, ServerPassword, MaxPlayers, RCONEnabled, MessageOfTheDay, MOTDDuration
+    # ezek a szerver szerkesztés oldalon vannak, ezért itt nincsenek
     "Általános Szerver Beállítások": {
-        "ServerSettings": ["ServerName", "ServerPassword", "ServerAdminPassword", "MaxPlayers", "ServerPVE", "ServerHardcore", "ServerAutoSave"],
-        "SessionSettings": ["SessionName", "Port", "QueryPort", "ServerPassword", "ServerAdminPassword", "MaxPlayers"]
+        "ServerSettings": ["ServerName", "ServerPVE", "ServerHardcore", "ServerAutoSave"],
+        "SessionSettings": ["Port", "QueryPort"]
     },
     "RCON Beállítások": {
-        "ServerSettings": ["RCONEnabled", "RCONPort"],
-        "SessionSettings": ["RCONEnabled", "RCONPort"]
+        "ServerSettings": ["RCONPort"],
+        "SessionSettings": ["RCONPort"]
     },
     "Üzenetek és Értesítések": {
-        "ServerSettings": ["MessageOfTheDay", "MOTDDuration", "AlwaysNotifyPlayerLeft", "DontAlwaysNotifyPlayerJoined"]
+        "ServerSettings": ["AlwaysNotifyPlayerLeft", "DontAlwaysNotifyPlayerJoined"]
     },
     "Játékmenet Beállítások": {
         "ServerSettings": ["ServerCrosshair", "ServerForceNoHud", "ShowFloatingDamageText", "AllowThirdPersonPlayer", "EnablePvPGamma", "EnablePvEGamma"]
