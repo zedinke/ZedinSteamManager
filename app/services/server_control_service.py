@@ -679,7 +679,6 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                         break
                 
                 server.status = ServerStatus.RUNNING
-                from datetime import datetime
                 server.started_at = datetime.now()
                 db.commit()
                 status_updated = True
