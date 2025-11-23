@@ -173,10 +173,29 @@ async def download_backup(
     if not backup_file.exists():
         raise HTTPException(status_code=404, detail="Backup fájl nem található")
     
+    # Media type meghatározása a fájl kiterjesztése alapján
+    media_type_map = {
+        '.tar.gz': 'application/gzip',
+        '.tar': 'application/x-tar',
+        '.zip': 'application/zip'
+    }
+    
+    # Fájl kiterjesztés meghatározása
+    file_ext = None
+    for ext in media_type_map.keys():
+        if backup_name.endswith(ext):
+            file_ext = ext
+            break
+    
+    media_type = media_type_map.get(file_ext, 'application/octet-stream')
+    
     return FileResponse(
         path=str(backup_file),
         filename=backup_name,
-        media_type="application/gzip"
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{backup_name}"'
+        }
     )
 
 @router.post("/{server_id}/backup/upload")
