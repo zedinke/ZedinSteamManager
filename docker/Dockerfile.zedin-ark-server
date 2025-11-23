@@ -15,9 +15,20 @@ RUN useradd -m -u 1000 -s /bin/bash zedin && \
     mkdir -p ${ARK_SERVER_DIR} ${STEAMCMD_DIR} && \
     chown -R zedin:zedin /home/zedin
 
+# Wine repository hozzáadása
+RUN dpkg --add-architecture i386 && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gnupg2 \
+        software-properties-common \
+        && \
+    mkdir -pm755 /etc/apt/keyrings && \
+    wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key && \
+    wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources && \
+    apt-get update
+
 # Szükséges csomagok telepítése
-RUN apt-get update && \
-    apt-get install -y \
+RUN apt-get install -y --no-install-recommends \
         curl \
         lib32gcc-s1 \
         lib32stdc++6 \
@@ -25,8 +36,7 @@ RUN apt-get update && \
         wget \
         unzip \
         ca-certificates \
-        wine \
-        wine32 \
+        winehq-stable \
         winetricks \
         xvfb \
         && \
