@@ -734,10 +734,18 @@ async def edit_server(
     
     # Commit előtt még egyszer ellenőrizzük
     print(f"DEBUG: Server config commit előtt: {server.config}")
+    print(f"DEBUG: AUTO_BACKUP_INTERVAL commit előtt: {server.config.get('AUTO_BACKUP_INTERVAL')}")
+    
+    # Explicit módon beállítjuk a config-ot újra, hogy biztos legyen
+    server.config = server_config
+    
     db.commit()
-    # Refresh után ellenőrizzük
-    db.refresh(server)
+    
+    # Újra lekérjük az adatbázisból, hogy lássuk, mi van benne
+    db.expire(server, ['config'])
+    db.refresh(server, ['config'])
     print(f"DEBUG: Server config commit után: {server.config}")
+    print(f"DEBUG: AUTO_BACKUP_INTERVAL commit után: {server.config.get('AUTO_BACKUP_INTERVAL')}")
     
     # Konfigurációs fájlok frissítése
     if server_path and (server_path.exists() or server_path.is_symlink()):
