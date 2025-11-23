@@ -25,7 +25,7 @@ RUN dpkg --add-architecture i386 && \
         && \
     mkdir -pm755 /etc/apt/keyrings && \
     wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key && \
-    echo "deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/debian/ bookworm main" > /etc/apt/sources.list.d/winehq-bookworm.sources && \
+    echo "Types: deb\nURIs: https://dl.winehq.org/wine-builds/debian/\nSuites: bookworm\nComponents: main\nSigned-By: /etc/apt/keyrings/winehq-archive.key" > /etc/apt/sources.list.d/winehq-bookworm.sources && \
     apt-get update
 
 # Szükséges csomagok telepítése
