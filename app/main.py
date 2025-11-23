@@ -102,6 +102,55 @@ async def startup_event():
         print(f"{'='*60}\n")
         raise RuntimeError(error_msg)
     
+    # FONTOS: Ellenőrizzük és javítjuk a root jogosultságokkal létező mappákat
+    try:
+        from app.config import settings
+        from pathlib import Path
+        import stat
+        import shutil
+        
+        base_path = Path(settings.ark_serverfiles_base)
+        current_uid = os.getuid()
+        current_gid = os.getgid()
+        
+        # Ha a base mappa létezik, ellenőrizzük
+        if base_path.exists():
+            # Végigmegyünk az összes user_* mappán
+            for user_dir in base_path.glob("user_*"):
+                if user_dir.is_dir():
+                    try:
+                        stat_info = user_dir.stat()
+                        if stat_info.st_uid == 0 and current_uid != 0:
+                            logging.warning(f"Root jogosultságokkal létező mappa észlelve: {user_dir}")
+                            # Próbáljuk meg javítani a jogosultságokat
+                            try:
+                                # Rekurzívan beállítjuk a jogosultságokat
+                                for root, dirs, files in os.walk(user_dir):
+                                    for d in dirs:
+                                        try:
+                                            dir_path = Path(root) / d
+                                            os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                                            os.chown(dir_path, current_uid, current_gid)
+                                        except (PermissionError, OSError):
+                                            pass
+                                    for f in files:
+                                        try:
+                                            file_path = Path(root) / f
+                                            os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                                            os.chown(file_path, current_uid, current_gid)
+                                        except (PermissionError, OSError):
+                                            pass
+                                # A mappa maga is
+                                os.chmod(user_dir, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                                os.chown(user_dir, current_uid, current_gid)
+                                logging.info(f"✓ Jogosultságok javítva: {user_dir}")
+                            except (PermissionError, OSError) as e:
+                                logging.error(f"⚠️ Nem sikerült javítani a jogosultságokat {user_dir}: {e}")
+                    except (PermissionError, OSError):
+                        pass
+    except Exception as e:
+        logging.warning(f"Startup ellenőrzés során hiba: {e}")
+    
     from app.tasks.token_expiry_task import token_expiry_worker
     asyncio.create_task(token_expiry_worker())
     logging.info("Token lejárat ellenőrzés elindítva")
