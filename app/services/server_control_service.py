@@ -690,7 +690,6 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 if "MySQL server has gone away" in error_msg or "2006" in error_msg or "Connection reset" in error_msg:
                     logger.warning(f"Adatbázis kapcsolat hiba a szerver indításakor (próbálkozás {retry_count}/{max_retries}): {db_error}")
                     if retry_count < max_retries:
-                        import time
                         time.sleep(0.5 * retry_count)  # Exponenciális backoff
                         continue
                 else:
@@ -815,7 +814,6 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 if "MySQL server has gone away" in error_msg or "2006" in error_msg or "Connection reset" in error_msg:
                     logger.warning(f"Adatbázis kapcsolat hiba a szerver leállításakor (próbálkozás {retry_count}/{max_retries}): {db_error}")
                     if retry_count < max_retries:
-                        import time
                         time.sleep(0.5 * retry_count)  # Exponenciális backoff
                         continue
                 else:
@@ -859,7 +857,6 @@ def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             return stop_result
         
         # Várakozás (2 másodperc)
-        import time
         time.sleep(2)
         
         # Újraindítás
