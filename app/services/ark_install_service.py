@@ -253,11 +253,27 @@ async def install_ark_server_files(
             await log(f"⚠️ SteamCMD exit code 8 (gyakori, nem feltétlenül hiba)")
             await log("Ellenőrizzük, hogy a telepítés sikeres volt-e...")
             
-            # Várunk egy kicsit, hogy a fájlrendszer frissüljön
-            await asyncio.sleep(3)
+            # Várunk többet, hogy a fájlrendszer teljesen frissüljön (verification után)
+            await log("Várakozás a fájlrendszer frissülésére...")
+            await asyncio.sleep(5)
             
             # Ellenőrizzük, hogy a Windows bináris létezik-e (csak Windows bináris van)
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
+            
+            # Részletes ellenőrzés
+            shooter_game = install_path / "ShooterGame"
+            if shooter_game.exists():
+                await log(f"✓ ShooterGame mappa létezik")
+                binaries = shooter_game / "Binaries"
+                if binaries.exists():
+                    await log(f"✓ Binaries mappa létezik")
+                    binaries_contents = [item.name for item in binaries.iterdir()] if binaries.exists() else []
+                    await log(f"  - Binaries tartalma: {binaries_contents}")
+                    win64_path = binaries / "Win64"
+                    if win64_path.exists():
+                        await log(f"✓ Win64 mappa létezik")
+                        win64_contents = [item.name for item in win64_path.iterdir()] if win64_path.exists() else []
+                        await log(f"  - Win64 tartalma: {win64_contents[:20]}")
             
             if win64_binary.exists():
                 await log(f"✓ Windows bináris megtalálva: {win64_binary}")
@@ -265,10 +281,20 @@ async def install_ark_server_files(
                 await log("ℹ️ Windows binárist használunk Wine-nal")
                 return True, '\n'.join(log_lines)
             else:
-                error_msg = f"Telepítés sikertelen (exit code 8, Windows bináris nem található)"
-                await log(f"✗ {error_msg}")
-                await log("Próbáld meg újratelepíteni a szerverfájlokat!")
-                return False, '\n'.join(log_lines)
+                # Ha még nincs, várunk még egy kicsit és újra ellenőrizzük
+                await log("⚠️ Bináris még nem található, várakozás további 5 másodpercet...")
+                await asyncio.sleep(5)
+                
+                if win64_binary.exists():
+                    await log(f"✓ Windows bináris megtalálva (később): {win64_binary}")
+                    await log("✓ Telepítés sikeres!")
+                    await log("ℹ️ Windows binárist használunk Wine-nal")
+                    return True, '\n'.join(log_lines)
+                else:
+                    error_msg = f"Telepítés sikertelen (exit code 8, Windows bináris nem található)"
+                    await log(f"✗ {error_msg}")
+                    await log("Próbáld meg újratelepíteni a szerverfájlokat!")
+                    return False, '\n'.join(log_lines)
         else:
             error_msg = f"Telepítés sikertelen (visszatérési kód: {return_code})"
             await log(f"✗ {error_msg}")
