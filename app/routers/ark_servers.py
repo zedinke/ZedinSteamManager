@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, asc
-from app.database import get_db, User, Game, ServerInstance, ServerStatus, Token, TokenType, Cluster, ClusterServerFiles
+from app.database import get_db, User, Game, ServerInstance, ServerStatus, Token, TokenType, Cluster, UserServerFiles
 from app.services.port_service import find_available_port, get_query_port, get_rcon_port
 from app.services.symlink_service import create_server_symlink, remove_server_symlink
 from fastapi.templating import Jinja2Templates
