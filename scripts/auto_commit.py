@@ -127,14 +127,14 @@ def auto_commit_and_push(project_dir: Path, commit_message: str = None) -> bool:
             logger.error(f"Git commit sikertelen: {result.stderr}")
             return False
         
-        logger.info(f"✅ Commit sikeres: {result.stdout.strip()}")
+        logger.info(f"[OK] Commit sikeres: {result.stdout.strip()}")
         
         # Branch meghatározása
         current_branch = get_current_branch(project_dir)
         logger.info(f"Jelenlegi branch: {current_branch}")
         
         # Push
-        logger.info("Push futtatása...")
+        logger.info("Push futtatasa...")
         result = subprocess.run(
             ["git", "push", "origin", current_branch],
             cwd=project_dir,
@@ -146,7 +146,7 @@ def auto_commit_and_push(project_dir: Path, commit_message: str = None) -> bool:
         if result.returncode != 0:
             logger.error(f"Git push sikertelen: {result.stderr}")
             # Lehet, hogy nincs upstream branch, próbáljuk meg set-upstream-mel
-            logger.info("Upstream branch beállítása...")
+            logger.info("Upstream branch beallitasa...")
             result = subprocess.run(
                 ["git", "push", "--set-upstream", "origin", current_branch],
                 cwd=project_dir,
@@ -158,7 +158,7 @@ def auto_commit_and_push(project_dir: Path, commit_message: str = None) -> bool:
                 logger.error(f"Git push (set-upstream) sikertelen: {result.stderr}")
                 return False
         
-        logger.info(f"✅ Push sikeres!")
+        logger.info(f"[OK] Push sikeres!")
         return True
         
     except subprocess.TimeoutExpired:
@@ -186,10 +186,10 @@ def main():
     success = auto_commit_and_push(project_dir, commit_message)
     
     if success:
-        logger.info("✅ Automatikus commit és push sikeres!")
+        logger.info("[OK] Automatikus commit es push sikeres!")
         sys.exit(0)
     else:
-        logger.error("❌ Automatikus commit és push sikertelen!")
+        logger.error("[HIBA] Automatikus commit es push sikertelen!")
         sys.exit(1)
 
 if __name__ == "__main__":
