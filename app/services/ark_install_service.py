@@ -59,6 +59,21 @@ async def install_ark_server_files(
     # Telepítési útvonal létrehozása
     install_path.mkdir(parents=True, exist_ok=True)
     
+    # Ha már van telepítés, de hiányos (pl. csak Saved mappa van), töröljük
+    # hogy teljes újratelepítést csinálhassunk
+    shooter_game = install_path / "ShooterGame"
+    if shooter_game.exists():
+        binaries = shooter_game / "Binaries"
+        if not binaries.exists():
+            # Hiányos telepítés - töröljük a ShooterGame mappát, hogy újratelepítsük
+            import shutil
+            await log("⚠️ Hiányos telepítés észlelve (nincs Binaries mappa). Régi telepítés törlése...")
+            try:
+                shutil.rmtree(shooter_game)
+                await log("✓ Régi telepítés törölve")
+            except Exception as e:
+                await log(f"⚠️ Nem sikerült törölni a régi telepítést: {e}")
+    
     # SteamCMD parancs összeállítása
     # Ark Survival Ascended App ID: 2430930
     app_id = "2430930"
@@ -66,12 +81,13 @@ async def install_ark_server_files(
     # SteamCMD parancsok argumentumként
     # Ark Survival Ascended szerverfájlok telepítése
     # A parancsokat közvetlenül argumentumként adjuk át, nem script fájlként
-    # Megjegyzés: A validate opció ellenőrzi és letölti a hiányzó fájlokat
+    # Megjegyzés: Teljes telepítés (nem csak validate), hogy biztosan minden fájl letöltődjön
+    # Ha már van telepítés, akkor is újratelepítjük, hogy biztosan teljes legyen
     steamcmd_args = [
         str(steamcmd_path),
         "+login", "anonymous",
         "+force_install_dir", str(install_path.absolute()),
-        "+app_update", app_id, "validate",  # validate = ellenőrzi és letölti a hiányzó fájlokat
+        "+app_update", app_id,  # Teljes telepítés (validate nélkül = minden fájlt letölt)
         "+quit"
     ]
     
@@ -115,6 +131,9 @@ async def install_ark_server_files(
         if return_code == 0:
             await log("✓ SteamCMD telepítés sikeresen befejeződött!")
             
+            # Várunk egy kicsit, hogy a fájlrendszer frissüljön
+            await asyncio.sleep(2)
+            
             # Ellenőrizzük, hogy a bináris létezik-e
             binary_path = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
             if not binary_path.exists():
@@ -123,17 +142,29 @@ async def install_ark_server_files(
                 await log("Ellenőrzés:")
                 await log(f"  - Install path létezik: {install_path.exists()}")
                 if install_path.exists():
-                    await log(f"  - Install path tartalma: {list(install_path.iterdir())[:10]}")
+                    install_contents = list(install_path.iterdir())
+                    await log(f"  - Install path tartalma ({len(install_contents)} elem): {[item.name for item in install_contents[:10]]}")
                     shooter_game = install_path / "ShooterGame"
                     if shooter_game.exists():
                         await log(f"  - ShooterGame mappa létezik: {shooter_game.exists()}")
+                        shooter_contents = list(shooter_game.iterdir())
+                        await log(f"  - ShooterGame tartalma ({len(shooter_contents)} elem): {[item.name for item in shooter_contents[:20]]}")
                         binaries = shooter_game / "Binaries"
                         if binaries.exists():
                             await log(f"  - Binaries mappa létezik: {binaries.exists()}")
+                            binaries_contents = list(binaries.iterdir())
+                            await log(f"  - Binaries tartalma ({len(binaries_contents)} elem): {[item.name for item in binaries_contents]}")
                             linux_bin = binaries / "Linux"
                             if linux_bin.exists():
                                 await log(f"  - Linux mappa létezik: {linux_bin.exists()}")
-                                await log(f"  - Linux mappa tartalma: {list(linux_bin.iterdir())[:10]}")
+                                linux_contents = list(linux_bin.iterdir())
+                                await log(f"  - Linux mappa tartalma ({len(linux_contents)} elem): {[item.name for item in linux_contents[:20]]}")
+                            else:
+                                await log(f"  - Linux mappa NEM létezik!")
+                                await log(f"  - Próbáljuk meg újratelepíteni a szerverfájlokat!")
+                        else:
+                            await log(f"  - Binaries mappa NEM létezik!")
+                            await log(f"  - A telepítés hiányos! Próbáljuk meg újratelepíteni!")
                 return False, '\n'.join(log_lines)
             
             await log(f"✓ ShooterGameServer bináris megtalálva: {binary_path}")
