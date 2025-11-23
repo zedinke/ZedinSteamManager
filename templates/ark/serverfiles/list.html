@@ -67,7 +67,16 @@
                                         <span class="badge badge-success">Aktív</span>
                                     {% endif %}
                                 </td>
-                                <td><code style="font-size: 0.9rem;">{{ sf.install_path }}</code></td>
+                                <td>
+                                    <code style="font-size: 0.9rem;">
+                                        {% set path_parts = sf.install_path.split('/') %}
+                                        {% if path_parts|length > 3 %}
+                                            .../{{ path_parts[-3] }}/{{ path_parts[-2] }}/{{ path_parts[-1] }}
+                                        {% else %}
+                                            {{ sf.install_path }}
+                                        {% endif %}
+                                    </code>
+                                </td>
                                 <td>
                                     {% if sf.installation_status == 'completed' %}
                                         <span class="badge badge-success">Kész</span>
