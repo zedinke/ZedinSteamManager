@@ -47,54 +47,52 @@
             {% endif %}
             
             <form method="POST" action="/ark/servers/{{ server.id }}/config/{{ config_file }}/save" id="configForm">
-                {% if formatted_settings %}
-                    {% set current_section = "" %}
-                    {% for setting in formatted_settings %}
-                        {% if setting.section != current_section %}
-                            {% if current_section != "" %}
-                                </div>
-                            {% endif %}
-                            {% set current_section = setting.section %}
-                            <div class="config-section" style="margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 20px;">
-                                <h4 style="color: #007bff; margin-bottom: 15px;">
-                                    <i class="fas fa-folder"></i> [{{ setting.section }}]
-                                </h4>
+                {% if settings_by_category %}
+                    {% for category in sorted_categories %}
+                        {% if settings_by_category[category] %}
+                            <div class="config-category" style="margin-bottom: 40px; border: 2px solid #007bff; border-radius: 8px; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                                <h3 style="color: #007bff; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #007bff;">
+                                    <i class="fas fa-tags"></i> {{ category }}
+                                </h3>
+                                
+                                {% for setting in settings_by_category[category] %}
+                                    <div class="form-group" style="margin-bottom: 15px; background-color: white; padding: 15px; border-radius: 5px; border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                        <label for="{{ setting.field_name }}" style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #333; margin-bottom: 8px;">
+                                            {% if setting.is_boolean %}
+                                                <input type="hidden" name="{{ setting.field_name }}" value="false">
+                                                <input type="checkbox" 
+                                                       id="{{ setting.field_name }}" 
+                                                       name="{{ setting.field_name }}" 
+                                                       value="true"
+                                                       {% if setting.value == True or setting.value == 'True' or setting.value == 'true' or setting.value == '1' %}checked{% endif %}
+                                                       style="width: auto; margin-right: 5px; transform: scale(1.2);">
+                                                <span style="font-size: 16px;">{{ setting.key }}</span>
+                                            {% else %}
+                                                <span style="font-size: 16px;">{{ setting.key }}</span>
+                                            {% endif %}
+                                        </label>
+                                        
+                                        {% if not setting.is_boolean %}
+                                            <input type="text" 
+                                                   id="{{ setting.field_name }}" 
+                                                   name="{{ setting.field_name }}" 
+                                                   value="{{ setting.value }}" 
+                                                   style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 14px; transition: border-color 0.3s;"
+                                                   onfocus="this.style.borderColor='#007bff';"
+                                                   onblur="this.style.borderColor='#ddd';">
+                                        {% endif %}
+                                        
+                                        {% if setting.description %}
+                                            <div style="display: block; color: #555; margin-top: 8px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; font-size: 13px; line-height: 1.5;">
+                                                <i class="fas fa-info-circle" style="color: #007bff; margin-right: 5px;"></i>
+                                                <span>{{ setting.description }}</span>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
                         {% endif %}
-                        
-                        <div class="form-group" style="margin-bottom: 15px;">
-                            <label for="{{ setting.field_name }}" style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
-                                {% if setting.is_boolean %}
-                                    <input type="hidden" name="{{ setting.field_name }}" value="false">
-                                    <input type="checkbox" 
-                                           id="{{ setting.field_name }}" 
-                                           name="{{ setting.field_name }}" 
-                                           value="true"
-                                           {% if setting.value == True or setting.value == 'True' or setting.value == 'true' or setting.value == '1' %}checked{% endif %}
-                                           style="width: auto; margin-right: 5px;">
-                                    <span>{{ setting.key }}</span>
-                                {% else %}
-                                    <span>{{ setting.key }}</span>
-                                {% endif %}
-                            </label>
-                            
-                            {% if not setting.is_boolean %}
-                                <input type="text" 
-                                       id="{{ setting.field_name }}" 
-                                       name="{{ setting.field_name }}" 
-                                       value="{{ setting.value }}" 
-                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; margin-top: 5px;">
-                            {% endif %}
-                            
-                            {% if setting.description %}
-                                <small style="display: block; color: #666; margin-top: 5px; font-style: italic;">
-                                    <i class="fas fa-info-circle"></i> {{ setting.description }}
-                                </small>
-                            {% endif %}
-                        </div>
                     {% endfor %}
-                    {% if current_section != "" %}
-                        </div>
-                    {% endif %}
                 {% else %}
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i> Nincs beállítás a fájlban. Az első mentéskor létrejönnek az alapértelmezett beállítások.
@@ -115,31 +113,39 @@
 </div>
 
 <style>
-.config-section {
-    background-color: #f8f9fa;
-    padding: 15px;
-    border-radius: 5px;
-    margin-bottom: 20px;
+.config-category {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.config-category:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.config-category h3 {
+    font-size: 20px;
+    font-weight: bold;
 }
 
 .form-group {
-    background-color: white;
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid #e0e0e0;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.form-group:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .form-group label {
-    color: #333;
-    margin-bottom: 5px;
+    cursor: pointer;
 }
 
-.form-group input[type="text"] {
-    font-family: 'Courier New', monospace;
+.form-group input[type="checkbox"] {
+    cursor: pointer;
 }
 
-.form-group small {
-    padding-left: 20px;
+.form-group input[type="text"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
 }
 </style>
 {% endblock %}

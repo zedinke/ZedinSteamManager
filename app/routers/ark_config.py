@@ -10,7 +10,7 @@ from pathlib import Path
 from app.database import get_db, User, ServerInstance
 from app.services.ark_config_service import (
     parse_ini_file, save_ini_file, get_setting_description,
-    is_boolean_setting, get_server_config_files
+    is_boolean_setting, get_server_config_files, get_setting_category
 )
 from app.services.symlink_service import get_user_serverfiles_path
 from fastapi.templating import Jinja2Templates
@@ -91,14 +91,18 @@ async def show_config(
     if config_file_path and config_file_path.exists():
         config_data = parse_ini_file(config_file_path)
     
-    # Beállítások formázása a template-hez
-    formatted_settings = []
+    # Beállítások formázása a template-hez - kategóriák szerint csoportosítva
+    settings_by_category = {}
     for section, items in config_data.items():
         for key, value in items.items():
             is_bool = is_boolean_setting(section, key, value)
             description = get_setting_description(section, key)
+            category = get_setting_category(section, key)
             
-            formatted_settings.append({
+            if category not in settings_by_category:
+                settings_by_category[category] = []
+            
+            settings_by_category[category].append({
                 "section": section,
                 "key": key,
                 "value": value,
@@ -107,6 +111,48 @@ async def show_config(
                 "field_name": f"{section}__{key}"  # Form field name
             })
     
+    # Kategóriák sorrendje (először a fontosabbak)
+    category_order = [
+        "Általános Szerver Beállítások",
+        "RCON Beállítások",
+        "Üzenetek és Értesítések",
+        "Játékmenet Beállítások",
+        "Nehézség Beállítások",
+        "Idő Beállítások",
+        "Sebzés Szorzók",
+        "Ellenállás Szorzók",
+        "Tapasztalat és Szelídítés",
+        "Erőforrás Gyűjtés",
+        "Játékos Fogyasztás",
+        "Dinoszaurusz Fogyasztás",
+        "Dinoszaurusz Spawn",
+        "Növénytermesztés",
+        "Párzás és Szaporodás",
+        "Bébi és Imprint Beállítások",
+        "Karakter és Tárgy Letöltés/Feltöltés",
+        "Dinoszaurusz Limit Beállítások",
+        "Törzs Beállítások",
+        "PvE Beállítások",
+        "PvP Beállítások",
+        "Struktúra Beállítások",
+        "Struktúra Pusztulás",
+        "Gyors Pusztulás Beállítások",
+        "Speciális Játékmenet Beállítások",
+        "Hang Chat Beállítások",
+        "Egyéb"
+    ]
+    
+    # Rendezett kategóriák
+    sorted_categories = []
+    for cat in category_order:
+        if cat in settings_by_category:
+            sorted_categories.append(cat)
+    
+    # Hozzáadjuk azokat a kategóriákat, amik nincsenek a listában
+    for cat in settings_by_category.keys():
+        if cat not in sorted_categories:
+            sorted_categories.append(cat)
+    
     return templates.TemplateResponse("ark/server_config.html", {
         "request": request,
         "current_user": current_user,
@@ -114,7 +160,8 @@ async def show_config(
         "config_file": config_file,
         "config_file_name": config_file_name,
         "config_data": config_data,
-        "formatted_settings": formatted_settings,
+        "settings_by_category": settings_by_category,
+        "sorted_categories": sorted_categories,
         "game_user_settings_path": game_user_settings_path,
         "game_ini_path": game_ini_path
     })
