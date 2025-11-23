@@ -33,19 +33,65 @@ SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
 if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
     echo "ARK szerver nincs telepítve. Telepítés indítása SteamCMD-vel..."
     
+    # Ellenőrizzük, hogy a SteamCMD létezik-e és végrehajtható-e
     if [ ! -f "${STEAMCMD_BIN}" ]; then
         echo "HIBA: SteamCMD nem található: ${STEAMCMD_BIN}"
+        echo "SteamCMD mappa tartalma:"
+        ls -la "${STEAMCMD_DIR}" || echo "SteamCMD mappa nem létezik"
         exit 1
     fi
     
+    if [ ! -x "${STEAMCMD_BIN}" ]; then
+        echo "SteamCMD nem végrehajtható, jogosultságok beállítása..."
+        chmod +x "${STEAMCMD_BIN}" || {
+            echo "HIBA: Nem lehet végrehajthatóvá tenni a SteamCMD-t!"
+            exit 1
+        }
+    fi
+    
+    # Ellenőrizzük, hogy az ARK_SERVER_DIR létezik-e és írható-e
+    if [ ! -d "${ARK_SERVER_DIR}" ]; then
+        echo "ARK szerver mappa létrehozása: ${ARK_SERVER_DIR}"
+        mkdir -p "${ARK_SERVER_DIR}" || {
+            echo "HIBA: Nem lehet létrehozni az ARK szerver mappát!"
+            exit 1
+        }
+    fi
+    
+    # Ellenőrizzük, hogy az ARK_SERVER_DIR írható-e
+    if [ ! -w "${ARK_SERVER_DIR}" ]; then
+        echo "HIBA: Az ARK szerver mappa nem írható: ${ARK_SERVER_DIR}"
+        exit 1
+    fi
+    
+    echo "SteamCMD futtatása..."
+    echo "  - Install dir: ${ARK_SERVER_DIR}"
+    echo "  - App ID: ${ARK_APP_ID}"
+    
     # ARK szerver telepítése/frissítése
+    # A SteamCMD hosszú ideig futhat, ezért timeout-ot nem állítunk
     "${STEAMCMD_BIN}" +force_install_dir "${ARK_SERVER_DIR}" \
         +login anonymous \
         +app_update ${ARK_APP_ID} validate \
         +quit
     
+    STEAMCMD_EXIT=$?
+    if [ ${STEAMCMD_EXIT} -ne 0 ]; then
+        echo "HIBA: SteamCMD telepítés sikertelen (exit code: ${STEAMCMD_EXIT})"
+        exit 1
+    fi
+    
+    # Várakozás, hogy a fájlok leírásra kerüljenek
+    sleep 2
+    
     if [ ! -f "${SERVER_BINARY}" ]; then
-        echo "HIBA: ARK szerver telepítése sikertelen!"
+        echo "HIBA: ARK szerver telepítése sikertelen! A bináris nem található: ${SERVER_BINARY}"
+        echo "ARK_SERVER_DIR tartalma:"
+        ls -la "${ARK_SERVER_DIR}" || echo "Mappa nem létezik"
+        if [ -d "${ARK_SERVER_DIR}/ShooterGame" ]; then
+            echo "ShooterGame mappa tartalma:"
+            ls -la "${ARK_SERVER_DIR}/ShooterGame" || true
+        fi
         exit 1
     fi
     

@@ -31,7 +31,10 @@ RUN apt-get update && \
 # SteamCMD letöltése és telepítése
 RUN cd ${STEAMCMD_DIR} && \
     curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
-    chown -R zedin:zedin ${STEAMCMD_DIR}
+    chown -R zedin:zedin ${STEAMCMD_DIR} && \
+    chmod +x ${STEAMCMD_DIR}/steamcmd.sh && \
+    # Ellenőrizzük, hogy a SteamCMD telepítve van-e
+    test -f ${STEAMCMD_DIR}/steamcmd.sh || (echo "HIBA: SteamCMD telepítése sikertelen!" && exit 1)
 
 # Entrypoint script másolása (root-ként, mert még nem váltottunk felhasználót)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

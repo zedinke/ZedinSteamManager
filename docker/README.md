@@ -40,15 +40,25 @@ config = {
 
 ### 3. Szerverfájlok telepítése
 
-**Fontos**: A szerverfájlokat először telepíteni kell a host rendszeren, vagy a konténer automatikusan letölti az első indításkor.
+**FONTOS**: A szerverfájlokat **ELŐSZÖR** telepíteni kell a host rendszeren a webes felületen keresztül!
 
-**Opció 1: Automatikus letöltés (ajánlott)**
-- A konténer automatikusan letölti a szerverfájlokat az első indításkor, ha még nincsenek telepítve
-- Ez időbe telhet (több GB letöltés)
+**Telepítési lépések:**
 
-**Opció 2: Manuális telepítés**
-- Telepítsd a szerverfájlokat a host rendszeren SteamCMD-vel
-- A volume mount útvonal: `Servers/server_{id}/ServerFiles`
+1. **Menj a webes felületre** (pl. `http://YOUR_SERVER_IP:8000`)
+2. **Jelentkezz be** Server Admin vagy Manager Admin felhasználóként
+3. **Menj az "ARK Server Files" menüpontra**
+4. **Telepítsd a szerverfájlokat** SteamCMD-vel
+   - A telepítés automatikusan a `ServerFiles/user_{user_id}/latest/` mappába történik
+   - A telepítés több GB-ot letölt, ez időbe telhet (30-60 perc)
+
+**Miután a szerverfájlok telepítve vannak:**
+- A szerverek automatikusan használják a telepített szerverfájlokat
+- A Docker konténer a volume mount-on keresztül éri el a szerverfájlokat
+- **A konténer NEM telepíti automatikusan a szerverfájlokat!** A host rendszeren kell telepíteni.
+
+**Ellenőrzés:**
+- Ellenőrizd, hogy a `ServerFiles/user_{user_id}/latest/ShooterGame/Binaries/Linux/ShooterGameServer` fájl létezik-e
+- Ha nem létezik, a telepítés nem fejeződött be, telepítsd újra
 
 ## Különbségek a POK image-hez képest
 
