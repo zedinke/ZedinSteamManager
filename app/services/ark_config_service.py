@@ -247,12 +247,12 @@ def get_setting_category(section: str, key: str) -> str:
         key: Beállítás kulcsa
     
     Returns:
-        Kategória neve vagy "Egyéb"
+        Kategória neve vagy "Egyedi" (ha nincs kategória, akkor egyedi beállítás)
     """
     for category, sections in SETTING_CATEGORIES.items():
         if section in sections and key in sections[section]:
             return category
-    return "Egyéb"
+    return "Egyedi"
 
 def parse_ini_file(file_path: Path) -> Dict[str, Dict[str, Any]]:
     """
@@ -413,7 +413,7 @@ def get_setting_description(section: str, key: str) -> str:
         key: Beállítás kulcsa
     
     Returns:
-        Leírás vagy üres string
+        Leírás vagy alapértelmezett leírás egyedi beállításokhoz
     """
     # Próbáljuk meg a section-t
     descriptions = SETTING_DESCRIPTIONS.get(section, {})
@@ -425,6 +425,10 @@ def get_setting_description(section: str, key: str) -> str:
         if section != "ServerSettings":
             server_settings_descriptions = SETTING_DESCRIPTIONS.get("ServerSettings", {})
             description = server_settings_descriptions.get(key, "")
+    
+    # Ha még mindig nincs leírás, akkor egyedi beállítás - adjunk alapértelmezett leírást
+    if not description:
+        description = f"Egyedi beállítás: {key} - Ez a beállítás nincs a standard Ark beállítások között. Kérjük, ellenőrizze az Ark dokumentációját vagy a mod dokumentációját a pontos leírásért."
     
     return description
 

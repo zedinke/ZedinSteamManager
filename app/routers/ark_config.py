@@ -162,7 +162,7 @@ async def show_config(
         "Gyors Pusztulás Beállítások",
         "Speciális Játékmenet Beállítások",
         "Hang Chat Beállítások",
-        "Egyéb"
+        "Egyedi"
     ]
     
     # Rendezett kategóriák
