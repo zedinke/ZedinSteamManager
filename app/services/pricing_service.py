@@ -1,36 +1,56 @@
 """
 Token árazási szolgáltatás
+Az árak EUR-ban vannak tárolva (centekben)
 """
 
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.database import TokenPricingRule, TokenBasePrice, TokenType
 from typing import Optional, Dict, List
+from app.services.exchange_rate_service import get_huf_eur_exchange_rate, eur_to_huf
 
 def get_base_price(db: Session, token_type: TokenType, item_type: str, days: Optional[int] = None) -> int:
-    """Alapár lekérése"""
+    """
+    Alapár lekérése EUR centekben
+    
+    Returns:
+        Ár EUR centekben (pl. 2500 = 25.00 EUR)
+    """
     base_price = db.query(TokenBasePrice).filter(
         TokenBasePrice.token_type == token_type,
         TokenBasePrice.item_type == item_type
     ).first()
     
     if not base_price:
-        # Alapértelmezett árak, ha nincs beállítva
+        # Alapértelmezett árak EUR-ban, ha nincs beállítva
+        # Régi HUF árak konvertálása EUR-ra (400 HUF/EUR árfolyammal)
+        exchange_rate = get_huf_eur_exchange_rate() or 400.0
+        
         if item_type == "token_request":
-            default_prices = {
-                TokenType.SERVER_ADMIN: 10000,  # 10,000 Ft
-                TokenType.USER: 5000  # 5,000 Ft
+            # Régi: 10,000 HUF és 5,000 HUF -> EUR-ban
+            default_prices_huf = {
+                TokenType.SERVER_ADMIN: 10000,  # 10,000 HUF
+                TokenType.USER: 5000  # 5,000 HUF
             }
-            base = default_prices.get(token_type, 5000)
+            # Konvertálás EUR-ra (centekben)
+            huf_price = default_prices_huf.get(token_type, 5000)
+            eur_price = huf_price / exchange_rate
+            base = int(eur_price * 100)  # EUR centekben
+            
             # Ha van napok száma megadva és van price_per_day, akkor számoljuk
             if days:
                 # Alapértelmezett: 30 nap = base_price, tehát naponta base_price/30
                 return int(base * days / 30)
             return base
         else:  # token_extension
+            # Régi: 1,000 HUF/nap -> EUR-ban
+            huf_per_day = 1000
+            eur_per_day = huf_per_day / exchange_rate
+            base_per_day = int(eur_per_day * 100)  # EUR centekben
+            
             if days:
-                return 1000 * days  # 1,000 Ft/nap alapértelmezett
-            return 1000  # 1,000 Ft/nap alapértelmezett
+                return base_per_day * days
+            return base_per_day
     
     # Ha van price_per_day és van napok száma, akkor használjuk azt
     if days and base_price.price_per_day:
@@ -140,13 +160,22 @@ def calculate_price(
     discount_amount = int(total_base_price * total_discount_percent / 100)
     final_price = total_base_price - discount_amount
     
+    # Árfolyam lekérése HUF konverzióhoz
+    exchange_rate = get_huf_eur_exchange_rate()
+    
     return {
-        "base_price": base_price,
+        "base_price": base_price,  # EUR centekben
         "quantity": quantity,
-        "total_base_price": total_base_price,
+        "total_base_price": total_base_price,  # EUR centekben
         "discount_percent": total_discount_percent,
-        "discount_amount": discount_amount,
-        "final_price": max(0, final_price),  # Minimum 0
-        "applied_rules": applied_rules
+        "discount_amount": discount_amount,  # EUR centekben
+        "final_price": max(0, final_price),  # EUR centekben, minimum 0
+        "applied_rules": applied_rules,
+        "exchange_rate": exchange_rate,  # HUF/EUR árfolyam
+        # HUF értékek is (opcionális, ha szükséges)
+        "base_price_huf": round(eur_to_huf(base_price / 100, exchange_rate), 2) if exchange_rate else None,
+        "total_base_price_huf": round(eur_to_huf(total_base_price / 100, exchange_rate), 2) if exchange_rate else None,
+        "discount_amount_huf": round(eur_to_huf(discount_amount / 100, exchange_rate), 2) if exchange_rate else None,
+        "final_price_huf": round(eur_to_huf(final_price / 100, exchange_rate), 2) if exchange_rate else None,
     }
 

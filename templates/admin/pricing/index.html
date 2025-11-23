@@ -34,10 +34,11 @@
                     <form method="POST" action="/admin/pricing/base-price" style="margin-bottom: 15px;">
                         <input type="hidden" name="item_type" value="token_request">
                         <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin Token:</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin Token (EUR centekben):</label>
                             <input type="number" name="base_price" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 10000 }}" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 2500 }}" 
                                    min="0" required style="width: 100%; padding: 8px;">
+                            <small style="color: #666;">Pl. 2500 = 25.00 EUR</small>
                             <input type="hidden" name="token_type" value="server_admin">
                         </div>
                         <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
@@ -46,10 +47,11 @@
                     <form method="POST" action="/admin/pricing/base-price">
                         <input type="hidden" name="item_type" value="token_request">
                         <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó Token:</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó Token (EUR centekben):</label>
                             <input type="number" name="base_price" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 5000 }}" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_request')|map(attribute='base_price')|first or 1250 }}" 
                                    min="0" required style="width: 100%; padding: 8px;">
+                            <small style="color: #666;">Pl. 1250 = 12.50 EUR</small>
                             <input type="hidden" name="token_type" value="user">
                         </div>
                         <button type="submit" class="btn btn-primary btn-sm">Mentés</button>
@@ -62,10 +64,11 @@
                     <form method="POST" action="/admin/pricing/base-price" style="margin-bottom: 15px;">
                         <input type="hidden" name="item_type" value="token_extension">
                         <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin (Ft/nap):</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin (EUR centekben/nap):</label>
                             <input type="number" name="price_per_day" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 1000 }}" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 250 }}" 
                                    min="0" required style="width: 100%; padding: 8px;">
+                            <small style="color: #666;">Pl. 250 = 2.50 EUR/nap</small>
                             <input type="hidden" name="token_type" value="server_admin">
                             <input type="hidden" name="base_price" value="0">
                         </div>
@@ -75,10 +78,11 @@
                     <form method="POST" action="/admin/pricing/base-price">
                         <input type="hidden" name="item_type" value="token_extension">
                         <div style="margin-bottom: 10px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó (Ft/nap):</label>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Felhasználó (EUR centekben/nap):</label>
                             <input type="number" name="price_per_day" 
-                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 500 }}" 
+                                   value="{{ base_prices|selectattr('token_type.value', 'equalto', 'user')|selectattr('item_type', 'equalto', 'token_extension')|map(attribute='price_per_day')|first or 125 }}" 
                                    min="0" required style="width: 100%; padding: 8px;">
+                            <small style="color: #666;">Pl. 125 = 1.25 EUR/nap</small>
                             <input type="hidden" name="token_type" value="user">
                             <input type="hidden" name="base_price" value="0">
                         </div>

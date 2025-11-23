@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     backup_max_per_server: int = 20  # Maximum backup száma szerverenként
     backup_max_total_size_gb: int = 20  # Maximum összes backup méret GB-ban
     
+    # Exchange rate
+    default_huf_eur_rate: float = 400.0  # Alapértelmezett HUF/EUR árfolyam (ha az API nem elérhető)
+    
     class Config:
         env_file = BASE_DIR / ".env"
         env_file_encoding = "utf-8"

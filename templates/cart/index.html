@@ -70,13 +70,23 @@
                                 <td>
                                     {% if item.pricing %}
                                         <div>
+                                            {% set total_base_eur = item.pricing.total_base_price / 100 %}
+                                            {% set final_eur = item.pricing.final_price / 100 %}
+                                            {% set base_eur = item.pricing.base_price / 100 %}
+                                            
                                             {% if item.pricing.discount_percent > 0 %}
-                                                <small style="text-decoration: line-through; color: #999;">{{ "{:,}".format(item.pricing.total_base_price) }} Ft</small><br>
-                                                <strong style="color: #667eea;">{{ "{:,}".format(item.pricing.final_price) }} Ft</strong>
+                                                <small style="text-decoration: line-through; color: #999;">{{ "%.2f"|format(total_base_eur) }} EUR</small><br>
+                                                <strong style="color: #667eea;">{{ "%.2f"|format(final_eur) }} EUR</strong>
+                                                {% if item.pricing.exchange_rate %}
+                                                    <br><small style="color: #999;">≈ {{ "{:,.0f}".format(item.pricing.final_price_huf) }} HUF</small>
+                                                {% endif %}
                                             {% else %}
-                                                <strong style="color: #667eea;">{{ "{:,}".format(item.pricing.total_base_price) }} Ft</strong>
+                                                <strong style="color: #667eea;">{{ "%.2f"|format(total_base_eur) }} EUR</strong>
+                                                {% if item.pricing.exchange_rate %}
+                                                    <br><small style="color: #999;">≈ {{ "{:,.0f}".format(item.pricing.total_base_price_huf) }} HUF</small>
+                                                {% endif %}
                                             {% endif %}
-                                            <br><small style="color: #999;">{{ "{:,}".format(item.pricing.base_price) }} Ft{{ "/db" if item.item_type == "token_request" else "/nap" }}</small>
+                                            <br><small style="color: #999;">{{ "%.2f"|format(base_eur) }} EUR{{ "/db" if item.item_type == "token_request" else "/nap" }}</small>
                                         </div>
                                     {% else %}
                                         <span class="text-muted">Számítás...</span>
@@ -85,8 +95,12 @@
                                 <td>
                                     {% if item.pricing and item.pricing.discount_percent > 0 %}
                                         <div>
+                                            {% set discount_eur = item.pricing.discount_amount / 100 %}
                                             <span class="badge badge-success">-{{ item.pricing.discount_percent }}%</span>
-                                            <br><small style="color: #28a745;">-{{ "{:,}".format(item.pricing.discount_amount) }} Ft</small>
+                                            <br><small style="color: #28a745;">-{{ "%.2f"|format(discount_eur) }} EUR</small>
+                                            {% if item.pricing.exchange_rate %}
+                                                <br><small style="color: #999;">≈ -{{ "{:,.0f}".format(item.pricing.discount_amount_huf) }} HUF</small>
+                                            {% endif %}
                                             {% if item.pricing.applied_rules %}
                                                 <br><small style="color: #666;">
                                                     {% for rule in item.pricing.applied_rules %}
@@ -101,7 +115,11 @@
                                 </td>
                                 <td>
                                     {% if item.pricing %}
-                                        <strong style="font-size: 16px; color: #667eea;">{{ "{:,}".format(item.pricing.final_price) }} Ft</strong>
+                                        {% set final_eur = item.pricing.final_price / 100 %}
+                                        <strong style="font-size: 16px; color: #667eea;">{{ "%.2f"|format(final_eur) }} EUR</strong>
+                                        {% if item.pricing.exchange_rate %}
+                                            <br><small style="color: #999;">≈ {{ "{:,.0f}".format(item.pricing.final_price_huf) }} HUF</small>
+                                        {% endif %}
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
@@ -129,21 +147,25 @@
                                 <strong>Összesen:</strong>
                             </td>
                             <td>
+                                {% set total_base_eur = total_base_price / 100 %}
+                                {% set total_discount_eur = total_discount / 100 %}
+                                {% set total_final_eur = total_final_price / 100 %}
+                                
                                 {% if total_discount > 0 %}
-                                    <span style="text-decoration: line-through; color: #999;">{{ "{:,}".format(total_base_price) }} Ft</span>
+                                    <span style="text-decoration: line-through; color: #999;">{{ "%.2f"|format(total_base_eur) }} EUR</span>
                                 {% else %}
-                                    <span>{{ "{:,}".format(total_base_price) }} Ft</span>
+                                    <span>{{ "%.2f"|format(total_base_eur) }} EUR</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if total_discount > 0 %}
-                                    <span class="badge badge-success">-{{ "{:,}".format(total_discount) }} Ft</span>
+                                    <span class="badge badge-success">-{{ "%.2f"|format(total_discount_eur) }} EUR</span>
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <strong style="font-size: 18px; color: #667eea;">{{ "{:,}".format(total_final_price) }} Ft</strong>
+                                <strong style="font-size: 18px; color: #667eea;">{{ "%.2f"|format(total_final_eur) }} EUR</strong>
                             </td>
                             <td colspan="2"></td>
                         </tr>
