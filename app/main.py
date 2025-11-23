@@ -163,6 +163,21 @@ async def startup_event():
                                 logging.info(f"✓ Jogosultságok javítva: {user_dir}")
                             except (PermissionError, OSError) as e:
                                 logging.error(f"⚠️ Nem sikerült javítani a jogosultságokat {user_dir}: {e}")
+                                # Ha nem sikerült javítani, próbáljuk meg átnevezni
+                                try:
+                                    backup_path = base_path / f"{user_dir.name}.root_backup"
+                                    if backup_path.exists():
+                                        # Ha már létezik a backup, próbáljuk meg törölni
+                                        try:
+                                            shutil.rmtree(backup_path)
+                                        except:
+                                            pass
+                                    user_dir.rename(backup_path)
+                                    logging.warning(f"⚠️ Root jogosultságokkal létező mappa átnevezve: {backup_path}")
+                                    logging.warning(f"⚠️ FONTOS: Manuálisan töröld ezt a mappát sudo-val: sudo rm -rf {backup_path}")
+                                except (PermissionError, OSError) as rename_e:
+                                    logging.error(f"⚠️ Nem sikerült átnevezni a mappát {user_dir}: {rename_e}")
+                                    logging.error(f"⚠️ FONTOS: Manuálisan javítsd a jogosultságokat sudo-val: sudo chown -R {current_uid}:{current_gid} {user_dir}")
                     except (PermissionError, OSError):
                         pass
     except Exception as e:
