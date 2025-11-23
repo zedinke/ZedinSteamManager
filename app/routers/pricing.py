@@ -402,6 +402,40 @@ async def delete_pricing_rule(
         status_code=302
     )
 
+@router.post("/admin/pricing/ram-price")
+async def update_ram_pricing(
+    request: Request,
+    price_per_gb_eur: float = Form(...),
+    db: Session = Depends(get_db)
+):
+    """RAM árazás frissítése"""
+    current_user = require_manager_admin(request, db)
+    
+    if price_per_gb_eur < 0:
+        raise HTTPException(status_code=400, detail="Az ár nem lehet negatív")
+    
+    # EUR-ból centekbe konvertálás
+    price_per_gb_eur_cents = int(price_per_gb_eur * 100)
+    
+    # Meglévő ár keresése vagy új létrehozása
+    ram_pricing = db.query(RamPricing).order_by(RamPricing.updated_at.desc()).first()
+    
+    if ram_pricing:
+        ram_pricing.price_per_gb_eur = price_per_gb_eur_cents
+        ram_pricing.updated_at = datetime.now()
+    else:
+        ram_pricing = RamPricing(
+            price_per_gb_eur=price_per_gb_eur_cents
+        )
+        db.add(ram_pricing)
+    
+    db.commit()
+    
+    return RedirectResponse(
+        url="/admin/pricing?success=RAM+árazás+frissítve",
+        status_code=302
+    )
+
 @router.post("/admin/pricing/system-settings")
 async def update_system_settings(
     request: Request,
