@@ -67,6 +67,9 @@ SERVER_ARGS=""
 # Map
 SERVER_ARGS="${SERVER_ARGS} ${MAP_NAME}"
 
+# Listen flag (dedicated server)
+SERVER_ARGS="${SERVER_ARGS} -listen"
+
 # Portok
 SERVER_ARGS="${SERVER_ARGS} -Port=${ASA_PORT}"
 SERVER_ARGS="${SERVER_ARGS} -QueryPort=${QUERY_PORT}"

@@ -489,10 +489,58 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         
         if result.returncode != 0:
             logger.error(f"Docker Compose indítás hiba: {result.stderr}")
+            error_msg = result.stderr or result.stdout or "Ismeretlen hiba"
             return {
                 "success": False,
-                "message": f"Docker Compose indítás sikertelen: {result.stderr}"
+                "message": f"Docker Compose indítás sikertelen: {error_msg}"
             }
+        
+        # Várakozás, hogy a konténer elinduljon (2 másodperc)
+        import time
+        time.sleep(2)
+        
+        # Ellenőrizzük, hogy a konténer ténylegesen fut-e
+        container_name = f"zedin_asa_{server.id}"
+        check_result = subprocess.run(
+            ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if check_result.returncode != 0 or not check_result.stdout.strip():
+            # A konténer nem fut, nézzük meg a logokat
+            logger.warning(f"Konténer {container_name} nem fut az indítás után")
+            
+            # Konténer státusz ellenőrzése (leállt konténer is lehet)
+            inspect_result = subprocess.run(
+                ["docker", "ps", "-a", "-q", "-f", f"name=^{container_name}$"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if inspect_result.stdout.strip():
+                # A konténer létezik, de nem fut - nézzük meg a logokat
+                log_result = subprocess.run(
+                    ["docker", "logs", "--tail", "50", container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                log_output = log_result.stdout or log_result.stderr or "Nincs log kimenet"
+                logger.error(f"Konténer {container_name} logok:\n{log_output}")
+                
+                return {
+                    "success": False,
+                    "message": f"A konténer elindult, de azonnal leállt. Logok: {log_output[:500]}"
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"A konténer nem indult el. Docker Compose kimenet: {result.stdout}"
+                }
         
         # Státusz frissítése
         server.status = ServerStatus.RUNNING
