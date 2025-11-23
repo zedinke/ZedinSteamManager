@@ -151,6 +151,8 @@ async def install_ark_server_files(
         # Visszatérési kód ellenőrzése
         return_code = await process.wait()
         
+        # SteamCMD néhány exit code esetén is sikeres lehet (pl. 8 = részben sikeres)
+        # Ellenőrizzük, hogy a bináris létezik-e, mert az a fontos
         if return_code == 0:
             await log("✓ SteamCMD telepítés sikeresen befejeződött!")
             
@@ -193,9 +195,50 @@ async def install_ark_server_files(
             await log(f"✓ ShooterGameServer bináris megtalálva: {binary_path}")
             await log("✓ Telepítés teljesen befejeződött!")
             return True, '\n'.join(log_lines)
+        elif return_code == 8:
+            # Exit code 8 gyakran előfordul, de a telepítés mégis sikeres lehet
+            # Ellenőrizzük, hogy a bináris létezik-e
+            await log(f"⚠️ SteamCMD exit code 8 (gyakori, nem feltétlenül hiba)")
+            await log("Ellenőrizzük, hogy a telepítés sikeres volt-e...")
+            
+            # Várunk egy kicsit, hogy a fájlrendszer frissüljön
+            await asyncio.sleep(3)
+            
+            # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
+            linux_binary = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
+            
+            if linux_binary.exists():
+                await log(f"✓ Linux bináris megtalálva: {linux_binary}")
+                await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
+                return True, '\n'.join(log_lines)
+            elif win64_binary.exists():
+                await log(f"✓ Windows bináris megtalálva: {win64_binary}")
+                await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
+                await log("ℹ️ Windows binárist használunk Wine-nal")
+                return True, '\n'.join(log_lines)
+            else:
+                error_msg = f"Telepítés sikertelen (exit code 8, bináris nem található)"
+                await log(f"✗ {error_msg}")
+                await log("Próbáld meg újratelepíteni a szerverfájlokat!")
+                return False, '\n'.join(log_lines)
         else:
             error_msg = f"Telepítés sikertelen (visszatérési kód: {return_code})"
             await log(f"✗ {error_msg}")
+            
+            # Mégis ellenőrizzük, hogy esetleg a bináris létezik-e
+            await asyncio.sleep(2)
+            linux_binary = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
+            
+            if linux_binary.exists() or win64_binary.exists():
+                await log("⚠️ Bináris mégis létezik, telepítés valószínűleg sikeres volt!")
+                if linux_binary.exists():
+                    await log(f"✓ Linux bináris: {linux_binary}")
+                if win64_binary.exists():
+                    await log(f"✓ Windows bináris: {win64_binary}")
+                return True, '\n'.join(log_lines)
+            
             return False, '\n'.join(log_lines)
             
     except Exception as e:
