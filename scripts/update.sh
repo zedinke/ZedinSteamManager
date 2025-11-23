@@ -18,9 +18,17 @@ echo "[UPDATE] Frissítés kezdése..."
 # Váltás a projekt könyvtárába
 cd "$PROJECT_DIR"
 
+# Jelenlegi branch meghatározása
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ -z "$CURRENT_BRANCH" ]; then
+    CURRENT_BRANCH="main"  # Alapértelmezett
+fi
+
+echo "[UPDATE] Jelenlegi branch: $CURRENT_BRANCH"
+
 # Git pull
 echo "[UPDATE] Git pull futtatása..."
-git pull origin main || {
+git pull origin "$CURRENT_BRANCH" || {
     echo "[UPDATE] HIBA: Git pull sikertelen!"
     exit 1
 }

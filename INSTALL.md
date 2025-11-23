@@ -117,7 +117,7 @@ http://localhost:8000
 
 ## Cron job beállítása
 
-Token lejárat ellenőrzéshez:
+### Token lejárat ellenőrzés
 
 ```bash
 crontab -e
@@ -128,6 +128,42 @@ Add hozzá:
 ```
 0 0 * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/check_token_expiry.py
 ```
+
+### Automatikus repo frissítés
+
+Az automatikus frissítés beállításához add hozzá a crontab-hoz:
+
+```bash
+crontab -e
+```
+
+**Napi frissítés (éjfélkor):**
+```
+0 0 * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/auto_update.py
+```
+
+**Óránkénti frissítés:**
+```
+0 * * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/auto_update.py
+```
+
+**30 percenkénti frissítés:**
+```
+*/30 * * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/auto_update.py
+```
+
+**15 percenkénti frissítés:**
+```
+*/15 * * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/auto_update.py
+```
+
+**Megjegyzés:** Cseréld ki a `/path/to/zedinarkmanager` részt a tényleges projekt útvonalára. Ha virtual environment-et használsz, használd a venv Python-ját:
+
+```
+*/30 * * * * /path/to/zedinarkmanager/venv/bin/python3 /path/to/zedinarkmanager/cron/auto_update.py
+```
+
+A frissítés log fájlja: `logs/auto_update.log`
 
 ## Fejlesztési mód
 

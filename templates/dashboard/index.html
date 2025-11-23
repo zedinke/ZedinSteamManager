@@ -604,17 +604,17 @@ function showExtensionRequestModal(tokenId, currentExpiry) {
         
         tokenIdInput.value = tokenId;
         currentExpirySpan.textContent = currentExpiry || 'Nincs lejárat';
-        
-        // Új lejárat számítása
-        const daysInput = document.getElementById('extensionRequestDays');
-        if (daysInput) {
+    
+    // Új lejárat számítása
+    const daysInput = document.getElementById('extensionRequestDays');
+    if (daysInput) {
             daysInput.value = 30; // Reset to default
-            daysInput.removeEventListener('input', updateNewExpiryRequest);
-            daysInput.addEventListener('input', updateNewExpiryRequest);
-            updateNewExpiryRequest();
-        }
-        
-        // Modal megjelenítése
+        daysInput.removeEventListener('input', updateNewExpiryRequest);
+        daysInput.addEventListener('input', updateNewExpiryRequest);
+        updateNewExpiryRequest();
+    }
+    
+    // Modal megjelenítése
         modal.style.display = 'block';
     } catch (error) {
         console.error('Error showing extension request modal:', error);
