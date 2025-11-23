@@ -90,13 +90,14 @@ async def show_backup(
     
     # Következő backup ideje számítása
     next_backup_time = None
-    if auto_backup_interval and last_backup_time:
-        from datetime import timedelta
-        next_backup_time = last_backup_time + timedelta(hours=int(auto_backup_interval))
-    elif auto_backup_interval:
-        # Ha nincs még backup, akkor az intervallum órával később lesz
+    if auto_backup_interval:
         from datetime import datetime, timedelta
-        next_backup_time = datetime.now() + timedelta(hours=int(auto_backup_interval))
+        if last_backup_time:
+            # Ha van már backup, akkor az utolsó backup ideje + intervallum
+            next_backup_time = last_backup_time + timedelta(hours=int(auto_backup_interval))
+        else:
+            # Ha nincs még backup, akkor az intervallum órával később lesz
+            next_backup_time = datetime.now() + timedelta(hours=int(auto_backup_interval))
     
     return templates.TemplateResponse("ark/server_backup.html", {
         "request": request,
