@@ -313,6 +313,41 @@ async def install_ark_server_files(
         await log("SteamCMD folyamat befejeződött, várakozás a fájlrendszer stabilizálódására...")
         await asyncio.sleep(2)  # Rövid várakozás a fájlrendszer műveletek befejezésére
         
+        # FONTOS: SteamCMD után AZONNAL beállítjuk a jogosultságokat (SteamCMD root-ként hozhatja létre a mappákat!)
+        await log("Jogosultságok beállítása a SteamCMD által létrehozott mappákra...")
+        try:
+            from app.services.symlink_service import ensure_permissions
+            # Rekurzívan beállítjuk az összes mappa és fájl jogosultságát
+            ensure_permissions(install_path, recursive=True)
+            await log("✓ Jogosultságok beállítva a SteamCMD telepítésre")
+        except Exception as e:
+            await log(f"⚠️ Jogosultságok beállítása sikertelen: {e}")
+            # Próbáljuk meg manuálisan is
+            try:
+                import stat
+                current_uid = os.getuid()
+                current_gid = os.getgid()
+                for root, dirs, files in os.walk(install_path):
+                    for d in dirs:
+                        try:
+                            dir_path = Path(root) / d
+                            os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                            if os.name != 'nt':
+                                os.chown(dir_path, current_uid, current_gid)
+                        except (PermissionError, OSError):
+                            pass
+                    for f in files:
+                        try:
+                            file_path = Path(root) / f
+                            os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                            if os.name != 'nt':
+                                os.chown(file_path, current_uid, current_gid)
+                        except (PermissionError, OSError):
+                            pass
+                await log("✓ Jogosultságok beállítva (manuális módszerrel)")
+            except Exception as e2:
+                await log(f"⚠️ Manuális jogosultság beállítás is sikertelen: {e2}")
+        
         # SteamCMD néhány exit code esetén is sikeres lehet (pl. 8 = részben sikeres)
         # Ellenőrizzük, hogy a bináris létezik-e, mert az a fontos
         if return_code == 0:
@@ -357,6 +392,13 @@ async def install_ark_server_files(
                     return_code = await process2.wait()
                     await log("Újratelepítés befejeződött, várakozás a fájlrendszer stabilizálódására...")
                     await asyncio.sleep(3)
+                    # FONTOS: Újratelepítés után AZONNAL beállítjuk a jogosultságokat
+                    try:
+                        from app.services.symlink_service import ensure_permissions
+                        ensure_permissions(install_path, recursive=True)
+                        await log("✓ Jogosultságok beállítva az újratelepítésre")
+                    except Exception as perm_e:
+                        await log(f"⚠️ Jogosultságok beállítása sikertelen: {perm_e}")
                 except Exception as e:
                     await log(f"⚠️ Újratelepítés sikertelen: {e}")
                     import traceback
@@ -411,6 +453,13 @@ async def install_ark_server_files(
                             await log(line_text)
                     return_code = await process2.wait()
                     await asyncio.sleep(3)  # Várunk, hogy a fájlrendszer frissüljön
+                    # FONTOS: Újratelepítés után AZONNAL beállítjuk a jogosultságokat
+                    try:
+                        from app.services.symlink_service import ensure_permissions
+                        ensure_permissions(install_path, recursive=True)
+                        await log("✓ Jogosultságok beállítva az újratelepítésre")
+                    except Exception as perm_e:
+                        await log(f"⚠️ Jogosultságok beállítása sikertelen: {perm_e}")
                 except Exception as e:
                     await log(f"⚠️ Újratelepítés sikertelen: {e}")
             
