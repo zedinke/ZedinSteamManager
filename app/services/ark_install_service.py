@@ -194,11 +194,12 @@ async def install_ark_server_files(
     # FONTOS: A force_install_dir-t a login ELŐTT kell megadni!
     # Linux-on nem kell a platform type paraméter, mert a SteamCMD automatikusan
     # a megfelelő platformot választja (Linux binárisokat tölt le Linux-on)
+    # FONTOS: A validate opciót használjuk, mert vannak mappák, amelyek csak validate után jönnek létre
     steamcmd_args = [
         str(steamcmd_path),
         "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
         "+login", "anonymous",  # Utána a bejelentkezés
-        "+app_update", app_id,  # Teljes telepítés (validate nélkül új telepítésnél)
+        "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval (minden mappa létrejön)
         "+quit"
     ]
     
@@ -294,7 +295,7 @@ async def install_ark_server_files(
                         str(steamcmd_path),
                         "+force_install_dir", str(install_path.absolute()),
                         "+login", "anonymous",
-                        "+app_update", app_id,
+                        "+app_update", app_id, "validate",  # Validate opcióval (minden mappa létrejön)
                         "+quit",
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.STDOUT,
@@ -353,7 +354,7 @@ async def install_ark_server_files(
                             str(steamcmd_path),
                             "+force_install_dir", str(install_path.absolute()),  # Először a telepítési útvonal
                             "+login", "anonymous",  # Utána a bejelentkezés
-                            "+app_update", app_id,  # Teljes telepítés (validate nélkül új telepítésnél)
+                            "+app_update", app_id, "validate",  # Teljes telepítés validate opcióval (minden mappa létrejön)
                             "+quit",
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.STDOUT,
