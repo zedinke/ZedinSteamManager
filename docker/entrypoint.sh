@@ -27,7 +27,18 @@ CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
 UPDATE_SERVER="${UPDATE_SERVER:-True}"
 
 # Ellenőrizzük, hogy a szerverfájlok léteznek-e
-SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+# ARK: Survival Ascended jelenleg csak Windows-on támogatott, ezért Wine-t használunk
+# Először próbáljuk meg a Linux binárist (ha létezik), majd a Windows binárist Wine-nal
+if [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer" ]; then
+    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+    USE_WINE=false
+elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ShooterGameServer.exe" ]; then
+    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ShooterGameServer.exe"
+    USE_WINE=true
+else
+    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+    USE_WINE=false
+fi
 
 # Ha a szerver nincs telepítve és UPDATE_SERVER=True, akkor telepítjük
 if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
@@ -204,7 +215,19 @@ fi
 
 # Szerver indítása
 echo "Szerver indítása..."
-exec "${SERVER_BINARY}" ${SERVER_ARGS}
+if [ "${USE_WINE}" = "true" ]; then
+    echo "Wine használata Windows bináris futtatásához..."
+    # Wine konfiguráció (ha szükséges)
+    export WINEPREFIX="${ARK_SERVER_DIR}/.wine"
+    export DISPLAY=:99
+    # Xvfb indítása háttérben (ha szükséges)
+    Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+    # Wine-nal futtatjuk a szervert
+    exec wine "${SERVER_BINARY}" ${SERVER_ARGS}
+else
+    # Natív Linux bináris
+    exec "${SERVER_BINARY}" ${SERVER_ARGS}
+fi
 
 # Ha ide jutunk, akkor a szerver leállt
 EXIT_CODE=$?
