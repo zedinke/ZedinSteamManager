@@ -113,6 +113,23 @@ async def startup_event():
         current_uid = os.getuid()
         current_gid = os.getgid()
         
+        # FONTOS: Először ellenőrizzük és javítjuk a base mappa szülő mappáit is
+        # Mert ha a base mappa szülő mappája root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
+        parent_path = base_path.parent
+        if parent_path.exists():
+            try:
+                stat_info = parent_path.stat()
+                if stat_info.st_uid == 0 and current_uid != 0:
+                    logging.warning(f"Root jogosultságokkal létező szülő mappa észlelve: {parent_path}")
+                    try:
+                        os.chmod(parent_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        os.chown(parent_path, current_uid, current_gid)
+                        logging.info(f"✓ Szülő mappa jogosultságok javítva: {parent_path}")
+                    except (PermissionError, OSError) as e:
+                        logging.error(f"⚠️ Nem sikerült javítani a szülő mappa jogosultságait {parent_path}: {e}")
+            except (PermissionError, OSError):
+                pass
+        
         # Ha a base mappa létezik, ellenőrizzük
         if base_path.exists():
             # Végigmegyünk az összes user_* mappán
