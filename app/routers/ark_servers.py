@@ -403,6 +403,19 @@ async def create_server(
     if server_path:
         server_instance.server_path = str(server_path)
         db.commit()
+        
+        # Konfigurációs fájlok frissítése szerver létrehozásakor
+        from app.services.ark_config_service import update_config_from_server_settings
+        # RCON port beállítása - alapértelmezett 27015 (Ark alapértelmezett RCON port), vagy a szerver rcon_port értéke
+        rcon_port_value = server_instance.rcon_port if server_instance.rcon_port else 27015
+        
+        update_config_from_server_settings(
+            server_path=server_path,
+            session_name=name,  # A szerver név lesz a session name
+            max_players=max_players,
+            rcon_enabled=True,  # Alapértelmezett: engedélyezve
+            rcon_port=rcon_port_value
+        )
     
     return RedirectResponse(
         url="/ark/servers?success=Szerver+létrehozva",
@@ -679,7 +692,7 @@ async def edit_server(
     
     # Konfigurációs fájlok frissítése
     if server_path and (server_path.exists() or server_path.is_symlink()):
-        # RCON port beállítása - alapértelmezett 27015, vagy a szerver rcon_port értéke
+        # RCON port beállítása - alapértelmezett 27015 (Ark alapértelmezett RCON port), vagy a szerver rcon_port értéke
         rcon_port_value = server.rcon_port if server.rcon_port else 27015
         
         update_config_from_server_settings(
