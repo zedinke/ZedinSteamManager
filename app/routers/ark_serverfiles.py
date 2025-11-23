@@ -526,3 +526,60 @@ async def start_update(
         "message": "Frissítés elindítva"
     })
 
+@router.get("/{serverfiles_id}/verify")
+async def verify_installation(
+    request: Request,
+    serverfiles_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Szerverfájlok telepítés ellenőrzése"""
+    current_user = require_server_admin(request, db)
+    
+    serverfiles = db.query(UserServerFiles).filter(
+        UserServerFiles.id == serverfiles_id
+    ).first()
+    
+    if not serverfiles:
+        raise HTTPException(status_code=404, detail="Szerverfájlok nem találhatók")
+    
+    if serverfiles.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod")
+    
+    install_path = Path(serverfiles.install_path)
+    binary_path = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+    
+    result = {
+        "install_path": str(install_path),
+        "install_path_exists": install_path.exists(),
+        "binary_path": str(binary_path),
+        "binary_exists": binary_path.exists(),
+        "details": {}
+    }
+    
+    if install_path.exists():
+        result["details"]["install_path_contents"] = [item.name for item in install_path.iterdir()][:20]
+        
+        shooter_game = install_path / "ShooterGame"
+        if shooter_game.exists():
+            result["details"]["shooter_game_exists"] = True
+            result["details"]["shooter_game_contents"] = [item.name for item in shooter_game.iterdir()][:20]
+            
+            binaries = shooter_game / "Binaries"
+            if binaries.exists():
+                result["details"]["binaries_exists"] = True
+                result["details"]["binaries_contents"] = [item.name for item in binaries.iterdir()]
+                
+                linux_bin = binaries / "Linux"
+                if linux_bin.exists():
+                    result["details"]["linux_exists"] = True
+                    result["details"]["linux_contents"] = [item.name for item in linux_bin.iterdir()][:20]
+                else:
+                    result["details"]["linux_exists"] = False
+                    result["details"]["binaries_subdirs"] = [item.name for item in binaries.iterdir() if item.is_dir()]
+            else:
+                result["details"]["binaries_exists"] = False
+        else:
+            result["details"]["shooter_game_exists"] = False
+    
+    return JSONResponse(result)
+

@@ -66,11 +66,12 @@ async def install_ark_server_files(
     # SteamCMD parancsok argumentumként
     # Ark Survival Ascended szerverfájlok telepítése
     # A parancsokat közvetlenül argumentumként adjuk át, nem script fájlként
+    # Megjegyzés: A validate opció ellenőrzi és letölti a hiányzó fájlokat
     steamcmd_args = [
         str(steamcmd_path),
         "+login", "anonymous",
         "+force_install_dir", str(install_path.absolute()),
-        "+app_update", app_id, "validate",
+        "+app_update", app_id, "validate",  # validate = ellenőrzi és letölti a hiányzó fájlokat
         "+quit"
     ]
     
@@ -112,7 +113,31 @@ async def install_ark_server_files(
         return_code = await process.wait()
         
         if return_code == 0:
-            await log("✓ Telepítés sikeresen befejeződött!")
+            await log("✓ SteamCMD telepítés sikeresen befejeződött!")
+            
+            # Ellenőrizzük, hogy a bináris létezik-e
+            binary_path = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            if not binary_path.exists():
+                error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer bináris nem található: {binary_path}"
+                await log(f"✗ {error_msg}")
+                await log("Ellenőrzés:")
+                await log(f"  - Install path létezik: {install_path.exists()}")
+                if install_path.exists():
+                    await log(f"  - Install path tartalma: {list(install_path.iterdir())[:10]}")
+                    shooter_game = install_path / "ShooterGame"
+                    if shooter_game.exists():
+                        await log(f"  - ShooterGame mappa létezik: {shooter_game.exists()}")
+                        binaries = shooter_game / "Binaries"
+                        if binaries.exists():
+                            await log(f"  - Binaries mappa létezik: {binaries.exists()}")
+                            linux_bin = binaries / "Linux"
+                            if linux_bin.exists():
+                                await log(f"  - Linux mappa létezik: {linux_bin.exists()}")
+                                await log(f"  - Linux mappa tartalma: {list(linux_bin.iterdir())[:10]}")
+                return False, '\n'.join(log_lines)
+            
+            await log(f"✓ ShooterGameServer bináris megtalálva: {binary_path}")
+            await log("✓ Telepítés teljesen befejeződött!")
             return True, '\n'.join(log_lines)
         else:
             error_msg = f"Telepítés sikertelen (visszatérési kód: {return_code})"

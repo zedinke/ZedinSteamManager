@@ -98,6 +98,11 @@
                                 </td>
                                 <td>
                                     <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+                                        {% if sf.installation_status == 'completed' %}
+                                            <button type="button" class="btn btn-sm btn-info" onclick="verifyInstallation({{ sf.id }})" title="Telepítés ellenőrzése">
+                                                <i class="fas fa-check-circle"></i> Ellenőrzés
+                                            </button>
+                                        {% endif %}
                                         {% if sf.installation_status == 'completed' and not sf.is_active %}
                                             <form method="POST" action="/ark/serverfiles/{{ sf.id }}/activate" style="display: inline;">
                                                 <button type="submit" class="btn btn-sm btn-success">
@@ -142,4 +147,55 @@
         </div>
     </div>
 </div>
+
+<script>
+async function verifyInstallation(serverfilesId) {
+    try {
+        const response = await fetch(`/ark/serverfiles/${serverfilesId}/verify`);
+        const data = await response.json();
+        
+        let message = `Telepítés ellenőrzés:\n\n`;
+        message += `Telepítési útvonal: ${data.install_path}\n`;
+        message += `Útvonal létezik: ${data.install_path_exists ? 'IGEN' : 'NEM'}\n\n`;
+        message += `Bináris útvonal: ${data.binary_path}\n`;
+        message += `Bináris létezik: ${data.binary_exists ? 'IGEN ✓' : 'NEM ✗'}\n\n`;
+        
+        if (data.details) {
+            if (data.details.install_path_contents) {
+                message += `Telepítési mappa tartalma:\n${data.details.install_path_contents.join(', ')}\n\n`;
+            }
+            if (data.details.shooter_game_exists !== undefined) {
+                message += `ShooterGame mappa: ${data.details.shooter_game_exists ? 'Létezik' : 'NEM létezik'}\n`;
+                if (data.details.shooter_game_contents) {
+                    message += `ShooterGame tartalma: ${data.details.shooter_game_contents.join(', ')}\n\n`;
+                }
+            }
+            if (data.details.binaries_exists !== undefined) {
+                message += `Binaries mappa: ${data.details.binaries_exists ? 'Létezik' : 'NEM létezik'}\n`;
+                if (data.details.binaries_contents) {
+                    message += `Binaries tartalma: ${data.details.binaries_contents.join(', ')}\n\n`;
+                }
+            }
+            if (data.details.linux_exists !== undefined) {
+                message += `Linux mappa: ${data.details.linux_exists ? 'Létezik' : 'NEM létezik'}\n`;
+                if (data.details.linux_contents) {
+                    message += `Linux mappa tartalma: ${data.details.linux_contents.join(', ')}\n\n`;
+                }
+                if (data.details.binaries_subdirs) {
+                    message += `Binaries almappái: ${data.details.binaries_subdirs.join(', ')}\n`;
+                }
+            }
+        }
+        
+        if (!data.binary_exists) {
+            message += `\n⚠️ HIBA: A ShooterGameServer bináris nem található!\n`;
+            message += `Telepítsd újra a szerverfájlokat!`;
+        }
+        
+        alert(message);
+    } catch (error) {
+        alert(`Hiba az ellenőrzés során: ${error.message}`);
+    }
+}
+</script>
 {% endblock %}
