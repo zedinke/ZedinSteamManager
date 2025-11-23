@@ -397,10 +397,15 @@ async def create_server(
     ).first()
     
     # Szerverfájlok használata (felhasználó vagy Manager Admin)
-    server_path = create_server_symlink(server_instance.id, cluster.cluster_id, db)
-    if server_path:
-        server_instance.server_path = str(server_path)
+    server_dir = create_server_symlink(server_instance.id, cluster.cluster_id, db)
+    if server_dir:
+        # server_dir most már a Servers/server_{server_id}/ mappa
+        server_instance.server_path = str(server_dir)
         db.commit()
+        
+        # ServerFiles symlink és Saved mappa útvonalai
+        serverfiles_link = server_dir / "ServerFiles"
+        saved_path = server_dir / "Saved"
         
         # Konfigurációs fájlok frissítése szerver létrehozásakor
         from app.services.ark_config_service import update_config_from_server_settings
@@ -408,7 +413,7 @@ async def create_server(
         rcon_port_value = server_instance.rcon_port if server_instance.rcon_port else 27015
         
         update_config_from_server_settings(
-            server_path=server_path,
+            server_path=serverfiles_link,  # A ServerFiles symlink-et adjuk át
             session_name=name,  # A szerver név lesz a session name
             max_players=max_players,
             rcon_enabled=True,  # Alapértelmezett: engedélyezve
@@ -416,11 +421,10 @@ async def create_server(
         )
         
         # Docker Compose fájl létrehozása szerver létrehozásakor (mindig, még akkor is, ha Docker nem elérhető)
-        from app.services.server_control_service import get_server_dedicated_saved_path, create_docker_compose_file
+        from app.services.server_control_service import create_docker_compose_file
         try:
-            saved_path = get_server_dedicated_saved_path(server_path)
-            if saved_path and saved_path.exists():
-                create_docker_compose_file(server_instance, server_path, saved_path)
+            if saved_path.exists():
+                create_docker_compose_file(server_instance, serverfiles_link, saved_path)
                 print(f"Docker Compose fájl létrehozva szerver létrehozásakor: {server_instance.id}")
             else:
                 print(f"Figyelmeztetés: Saved mappa nem található: {saved_path}")
@@ -777,21 +781,25 @@ async def edit_server(
     print(f"DEBUG: AUTO_BACKUP_INTERVAL commit után: {server.config.get('AUTO_BACKUP_INTERVAL')}")
     
     # Konfigurációs fájlok frissítése
-    if server_path and (server_path.exists() or server_path.is_symlink()):
-        # RCON port beállítása - alapértelmezett 27015 (Ark alapértelmezett RCON port), vagy a szerver rcon_port értéke
-        rcon_port_value = server.rcon_port if server.rcon_port else 27015
-        
-        update_config_from_server_settings(
-            server_path=server_path,
-            session_name=session_name or server_config.get("SESSION_NAME"),
-            server_admin_password=server_admin_password if server_admin_password and server_admin_password.strip() else None,
-            server_password=server_password if server_password is not None else None,
-            max_players=server.max_players,
-            rcon_enabled=rcon_enabled == "true" if rcon_enabled else server_config.get("RCON_ENABLED", True),
-            rcon_port=rcon_port_value,
-            motd=motd or server_config.get("MOTD"),
-            motd_duration=motd_duration if motd_duration is not None else server_config.get("MOTD_DURATION")
-        )
+    if server_path and server_path.exists():
+        # Új struktúra: server_path most már a Servers/server_{server_id}/ mappa
+        # A ServerFiles symlink: server_path / "ServerFiles"
+        serverfiles_link = server_path / "ServerFiles"
+        if serverfiles_link.exists() and serverfiles_link.is_symlink():
+            # RCON port beállítása - alapértelmezett 27015 (Ark alapértelmezett RCON port), vagy a szerver rcon_port értéke
+            rcon_port_value = server.rcon_port if server.rcon_port else 27015
+            
+            update_config_from_server_settings(
+                server_path=serverfiles_link,  # A ServerFiles symlink-et adjuk át
+                session_name=session_name or server_config.get("SESSION_NAME"),
+                server_admin_password=server_admin_password if server_admin_password and server_admin_password.strip() else None,
+                server_password=server_password if server_password is not None else None,
+                max_players=server.max_players,
+                rcon_enabled=rcon_enabled == "true" if rcon_enabled else server_config.get("RCON_ENABLED", True),
+                rcon_port=rcon_port_value,
+                motd=motd or server_config.get("MOTD"),
+                motd_duration=motd_duration if motd_duration is not None else server_config.get("MOTD_DURATION")
+            )
     
     return RedirectResponse(
         url=f"/ark/servers?success=Szerver+módosítva",

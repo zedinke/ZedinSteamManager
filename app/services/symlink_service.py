@@ -13,7 +13,7 @@ from app.database import ArkServerFiles, SessionLocal
 
 def get_user_serverfiles_path(user_id: int) -> Path:
     """
-    Felhasználó serverfiles mappa útvonala
+    Felhasználó serverfiles mappa útvonala (régi struktúra, kompatibilitás)
     
     Args:
         user_id: User ID (Server Admin)
@@ -25,26 +25,39 @@ def get_user_serverfiles_path(user_id: int) -> Path:
     user_serverfiles_path = base_path / f"user_{user_id}"
     return user_serverfiles_path
 
+def get_servers_base_path() -> Path:
+    """
+    Servers mappa alap útvonala (új struktúra)
+    
+    Returns:
+        Path objektum a Servers mappához
+    """
+    if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
+        base_dir = Path(settings.ark_serverfiles_base).parent
+    else:
+        base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
+    
+    servers_base = base_dir / "Servers"
+    return servers_base
+
 def get_server_path(server_id: Optional[int], cluster_id: Optional[str] = None, user_id: Optional[int] = None) -> Path:
     """
-    Szerver útvonal generálása (user serverfiles mappában)
+    Szerver útvonal generálása (új struktúra: Servers/server_{server_id}/)
     
     Args:
         server_id: Szerver ID
         cluster_id: Cluster ID (opcionális, csak kompatibilitás miatt)
-        user_id: User ID (ha nincs megadva, akkor None-t ad vissza)
+        user_id: User ID (opcionális, új struktúrában nem használjuk)
     
     Returns:
         Path objektum a szerver útvonalához
     """
-    if not user_id:
-        # Ha nincs user_id, akkor None-t adunk vissza
-        # A hívó felelőssége, hogy megadja a user_id-t
+    if not server_id:
         return None
     
-    # User serverfiles mappa
-    user_serverfiles = get_user_serverfiles_path(user_id)
-    server_path = user_serverfiles / f"server_{server_id}"
+    # Új struktúra: Servers/server_{server_id}/
+    servers_base = get_servers_base_path()
+    server_path = servers_base / f"server_{server_id}"
     
     return server_path
 
@@ -120,12 +133,9 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
             if not install_path.exists():
                 return None
         
-        # Felhasználó serverfiles mappa létrehozása
-        user_serverfiles = get_user_serverfiles_path(server_instance.server_admin_id)
-        user_serverfiles.mkdir(parents=True, exist_ok=True)
-        
-        # Szerver útvonal a felhasználó serverfiles mappában
-        server_path = user_serverfiles / f"server_{server_id}"
+        # Új struktúra: Servers/server_{server_id}/
+        servers_base = get_servers_base_path()
+        server_path = servers_base / f"server_{server_id}"
         
         # Szülő könyvtárak létrehozása
         server_path.parent.mkdir(parents=True, exist_ok=True)
@@ -137,16 +147,27 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
             else:
                 shutil.rmtree(server_path)
         
-        # Symlink létrehozása az aktív Ark fájlokhoz
-        server_path.symlink_to(install_path)
+        # Szerver mappa létrehozása
+        server_path.mkdir(parents=True, exist_ok=True)
+        
+        # ServerFiles symlink létrehozása az aktív Ark fájlokhoz
+        serverfiles_link = server_path / "ServerFiles"
+        if serverfiles_link.exists() or serverfiles_link.is_symlink():
+            if serverfiles_link.is_symlink():
+                serverfiles_link.unlink()
+            else:
+                shutil.rmtree(serverfiles_link)
+        serverfiles_link.symlink_to(install_path)
         
         # Dedikált Saved mappa létrehozása és symlink
-        create_dedicated_saved_folder(server_path)
+        # A server_path most már a Servers/server_{server_id}/ mappa
+        # A Saved mappa közvetlenül ebben lesz: Servers/server_{server_id}/Saved/
+        create_dedicated_saved_folder(serverfiles_link)  # A symlink-et adjuk át, hogy a Saved symlink a helyes helyre kerüljön
         
         # Alapértelmezett konfigurációs fájlok másolása
-        copy_default_config_files(server_path)
+        copy_default_config_files(serverfiles_link)
         
-        return server_path
+        return serverfiles_link  # Visszaadjuk a ServerFiles symlink-et, hogy kompatibilis maradjon
     finally:
         if should_close:
             db.close()
@@ -172,55 +193,40 @@ def remove_server_symlink(server_id: int, cluster_id: Optional[str] = None) -> b
             if not server_instance:
                 return False
             
-            # User serverfiles mappa használata
-            user_serverfiles = get_user_serverfiles_path(server_instance.server_admin_id)
-            server_path = user_serverfiles / f"server_{server_id}"
+            # Új struktúra: Servers/server_{server_id}/
+            servers_base = get_servers_base_path()
+            server_path = servers_base / f"server_{server_id}"
         finally:
             db.close()
         
-        # Symlink törlése
-        if server_path.exists() or server_path.is_symlink():
-            # Saved symlink törlése (ha létezik)
-            real_saved_path = get_server_saved_path(server_path)
-            if real_saved_path.exists() and real_saved_path.is_symlink():
-                try:
-                    real_saved_path.unlink()
-                    print(f"Saved symlink törölve: {real_saved_path}")
-                except Exception as e:
-                    print(f"Figyelmeztetés: Saved symlink törlése sikertelen: {e}")
+        # Új struktúra: Servers/server_{server_id}/ teljes mappa törlése
+        if server_path.exists():
+            # Saved symlink törlése (ha létezik) - a ServerFiles symlink mögött
+            serverfiles_link = server_path / "ServerFiles"
+            if serverfiles_link.exists() and serverfiles_link.is_symlink():
+                real_saved_path = get_server_saved_path(serverfiles_link)
+                if real_saved_path.exists() and real_saved_path.is_symlink():
+                    try:
+                        real_saved_path.unlink()
+                        print(f"Saved symlink törölve: {real_saved_path}")
+                    except Exception as e:
+                        print(f"Figyelmeztetés: Saved symlink törlése sikertelen: {e}")
+                
+                # Config symlink törlése (ha létezik)
+                real_config_path = get_server_config_path(serverfiles_link)
+                if real_config_path.exists() and real_config_path.is_symlink():
+                    try:
+                        real_config_path.unlink()
+                        print(f"Config symlink törölve: {real_config_path}")
+                    except Exception as e:
+                        print(f"Figyelmeztetés: Config symlink törlése sikertelen: {e}")
             
-            # Dedikált Saved mappa törlése
-            dedicated_saved_path = get_server_dedicated_saved_path(server_path)
-            if dedicated_saved_path.exists():
-                try:
-                    shutil.rmtree(dedicated_saved_path)
-                    print(f"Dedikált Saved mappa törölve: {dedicated_saved_path}")
-                except Exception as e:
-                    print(f"Figyelmeztetés: Dedikált Saved mappa törlése sikertelen: {e}")
-            
-            # Dedikált config mappa törlése
-            dedicated_config_path = get_server_dedicated_config_path(server_path)
-            if dedicated_config_path.exists():
-                try:
-                    shutil.rmtree(dedicated_config_path)
-                    print(f"Dedikált config mappa törölve: {dedicated_config_path}")
-                except Exception as e:
-                    print(f"Figyelmeztetés: Dedikált config mappa törlése sikertelen: {e}")
-            
-            # Config symlink törlése (ha létezik)
-            real_config_path = get_server_config_path(server_path)
-            if real_config_path.exists() and real_config_path.is_symlink():
-                try:
-                    real_config_path.unlink()
-                    print(f"Config symlink törölve: {real_config_path}")
-                except Exception as e:
-                    print(f"Figyelmeztetés: Config symlink törlése sikertelen: {e}")
-            
-            # Szerver symlink törlése
-            if server_path.is_symlink():
-                server_path.unlink()
-            else:
+            # Teljes szerver mappa törlése (Saved, ServerFiles symlink, stb. mind benne van)
+            try:
                 shutil.rmtree(server_path)
+                print(f"Szerver mappa törölve: {server_path}")
+            except Exception as e:
+                print(f"Figyelmeztetés: Szerver mappa törlése sikertelen: {e}")
             return True
         
         return False
@@ -256,18 +262,26 @@ def get_server_dedicated_config_path(server_path: Path) -> Path:
 
 def get_server_dedicated_saved_path(server_path: Path) -> Path:
     """
-    Szerver dedikált Saved mappa útvonala (külön a symlink-től)
+    Szerver dedikált Saved mappa útvonala (új struktúra: Servers/server_{server_id}/Saved/)
     Ez a mappa minden szerverhez külön van, nem osztott
     
     Args:
-        server_path: Szerver útvonal (symlink)
+        server_path: Szerver útvonal (ServerFiles symlink vagy szerver mappa)
     
     Returns:
         Path objektum a dedikált Saved mappához
     """
-    # A dedikált Saved mappa a symlink mappájában van, de külön mappaként
-    # Példa: user_1/server_5 -> user_1/server_5_saved
-    dedicated_saved_path = server_path.parent / f"{server_path.name}_saved"
+    # Új struktúra: 
+    # Ha server_path egy symlink (ServerFiles), akkor a parent a szerver mappa
+    # Ha server_path egy mappa (Servers/server_{server_id}/), akkor közvetlenül használjuk
+    if server_path.is_symlink() or server_path.name == "ServerFiles":
+        # ServerFiles symlink esetén: Servers/server_{server_id}/ServerFiles -> Servers/server_{server_id}/Saved/
+        server_dir = server_path.parent
+    else:
+        # Ha már a szerver mappa: Servers/server_{server_id}/ -> Servers/server_{server_id}/Saved/
+        server_dir = server_path
+    
+    dedicated_saved_path = server_dir / "Saved"
     return dedicated_saved_path
 
 def get_server_saved_path(server_path: Path) -> Path:
@@ -287,20 +301,21 @@ def get_server_saved_path(server_path: Path) -> Path:
         real_server_path = server_path
     return real_server_path / "ShooterGame" / "Saved"
 
-def create_dedicated_saved_folder(server_path: Path) -> bool:
+def create_dedicated_saved_folder(serverfiles_link: Path) -> bool:
     """
     Dedikált Saved mappa létrehozása és symlink beállítása
-    Minden szervernek külön Saved mappája van
+    Új struktúra: Servers/server_{server_id}/Saved/
     
     Args:
-        server_path: Szerver útvonal (symlink)
+        serverfiles_link: ServerFiles symlink útvonala (Servers/server_{server_id}/ServerFiles)
     
     Returns:
         True ha sikeres, False egyébként
     """
     try:
-        # Dedikált Saved mappa útvonala
-        dedicated_saved_path = get_server_dedicated_saved_path(server_path)
+        # Új struktúra: Servers/server_{server_id}/Saved/
+        server_dir = serverfiles_link.parent  # Servers/server_{server_id}/
+        dedicated_saved_path = server_dir / "Saved"
         
         # Ha már létezik a dedikált Saved mappa, ne töröljük (megtartjuk a meglévő adatokat)
         if not dedicated_saved_path.exists():
@@ -317,8 +332,8 @@ def create_dedicated_saved_folder(server_path: Path) -> bool:
         else:
             print(f"Dedikált Saved mappa már létezik, megtartjuk a meglévő adatokat: {dedicated_saved_path}")
         
-        # Tényleges szerver Saved mappa útvonala
-        real_saved_path = get_server_saved_path(server_path)
+        # Tényleges szerver Saved mappa útvonala (a ServerFiles symlink mögött)
+        real_saved_path = get_server_saved_path(serverfiles_link)
         real_saved_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Ha már létezik Saved mappa vagy symlink, töröljük
@@ -349,13 +364,13 @@ def get_default_config_path() -> Path:
     """Alapértelmezett konfigurációs fájlok útvonala"""
     return Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended/defaults")
 
-def copy_default_config_files(server_path: Path) -> bool:
+def copy_default_config_files(serverfiles_link: Path) -> bool:
     """
     Alapértelmezett konfigurációs fájlok másolása a szerverhez
-    Minden szervernek külön config mappája van, hogy ne osztozzanak konfigon
+    Új struktúra: Servers/server_{server_id}/Saved/Config/WindowsServer/
     
     Args:
-        server_path: Szerver útvonal (symlink)
+        serverfiles_link: ServerFiles symlink útvonala (Servers/server_{server_id}/ServerFiles)
     
     Returns:
         True ha sikeres, False egyébként
@@ -368,8 +383,9 @@ def copy_default_config_files(server_path: Path) -> bool:
             print(f"Figyelmeztetés: Alapértelmezett config mappa nem található: {default_config_path}")
             return False
         
-        # A config mappa a dedikált Saved mappában van
-        dedicated_saved_path = get_server_dedicated_saved_path(server_path)
+        # Új struktúra: Servers/server_{server_id}/Saved/Config/WindowsServer/
+        server_dir = serverfiles_link.parent  # Servers/server_{server_id}/
+        dedicated_saved_path = server_dir / "Saved"
         dedicated_config_in_saved = dedicated_saved_path / "Config" / "WindowsServer"
         
         # Ha már létezik a dedikált Saved mappa és van benne config, ne másoljuk újra (megtartjuk a meglévő beállításokat)
@@ -403,13 +419,9 @@ def copy_default_config_files(server_path: Path) -> bool:
         # Mindig létrehozzuk/frissítjük a symlink-et a dedikált config mappából a tényleges szerver config mappájába
         # A config mappa a dedikált Saved mappában van (dedicated_saved_path/Config/WindowsServer)
         # De a tényleges szerver Saved mappája symlink, szóval a config mappa is a symlink mögött lesz
-        real_saved_path = get_server_saved_path(server_path)
+        real_saved_path = get_server_saved_path(serverfiles_link)
         real_config_path = real_saved_path / "Config" / "WindowsServer"
         real_config_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # A dedikált config mappa a dedikált Saved mappában van
-        dedicated_saved_path = get_server_dedicated_saved_path(server_path)
-        dedicated_config_in_saved = dedicated_saved_path / "Config" / "WindowsServer"
         
         # Ha már létezik config mappa vagy symlink, töröljük
         if real_config_path.exists() or real_config_path.is_symlink():
@@ -423,21 +435,6 @@ def copy_default_config_files(server_path: Path) -> bool:
                         shutil.rmtree(item)
                     else:
                         item.unlink()
-        
-        # Config fájlok másolása a dedikált Saved mappába
-        if default_config_path.is_dir():
-            # Rekurzív másolás a defaults mappából a dedikált Saved mappába
-            for item in default_config_path.iterdir():
-                dest_item = dedicated_config_in_saved / item.name
-                
-                if item.is_dir():
-                    # Mappa másolása
-                    if dest_item.exists():
-                        shutil.rmtree(dest_item)
-                    shutil.copytree(item, dest_item)
-                else:
-                    # Fájl másolása
-                    shutil.copy2(item, dest_item)
         
         # Symlink létrehozása: a tényleges szerver config mappája -> dedikált Saved mappában lévő config mappa
         real_config_path.symlink_to(dedicated_config_in_saved)

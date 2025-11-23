@@ -106,44 +106,36 @@ def get_docker_compose_cmd() -> Optional[str]:
 
 def get_instance_dir(server: ServerInstance) -> Path:
     """
-    Instance mappa útvonala (ahol a docker-compose fájl van)
+    Instance mappa útvonala (új struktúra: Servers/server_{server_id}/)
+    A docker-compose.yaml közvetlenül a szerver mappájában van
     
     Args:
         server: ServerInstance objektum
     
     Returns:
-        Path objektum az instance mappához
+        Path objektum a szerver mappához (ahol a docker-compose.yaml van)
     """
-    # A POK Manager script szerint: Instance_{instance_name}
-    # Mi a szerver ID-t használjuk instance name-ként
-    # A BASE_DIR a ServerFiles mappa szülő mappája
-    # Példa: ark_serverfiles_base = /home/ai_developer/ZedinSteamManager/Server/ArkAscended/ServerFiles
-    # BASE_DIR = /home/ai_developer/ZedinSteamManager/Server/ArkAscended
-    if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
-        base_dir = Path(settings.ark_serverfiles_base).parent
-    else:
-        base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
-    
-    instance_dir = base_dir / f"Instance_{server.id}"
+    # Új struktúra: Servers/server_{server_id}/
+    from app.services.symlink_service import get_servers_base_path
+    servers_base = get_servers_base_path()
+    instance_dir = servers_base / f"server_{server.id}"
     logger.info(f"Instance mappa útvonal: {instance_dir}")
     return instance_dir
 
 def get_instance_dir_by_id(server_id: int) -> Path:
     """
     Instance mappa útvonala szerver ID alapján (törléshez)
+    Új struktúra: Servers/server_{server_id}/
     
     Args:
         server_id: Szerver ID
     
     Returns:
-        Path objektum az instance mappához
+        Path objektum a szerver mappához
     """
-    if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
-        base_dir = Path(settings.ark_serverfiles_base).parent
-    else:
-        base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
-    
-    instance_dir = base_dir / f"Instance_{server_id}"
+    from app.services.symlink_service import get_servers_base_path
+    servers_base = get_servers_base_path()
+    instance_dir = servers_base / f"server_{server_id}"
     return instance_dir
 
 def remove_instance_dir(server_id: int) -> bool:
@@ -175,7 +167,7 @@ def remove_instance_dir(server_id: int) -> bool:
 
 def get_docker_compose_file(server: ServerInstance) -> Path:
     """
-    Docker Compose fájl útvonala
+    Docker Compose fájl útvonala (új struktúra: Servers/server_{server_id}/docker-compose.yaml)
     
     Args:
         server: ServerInstance objektum
@@ -184,32 +176,23 @@ def get_docker_compose_file(server: ServerInstance) -> Path:
         Path objektum a docker-compose fájlhoz
     """
     instance_dir = get_instance_dir(server)
-    return instance_dir / f"docker-compose-{server.id}.yaml"
+    return instance_dir / "docker-compose.yaml"
 
-def create_docker_compose_file(server: ServerInstance, server_path: Path, saved_path: Path) -> bool:
+def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, saved_path: Path) -> bool:
     """
-    Docker Compose fájl létrehozása
+    Docker Compose fájl létrehozása (új struktúra: Servers/server_{server_id}/docker-compose.yaml)
     
     Args:
         server: ServerInstance objektum
-        server_path: Szerver útvonal (symlink vagy valós mappa)
-        saved_path: Dedikált Saved mappa útvonala
+        serverfiles_link: ServerFiles symlink útvonala (Servers/server_{server_id}/ServerFiles)
+        saved_path: Dedikált Saved mappa útvonala (Servers/server_{server_id}/Saved/)
     
     Returns:
         True ha sikeres, False egyébként
     """
     try:
-        instance_dir = get_instance_dir(server)
+        instance_dir = get_instance_dir(server)  # Servers/server_{server_id}/
         instance_dir.mkdir(parents=True, exist_ok=True)
-        
-        # A POK Manager script szerint az Instance_{server_id}/Saved mappa NEM kell,
-        # mert a Saved mappa a dedikált Saved mappában van (user_{user_id}/server_{server_id}_saved)
-        # A Docker Compose fájlban a saved_path-et közvetlenül használjuk
-        # DE: a POK Manager script létrehozza az Instance_{server_id}/Saved mappát, szóval mi is
-        # (bár valójában nem használjuk, de kompatibilitás miatt létrehozzuk)
-        saved_dir = instance_dir / "Saved"
-        if not saved_dir.exists():
-            saved_dir.mkdir(parents=True, exist_ok=True)
         
         # Ha a saved_path egy symlink, követjük
         if saved_path.is_symlink():
@@ -218,11 +201,11 @@ def create_docker_compose_file(server: ServerInstance, server_path: Path, saved_
             except Exception as e:
                 logger.warning(f"Symlink követése sikertelen: {e}")
         
-        # Ha a server_path egy symlink, követjük
-        real_server_path = server_path
-        if server_path.is_symlink():
+        # Ha a serverfiles_link egy symlink, követjük
+        real_server_path = serverfiles_link
+        if serverfiles_link.is_symlink():
             try:
-                real_server_path = server_path.resolve()
+                real_server_path = serverfiles_link.resolve()
             except Exception as e:
                 logger.warning(f"Symlink követése sikertelen: {e}")
         
@@ -254,6 +237,7 @@ def create_docker_compose_file(server: ServerInstance, server_path: Path, saved_
                         f'{real_server_path}:/home/pok/arkserver',
                         f'{saved_path}:/home/pok/arkserver/ShooterGame/Saved',
                     ],
+                    'working_dir': '/home/pok/arkserver',
                     'environment': [
                         f'INSTANCE_NAME={server.id}',
                         f'MAP_NAME={config.get("MAP_NAME", "TheIsland")}',
@@ -349,42 +333,53 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         except Exception as e:
             logger.warning(f"Docker ps hiba: {e}")
         
-        # Szerver útvonal lekérése
+        # Szerver útvonal lekérése (új struktúra: Servers/server_{server_id}/)
         if server.server_path:
+            # Ha server_path van az adatbázisban, ellenőrizzük, hogy az új struktúrában van-e
             server_path = Path(server.server_path)
+            # Ha a régi struktúrában van (user_X/server_Y), akkor az új struktúrára konvertáljuk
+            if "user_" in str(server_path) or not server_path.exists():
+                from app.services.symlink_service import get_servers_base_path
+                servers_base = get_servers_base_path()
+                server_path = servers_base / f"server_{server.id}"
         else:
-            from app.database import Cluster
-            cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first() if server.cluster_id else None
-            cluster_id_str = cluster.cluster_id if cluster else None
-            server_path = get_server_path(server.id, cluster_id_str, server.server_admin_id)
+            from app.services.symlink_service import get_servers_base_path
+            servers_base = get_servers_base_path()
+            server_path = servers_base / f"server_{server.id}"
         
         if not server_path or not server_path.exists():
             return {
                 "success": False,
-                "message": "Szerver útvonal nem található"
+                "message": f"Szerver útvonal nem található: {server_path}"
             }
         
-        # Saved mappa útvonala
-        # A get_server_dedicated_saved_path egy server_path-et vár, nem server_id-t
-        # Szóval először meg kell találnunk a server_path-et
-        saved_path = get_server_dedicated_saved_path(server_path)
+        # ServerFiles symlink útvonala (új struktúra: Servers/server_{server_id}/ServerFiles)
+        serverfiles_link = server_path / "ServerFiles"
+        if not serverfiles_link.exists() or not serverfiles_link.is_symlink():
+            return {
+                "success": False,
+                "message": f"ServerFiles symlink nem található: {serverfiles_link}"
+            }
+        
+        # Saved mappa útvonala (új struktúra: Servers/server_{server_id}/Saved/)
+        saved_path = server_path / "Saved"
         if not saved_path or not saved_path.exists():
             return {
                 "success": False,
-                "message": "Saved mappa nem található"
+                "message": f"Saved mappa nem található: {saved_path}"
             }
         
         # Docker Compose fájl létrehozása/frissítése
         compose_file = get_docker_compose_file(server)
         if not compose_file.exists():
-            if not create_docker_compose_file(server, server_path, saved_path):
+            if not create_docker_compose_file(server, serverfiles_link, saved_path):
                 return {
                     "success": False,
                     "message": "Docker Compose fájl létrehozása sikertelen"
                 }
         else:
             # Ha létezik, frissítjük
-            create_docker_compose_file(server, server_path, saved_path)
+            create_docker_compose_file(server, serverfiles_link, saved_path)
         
         # Docker Compose indítás
         compose_cmd = docker_compose_cmd.split() + ["-f", str(compose_file), "up", "-d"]

@@ -66,15 +66,26 @@ async def show_backup(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
-    # Szerver útvonal
+    # Szerver útvonal (új struktúra: Servers/server_{server_id}/)
     if server.server_path:
-        server_path = Path(server.server_path)
+        server_dir = Path(server.server_path)
+        # Ha régi struktúrában van (user_X/server_Y), akkor az új struktúrára konvertáljuk
+        if "user_" in str(server_dir) or not server_dir.exists():
+            from app.services.symlink_service import get_servers_base_path
+            servers_base = get_servers_base_path()
+            server_dir = servers_base / f"server_{server.id}"
     else:
-        from app.database import Cluster
-        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
-        if not cluster:
-            raise HTTPException(status_code=404, detail="Cluster nem található")
-        server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
+        from app.services.symlink_service import get_servers_base_path
+        servers_base = get_servers_base_path()
+        server_dir = servers_base / f"server_{server.id}"
+    
+    # ServerFiles symlink útvonala (backup service-ek ezt várják)
+    serverfiles_link = server_dir / "ServerFiles"
+    if not serverfiles_link.exists():
+        # Ha nincs ServerFiles symlink, akkor a szerver mappát használjuk
+        server_path = server_dir
+    else:
+        server_path = serverfiles_link
     
     # Backup lista
     backups = list_backups(server_path)
@@ -162,15 +173,21 @@ async def create_backup_endpoint(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
-    # Szerver útvonal
+    # Szerver útvonal (új struktúra: Servers/server_{server_id}/)
     if server.server_path:
-        server_path = Path(server.server_path)
+        server_dir = Path(server.server_path)
+        if "user_" in str(server_dir) or not server_dir.exists():
+            from app.services.symlink_service import get_servers_base_path
+            servers_base = get_servers_base_path()
+            server_dir = servers_base / f"server_{server.id}"
     else:
-        from app.database import Cluster
-        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
-        if not cluster:
-            raise HTTPException(status_code=404, detail="Cluster nem található")
-        server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
+        from app.services.symlink_service import get_servers_base_path
+        servers_base = get_servers_base_path()
+        server_dir = servers_base / f"server_{server.id}"
+    
+    # ServerFiles symlink útvonala
+    serverfiles_link = server_dir / "ServerFiles"
+    server_path = serverfiles_link if serverfiles_link.exists() else server_dir
     
     # Backup készítése
     backup_file = create_backup(server_path)
@@ -207,15 +224,21 @@ async def download_backup(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
-    # Szerver útvonal
+    # Szerver útvonal (új struktúra: Servers/server_{server_id}/)
     if server.server_path:
-        server_path = Path(server.server_path)
+        server_dir = Path(server.server_path)
+        if "user_" in str(server_dir) or not server_dir.exists():
+            from app.services.symlink_service import get_servers_base_path
+            servers_base = get_servers_base_path()
+            server_dir = servers_base / f"server_{server.id}"
     else:
-        from app.database import Cluster
-        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
-        if not cluster:
-            raise HTTPException(status_code=404, detail="Cluster nem található")
-        server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
+        from app.services.symlink_service import get_servers_base_path
+        servers_base = get_servers_base_path()
+        server_dir = servers_base / f"server_{server.id}"
+    
+    # ServerFiles symlink útvonala
+    serverfiles_link = server_dir / "ServerFiles"
+    server_path = serverfiles_link if serverfiles_link.exists() else server_dir
     
     # Backup fájl
     backup_dir = get_server_backup_path(server_path)
@@ -270,15 +293,21 @@ async def upload_backup_endpoint(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
-    # Szerver útvonal
+    # Szerver útvonal (új struktúra: Servers/server_{server_id}/)
     if server.server_path:
-        server_path = Path(server.server_path)
+        server_dir = Path(server.server_path)
+        if "user_" in str(server_dir) or not server_dir.exists():
+            from app.services.symlink_service import get_servers_base_path
+            servers_base = get_servers_base_path()
+            server_dir = servers_base / f"server_{server.id}"
     else:
-        from app.database import Cluster
-        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
-        if not cluster:
-            raise HTTPException(status_code=404, detail="Cluster nem található")
-        server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
+        from app.services.symlink_service import get_servers_base_path
+        servers_base = get_servers_base_path()
+        server_dir = servers_base / f"server_{server.id}"
+    
+    # ServerFiles symlink útvonala
+    serverfiles_link = server_dir / "ServerFiles"
+    server_path = serverfiles_link if serverfiles_link.exists() else server_dir
     
     # Fájl ellenőrzése
     if not file.filename:
@@ -330,15 +359,21 @@ async def restore_backup_endpoint(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
-    # Szerver útvonal
+    # Szerver útvonal (új struktúra: Servers/server_{server_id}/)
     if server.server_path:
-        server_path = Path(server.server_path)
+        server_dir = Path(server.server_path)
+        if "user_" in str(server_dir) or not server_dir.exists():
+            from app.services.symlink_service import get_servers_base_path
+            servers_base = get_servers_base_path()
+            server_dir = servers_base / f"server_{server.id}"
     else:
-        from app.database import Cluster
-        cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
-        if not cluster:
-            raise HTTPException(status_code=404, detail="Cluster nem található")
-        server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
+        from app.services.symlink_service import get_servers_base_path
+        servers_base = get_servers_base_path()
+        server_dir = servers_base / f"server_{server.id}"
+    
+    # ServerFiles symlink útvonala
+    serverfiles_link = server_dir / "ServerFiles"
+    server_path = serverfiles_link if serverfiles_link.exists() else server_dir
     
     # Backup visszaállítása
     success = restore_backup(server_path, backup_name)

@@ -15,17 +15,26 @@ from app.config import settings
 
 def get_server_backup_path(server_path: Path) -> Path:
     """
-    Szerver backup mappa útvonala (Saved mappán kívül)
+    Szerver backup mappa útvonala (új struktúra: Servers/server_{server_id}/Backups/)
     
     Args:
-        server_path: Szerver útvonal (symlink)
+        server_path: Szerver útvonal (ServerFiles symlink vagy szerver mappa)
     
     Returns:
         Path objektum a backup mappához
     """
-    # Backup mappa a szerver mappájában, de Saved mappán kívül
-    # Példa: user_1/server_5 -> user_1/server_5_backups
-    backup_path = server_path.parent / f"{server_path.name}_backups"
+    # Új struktúra: 
+    # Ha server_path egy symlink (ServerFiles), akkor a parent a szerver mappa
+    # Ha server_path egy mappa (Servers/server_{server_id}/), akkor közvetlenül használjuk
+    if server_path.is_symlink() or server_path.name == "ServerFiles":
+        # ServerFiles symlink esetén: Servers/server_{server_id}/ServerFiles -> Servers/server_{server_id}/Backups/
+        server_dir = server_path.parent
+    else:
+        # Ha már a szerver mappa: Servers/server_{server_id}/ -> Servers/server_{server_id}/Backups/
+        server_dir = server_path
+    
+    # Backup mappa a szerver mappájában: Servers/server_{server_id}/Backups/
+    backup_path = server_dir / "Backups"
     return backup_path
 
 def create_backup(server_path: Path, backup_name: Optional[str] = None) -> Optional[Path]:
