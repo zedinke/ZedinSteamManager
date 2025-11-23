@@ -491,6 +491,7 @@ def update_config_from_server_settings(
     server_password: Optional[str] = None,
     max_players: Optional[int] = None,
     rcon_enabled: Optional[bool] = None,
+    rcon_port: Optional[int] = None,
     motd: Optional[str] = None,
     motd_duration: Optional[int] = None
 ) -> bool:
@@ -504,6 +505,7 @@ def update_config_from_server_settings(
         server_password: Szerver jelszó
         max_players: Maximum játékosok száma
         rcon_enabled: RCON engedélyezve
+        rcon_port: RCON port száma
         motd: MOTD üzenet
         motd_duration: MOTD időtartam másodpercben
     
@@ -545,6 +547,9 @@ def update_config_from_server_settings(
         
         if rcon_enabled is not None:
             config_data["ServerSettings"]["RCONEnabled"] = rcon_enabled
+        
+        if rcon_port is not None:
+            config_data["ServerSettings"]["RCONPort"] = rcon_port
         
         if motd is not None:
             if motd.strip():

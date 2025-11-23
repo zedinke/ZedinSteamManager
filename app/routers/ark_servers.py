@@ -679,6 +679,9 @@ async def edit_server(
     
     # Konfigurációs fájlok frissítése
     if server_path and (server_path.exists() or server_path.is_symlink()):
+        # RCON port beállítása - alapértelmezett 27015, vagy a szerver rcon_port értéke
+        rcon_port_value = server.rcon_port if server.rcon_port else 27015
+        
         update_config_from_server_settings(
             server_path=server_path,
             session_name=session_name or server_config.get("SESSION_NAME"),
@@ -686,6 +689,7 @@ async def edit_server(
             server_password=server_password if server_password is not None else None,
             max_players=server.max_players,
             rcon_enabled=rcon_enabled == "true" if rcon_enabled else server_config.get("RCON_ENABLED", True),
+            rcon_port=rcon_port_value,
             motd=motd or server_config.get("MOTD"),
             motd_duration=motd_duration if motd_duration is not None else server_config.get("MOTD_DURATION")
         )
