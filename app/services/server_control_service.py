@@ -355,6 +355,29 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             memory_limit_mb = total_ram_gb * 1024
             compose_data['services']['asaserver']['mem_limit'] = f'{memory_limit_mb}M'
         
+        # Debug információk
+        logger.info(f"Docker Compose fájl generálása:")
+        logger.info(f"  - ServerFiles path: {real_server_path} (exists: {real_server_path.exists()})")
+        logger.info(f"  - Saved path: {saved_path} (exists: {saved_path.exists()})")
+        logger.info(f"  - Container work dir: {container_work_dir}")
+        logger.info(f"  - Container saved path: {container_saved_path}")
+        logger.info(f"  - Docker image: {docker_image}")
+        
+        # Ellenőrizzük, hogy a szerverfájlok léteznek-e
+        if not real_server_path.exists():
+            logger.warning(f"ServerFiles útvonal nem létezik: {real_server_path}")
+        else:
+            # Ellenőrizzük, hogy van-e ShooterGame mappa
+            shooter_game_path = real_server_path / "ShooterGame"
+            if not shooter_game_path.exists():
+                logger.warning(f"ShooterGame mappa nem létezik: {shooter_game_path}")
+            else:
+                binary_path = shooter_game_path / "Binaries" / "Linux" / "ShooterGameServer"
+                if not binary_path.exists():
+                    logger.warning(f"ShooterGameServer bináris nem létezik: {binary_path}")
+                else:
+                    logger.info(f"ShooterGameServer bináris megtalálva: {binary_path}")
+        
         # YAML fájl írása
         with open(compose_file, 'w') as f:
             yaml.dump(compose_data, f, default_flow_style=False, sort_keys=False)
@@ -532,9 +555,32 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 log_output = log_result.stdout or log_result.stderr or "Nincs log kimenet"
                 logger.error(f"Konténer {container_name} logok:\n{log_output}")
                 
+                # Konténer státusz ellenőrzése
+                inspect_result = subprocess.run(
+                    ["docker", "inspect", "--format", "{{.State.Status}}", container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                container_status = inspect_result.stdout.strip() if inspect_result.returncode == 0 else "ismeretlen"
+                
+                # Exit code ellenőrzése
+                exit_code_result = subprocess.run(
+                    ["docker", "inspect", "--format", "{{.State.ExitCode}}", container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                exit_code = exit_code_result.stdout.strip() if exit_code_result.returncode == 0 else "ismeretlen"
+                
+                error_msg = f"A konténer elindult, de azonnal leállt.\n"
+                error_msg += f"Státusz: {container_status}\n"
+                error_msg += f"Kilépési kód: {exit_code}\n"
+                error_msg += f"Logok (utolsó 500 karakter):\n{log_output[-500:]}"
+                
                 return {
                     "success": False,
-                    "message": f"A konténer elindult, de azonnal leállt. Logok: {log_output[:500]}"
+                    "message": error_msg
                 }
             else:
                 return {

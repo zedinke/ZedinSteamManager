@@ -1,7 +1,8 @@
 #!/bin/bash
 # ZedinArkManager - ARK Server Entrypoint Script
 
-set -e
+# set -e kikapcsolva, hogy jobban kezeljük a hibákat
+set +e
 
 ARK_SERVER_DIR="${ARK_SERVER_DIR:-/home/zedin/arkserver}"
 STEAMCMD_DIR="${STEAMCMD_DIR:-/home/zedin/steamcmd}"
@@ -55,11 +56,32 @@ fi
 if [ ! -f "${SERVER_BINARY}" ]; then
     echo "HIBA: ARK szerver bináris nem található: ${SERVER_BINARY}"
     echo "Ellenőrizd, hogy a szerverfájlok telepítve vannak-e a volume-on!"
+    echo "ARK_SERVER_DIR: ${ARK_SERVER_DIR}"
+    echo "Mappa tartalma:"
+    ls -la "${ARK_SERVER_DIR}" || echo "Mappa nem létezik vagy nem elérhető"
+    if [ -d "${ARK_SERVER_DIR}/ShooterGame" ]; then
+        echo "ShooterGame mappa tartalma:"
+        ls -la "${ARK_SERVER_DIR}/ShooterGame" || true
+        if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries" ]; then
+            echo "Binaries mappa tartalma:"
+            ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries" || true
+            if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" ]; then
+                echo "Linux mappa tartalma:"
+                ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" || true
+            fi
+        fi
+    fi
     exit 1
 fi
 
 # Szerver indítási parancs összeállítása
-cd "${ARK_SERVER_DIR}"
+cd "${ARK_SERVER_DIR}" || {
+    echo "HIBA: Nem lehet váltani a ${ARK_SERVER_DIR} mappába!"
+    exit 1
+}
+
+echo "Jelenlegi mappa: $(pwd)"
+echo "Szerver bináris létezik: $([ -f "${SERVER_BINARY}" ] && echo "IGEN" || echo "NEM")"
 
 # Alap parancs
 SERVER_ARGS=""
@@ -124,5 +146,24 @@ echo "Starting ARK Server..."
 echo "Command: ${SERVER_BINARY} ${SERVER_ARGS}"
 echo "=========================================="
 
+# Ellenőrizzük, hogy a bináris végrehajtható-e
+if [ ! -x "${SERVER_BINARY}" ]; then
+    echo "HIBA: A szerver bináris nem végrehajtható: ${SERVER_BINARY}"
+    echo "Jogosultságok beállítása..."
+    chmod +x "${SERVER_BINARY}" || {
+        echo "HIBA: Nem lehet végrehajthatóvá tenni a binárist!"
+        exit 1
+    }
+fi
+
+# Szerver indítása
+echo "Szerver indítása..."
 exec "${SERVER_BINARY}" ${SERVER_ARGS}
+
+# Ha ide jutunk, akkor a szerver leállt
+EXIT_CODE=$?
+echo "=========================================="
+echo "ARK szerver leállt, kilépési kód: ${EXIT_CODE}"
+echo "=========================================="
+exit ${EXIT_CODE}
 
