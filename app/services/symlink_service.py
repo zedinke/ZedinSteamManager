@@ -137,6 +137,9 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         # Symlink létrehozása az aktív Ark fájlokhoz
         server_path.symlink_to(install_path)
         
+        # Alapértelmezett konfigurációs fájlok másolása
+        copy_default_config_files(server_path)
+        
         return server_path
     finally:
         if should_close:
@@ -170,4 +173,69 @@ def remove_server_symlink(server_id: int, cluster_id: Optional[str] = None) -> b
 def get_server_config_path(server_path: Path) -> Path:
     """Szerver konfigurációs fájl útvonala"""
     return server_path / "ShooterGame" / "Saved" / "Config" / "WindowsServer"
+
+def get_default_config_path() -> Path:
+    """Alapértelmezett konfigurációs fájlok útvonala"""
+    return Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended/defaults")
+
+def copy_default_config_files(server_path: Path) -> bool:
+    """
+    Alapértelmezett konfigurációs fájlok másolása a szerverhez
+    
+    Args:
+        server_path: Szerver útvonal (symlink)
+    
+    Returns:
+        True ha sikeres, False egyébként
+    """
+    try:
+        default_config_path = get_default_config_path()
+        
+        # Ellenőrizzük, hogy létezik-e a defaults mappa
+        if not default_config_path.exists():
+            print(f"Figyelmeztetés: Alapértelmezett config mappa nem található: {default_config_path}")
+            return False
+        
+        # Szerver config mappa útvonala
+        server_config_path = get_server_config_path(server_path)
+        
+        # Ha a server_path symlink, akkor a config mappa is a symlink mögött lesz
+        # De mivel symlink-et használunk, a config fájlokat közvetlenül a symlink mögé kell másolni
+        # A symlink mögötti tényleges útvonal
+        if server_path.is_symlink():
+            real_server_path = server_path.resolve()
+        else:
+            real_server_path = server_path
+        
+        real_config_path = real_server_path / "ShooterGame" / "Saved" / "Config" / "WindowsServer"
+        
+        # Config mappa létrehozása, ha nem létezik
+        real_config_path.mkdir(parents=True, exist_ok=True)
+        
+        # Alapértelmezett fájlok másolása
+        if default_config_path.is_dir():
+            # Rekurzív másolás a defaults mappából
+            for item in default_config_path.iterdir():
+                dest_item = real_config_path / item.name
+                
+                if item.is_dir():
+                    # Mappa másolása
+                    if dest_item.exists():
+                        shutil.rmtree(dest_item)
+                    shutil.copytree(item, dest_item)
+                else:
+                    # Fájl másolása
+                    shutil.copy2(item, dest_item)
+            
+            print(f"Alapértelmezett config fájlok másolva: {default_config_path} -> {real_config_path}")
+            return True
+        else:
+            print(f"Figyelmeztetés: Alapértelmezett config útvonal nem mappa: {default_config_path}")
+            return False
+            
+    except Exception as e:
+        print(f"Hiba az alapértelmezett config fájlok másolásakor: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
