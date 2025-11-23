@@ -22,26 +22,56 @@ def find_server_executable(server_path: Path) -> Optional[Path]:
     Ark szerver executable fájl keresése
     
     Args:
-        server_path: Szerver útvonal (symlink)
+        server_path: Szerver útvonal (symlink vagy valós mappa)
     
     Returns:
         Path objektum az executable fájlhoz vagy None
     """
+    # Ha symlink, követjük a valós útvonalat
+    real_path = server_path
+    if server_path.is_symlink():
+        try:
+            real_path = server_path.resolve()
+        except Exception as e:
+            logger.warning(f"Symlink követése sikertelen: {e}")
+            real_path = server_path
+    
     # Windows: ShooterGameServer.exe
     # Linux: ShooterGameServer
     possible_names = ["ShooterGameServer.exe", "ShooterGameServer"]
     
-    # Először a server_path-ben keresünk
-    for name in possible_names:
-        exe_path = server_path / "ShooterGame" / "Binaries" / "Win64" / name
-        if exe_path.exists():
-            return exe_path
-        
-        # Linux alternatíva
-        exe_path = server_path / "ShooterGame" / "Binaries" / "Linux" / name
-        if exe_path.exists():
-            return exe_path
+    # Lehetséges útvonalak
+    possible_paths = [
+        # Standard Ark Survival Ascended struktúra
+        real_path / "ShooterGame" / "Binaries" / "Win64",
+        real_path / "ShooterGame" / "Binaries" / "Linux",
+        # Alternatív struktúrák
+        real_path / "Binaries" / "Win64",
+        real_path / "Binaries" / "Linux",
+        # Közvetlenül a szerver mappában
+        real_path,
+    ]
     
+    # Keresés minden lehetséges útvonalon
+    for base_path in possible_paths:
+        if not base_path.exists():
+            continue
+        
+        for name in possible_names:
+            exe_path = base_path / name
+            if exe_path.exists() and exe_path.is_file():
+                logger.info(f"Executable található: {exe_path}")
+                return exe_path
+    
+    # Ha nem találtuk, próbáljuk meg rekurzívan keresni
+    logger.warning(f"Executable nem található a szabványos útvonalakon, rekurzív keresés...")
+    for name in possible_names:
+        for exe_path in real_path.rglob(name):
+            if exe_path.is_file():
+                logger.info(f"Executable található rekurzív kereséssel: {exe_path}")
+                return exe_path
+    
+    logger.error(f"Executable nem található a következő útvonalon: {real_path}")
     return None
 
 def build_start_command(server: ServerInstance, server_path: Path, exe_path: Path) -> list:
@@ -251,9 +281,34 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Executable keresése
         exe_path = find_server_executable(server_path)
         if not exe_path:
+            # Részletes hibaüzenet
+            real_path = server_path.resolve() if server_path.is_symlink() else server_path
+            logger.error(f"Executable nem található. Szerver útvonal: {server_path}, Valós útvonal: {real_path}")
+            
+            # Ellenőrizzük, hogy létezik-e a szerver útvonal
+            if not server_path.exists():
+                return {
+                    "success": False,
+                    "message": f"Szerver útvonal nem létezik: {server_path}"
+                }
+            
+            # Ellenőrizzük, hogy a symlink helyes-e
+            if server_path.is_symlink():
+                try:
+                    target = server_path.readlink()
+                    return {
+                        "success": False,
+                        "message": f"Szerver executable nem található. Symlink cél: {target}, Valós útvonal: {real_path}. Ellenőrizd, hogy az Ark szerverfájlok telepítve vannak-e."
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "message": f"Symlink olvasása sikertelen: {e}"
+                    }
+            
             return {
                 "success": False,
-                "message": "Szerver executable nem található"
+                "message": f"Szerver executable nem található az útvonalon: {real_path}. Ellenőrizd, hogy a ShooterGameServer.exe vagy ShooterGameServer fájl létezik-e."
             }
         
         # Parancs összeállítása
