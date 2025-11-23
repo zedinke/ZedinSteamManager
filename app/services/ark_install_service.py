@@ -78,12 +78,34 @@ async def install_ark_server_files(
         if not binaries.exists():
             # Hiányos telepítés - töröljük a ShooterGame mappát, hogy újratelepítsük
             import shutil
+            import os
             await log("⚠️ Hiányos telepítés észlelve (nincs Binaries mappa). Régi telepítés törlése...")
             try:
+                # Próbáljuk meg törölni, de ha nincs jogosultság, akkor csak figyelmeztetünk
+                # A SteamCMD telepítés felülírja a fájlokat úgyis
                 shutil.rmtree(shooter_game)
                 await log("✓ Régi telepítés törölve")
+            except PermissionError as e:
+                await log(f"⚠️ Nincs jogosultság a régi telepítés törléséhez: {e}")
+                await log("ℹ️ A SteamCMD telepítés felülírja a fájlokat, ezért a törlés nem szükséges.")
+                # Próbáljuk meg a jogosultságok javítását (ha lehetséges)
+                try:
+                    import stat
+                    # Jogosultságok javítása
+                    for root, dirs, files in os.walk(shooter_game):
+                        for d in dirs:
+                            os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                        for f in files:
+                            os.chmod(os.path.join(root, f), stat.S_IRUSR | stat.S_IWUSR)
+                    # Most próbáljuk meg újra törölni
+                    shutil.rmtree(shooter_game)
+                    await log("✓ Régi telepítés törölve (jogosultságok javítása után)")
+                except Exception as e2:
+                    await log(f"⚠️ Jogosultságok javítása sem sikerült: {e2}")
+                    await log("ℹ️ Folytatjuk a telepítést - a SteamCMD felülírja a fájlokat.")
             except Exception as e:
                 await log(f"⚠️ Nem sikerült törölni a régi telepítést: {e}")
+                await log("ℹ️ Folytatjuk a telepítést - a SteamCMD felülírja a fájlokat.")
     
     # SteamCMD parancs összeállítása
     # Ark Survival Ascended App ID: 2430930
