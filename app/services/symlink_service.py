@@ -140,6 +140,23 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         # Szülő könyvtárak létrehozása
         server_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # Jogosultságok beállítása a szülő mappára
+        try:
+            import os
+            import pwd
+            current_user = os.getenv('USER') or os.getenv('USERNAME') or 'ai_developer'
+            try:
+                user_info = pwd.getpwnam(current_user)
+                os.chown(server_path.parent, user_info.pw_uid, user_info.pw_gid)
+            except (KeyError, ImportError):
+                # Ha nem található a felhasználó vagy nincs pwd modul, próbáljuk meg UID 1000-vel
+                try:
+                    os.chown(server_path.parent, 1000, 1000)
+                except (OSError, PermissionError):
+                    pass  # Ha nincs jogosultság, folytatjuk
+        except Exception:
+            pass  # Ha bármi hiba van, folytatjuk
+        
         # Ha már létezik, töröljük
         if server_path.exists() or server_path.is_symlink():
             if server_path.is_symlink():
@@ -327,6 +344,9 @@ def create_dedicated_saved_folder(serverfiles_link: Path) -> bool:
             (dedicated_saved_path / "Config" / "WindowsServer").mkdir(exist_ok=True)
             (dedicated_saved_path / "SavedArks").mkdir(exist_ok=True)
             (dedicated_saved_path / "Logs").mkdir(exist_ok=True)
+            
+            # Jogosultságok beállítása
+            _fix_permissions(dedicated_saved_path)
             
             print(f"Dedikált Saved mappa létrehozva: {dedicated_saved_path}")
         else:
