@@ -277,8 +277,15 @@ def parse_ini_file(file_path: Path) -> Dict[str, Dict[str, Any]]:
             lines = f.readlines()
         
         # Először próbáljuk meg a standard configparser-rel
+        # Duplikált kulcsok esetén manuális parsing-ra váltunk
         try:
-            config = configparser.ConfigParser()
+            # Próbáljuk meg a strict=False paramétert (Python 3.2+)
+            try:
+                config = configparser.ConfigParser(allow_no_value=True, strict=False)
+            except TypeError:
+                # Régebbi Python verzió, strict paraméter nélkül
+                config = configparser.ConfigParser(allow_no_value=True)
+            
             config.optionxform = str  # Case-sensitive kulcsok
             config.read(file_path, encoding='utf-8')
             
@@ -289,6 +296,8 @@ def parse_ini_file(file_path: Path) -> Dict[str, Dict[str, Any]]:
             
             if result:
                 return result
+        except (configparser.DuplicateOptionError, configparser.DuplicateSectionError) as e:
+            print(f"ConfigParser hiba (duplikált kulcs/szekció), manuális parsing: {e}")
         except Exception as e:
             print(f"ConfigParser hiba, manuális parsing: {e}")
         
@@ -319,6 +328,10 @@ def parse_ini_file(file_path: Path) -> Dict[str, Dict[str, Any]]:
                         current_section = "ServerSettings"
                         if current_section not in result:
                             result[current_section] = {}
+                    
+                    # Duplikált kulcs kezelése: ha már létezik, figyelmeztetünk és az utolsó értéket tartjuk meg
+                    if key in result[current_section]:
+                        print(f"Figyelmeztetés: Duplikált kulcs '{key}' a '{current_section}' szekcióban (sor {line_num}). Az utolsó értéket használjuk.")
                     
                     result[current_section][key] = convert_value(value)
                 except Exception as e:
