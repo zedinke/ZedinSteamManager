@@ -37,6 +37,14 @@ def find_server_executable(server_path: Path) -> Optional[Path]:
             logger.warning(f"Symlink követése sikertelen: {e}")
             real_path = server_path
     
+    # Ha a real_path egy "latest" mappa, próbáljuk meg követni
+    if real_path.name == "latest" and real_path.is_dir():
+        # Keresünk egy ShooterGame mappát a latest mappában
+        shooter_game = real_path / "ShooterGame"
+        if shooter_game.exists():
+            real_path = shooter_game.parent  # Visszaállítjuk a real_path-et a latest mappára
+            logger.info(f"'latest' mappa található, ShooterGame mappa megtalálva: {shooter_game}")
+    
     # Windows: ShooterGameServer.exe
     # Linux: ShooterGameServer
     possible_names = ["ShooterGameServer.exe", "ShooterGameServer"]
@@ -47,9 +55,12 @@ def find_server_executable(server_path: Path) -> Optional[Path]:
         real_path / "ShooterGame" / "Binaries" / "Win64",
         # Standard Ark Survival Ascended struktúra (Linux)
         real_path / "ShooterGame" / "Binaries" / "Linux",
-        # Alternatív struktúrák
+        # Ha a real_path már a ShooterGame mappa
         real_path / "Binaries" / "Win64",
         real_path / "Binaries" / "Linux",
+        # Alternatív struktúrák
+        real_path.parent / "ShooterGame" / "Binaries" / "Win64",
+        real_path.parent / "ShooterGame" / "Binaries" / "Linux",
         # SteamCMD telepítés struktúra
         real_path / "ShooterGame" / "Binaries" / "ThirdParty" / "SteamCMD" / "Win64",
         real_path / "ShooterGame" / "Binaries" / "ThirdParty" / "SteamCMD" / "Linux",
@@ -61,8 +72,17 @@ def find_server_executable(server_path: Path) -> Optional[Path]:
     logger.info(f"Keresés az útvonalon: {real_path}")
     if real_path.exists():
         try:
-            dir_contents = list(real_path.iterdir())[:10]  # Első 10 elem
-            logger.info(f"Mappa tartalma (első 10): {[str(p.name) for p in dir_contents]}")
+            dir_contents = list(real_path.iterdir())[:20]  # Első 20 elem
+            logger.info(f"Mappa tartalma (első 20): {[str(p.name) for p in dir_contents]}")
+            
+            # Ha van ShooterGame mappa, listázzuk azt is
+            shooter_game = real_path / "ShooterGame"
+            if shooter_game.exists():
+                try:
+                    shooter_contents = list(shooter_game.iterdir())[:10]
+                    logger.info(f"ShooterGame mappa tartalma (első 10): {[str(p.name) for p in shooter_contents]}")
+                except Exception as e:
+                    logger.warning(f"ShooterGame mappa tartalmának listázása sikertelen: {e}")
         except Exception as e:
             logger.warning(f"Mappa tartalmának listázása sikertelen: {e}")
     
