@@ -673,9 +673,28 @@ async def delete_server(
         # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
         print(f"Figyelmeztetés: Symlink és Saved mappa törlése sikertelen: {e}")
     
-    # Szerver törlése
+    # Szerver törlése az adatbázisból (előbb, hogy ellenőrizhessük, van-e még más szerver)
+    user_id = server.server_admin_id
     db.delete(server)
     db.commit()
+    
+    # Ellenőrizzük, hogy van-e még más szerver, ami ezt a felhasználót használja
+    remaining_servers = db.query(ServerInstance).filter(
+        ServerInstance.server_admin_id == user_id
+    ).count()
+    
+    # Ha nincs már más szerver, töröljük a ServerFiles/user_{user_id} mappát is
+    if remaining_servers == 0:
+        try:
+            from app.services.symlink_service import get_user_serverfiles_path
+            import shutil
+            user_serverfiles_path = get_user_serverfiles_path(user_id)
+            if user_serverfiles_path.exists():
+                shutil.rmtree(user_serverfiles_path)
+                print(f"ServerFiles/user_{user_id} mappa törölve: {user_serverfiles_path}")
+        except Exception as e:
+            # Ha hiba van, csak logoljuk, de ne akadályozza a törlést
+            print(f"Figyelmeztetés: ServerFiles/user_{user_id} mappa törlése sikertelen: {e}")
     
     return RedirectResponse(
         url="/ark/servers?success=Szerver+törölve",
