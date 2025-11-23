@@ -130,10 +130,17 @@ async def startup_event():
             except (PermissionError, OSError):
                 pass
         
-        # Ha a base mappa létezik, ellenőrizzük
+        # FONTOS: NE hozzuk létre a base mappát, csak ellenőrizzük, ha már létezik!
+        # Ha a base mappa nem létezik, NE hozzuk létre automatikusan!
+        # Csak akkor ellenőrizzük, ha már létezik
         if base_path.exists():
-            # Végigmegyünk az összes user_* mappán
-            for user_dir in base_path.glob("user_*"):
+            # Végigmegyünk az összes user_* mappán (csak akkor, ha a base mappa létezik)
+            try:
+                user_dirs = list(base_path.glob("user_*"))
+            except (PermissionError, OSError):
+                user_dirs = []
+            
+            for user_dir in user_dirs:
                 if user_dir.is_dir():
                     try:
                         stat_info = user_dir.stat()

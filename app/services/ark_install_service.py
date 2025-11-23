@@ -83,6 +83,36 @@ async def install_ark_server_files(
         target_uid = current_uid
         target_gid = current_gid
         
+        # FONTOS: Először ellenőrizzük és javítjuk a user_serverfiles_path mappát is!
+        # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
+        user_serverfiles_path = install_path.parent
+        if user_serverfiles_path.exists():
+            try:
+                stat_info = user_serverfiles_path.stat()
+                if stat_info.st_uid == 0 and target_uid != 0:
+                    await log(f"⚠️ {user_serverfiles_path} root jogosultságokkal létezik, javítás...")
+                    try:
+                        # Próbáljuk meg javítani a jogosultságokat
+                        os.chmod(user_serverfiles_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        os.chown(user_serverfiles_path, target_uid, target_gid)
+                        await log(f"✓ {user_serverfiles_path} jogosultságok javítva")
+                    except (PermissionError, OSError) as e:
+                        await log(f"⚠️ Nem sikerült javítani {user_serverfiles_path}: {e}")
+                        # Ha nem sikerül javítani, próbáljuk meg átnevezni
+                        try:
+                            import shutil
+                            backup_path = user_serverfiles_path.parent / f"{user_serverfiles_path.name}.root_backup"
+                            if backup_path.exists():
+                                shutil.rmtree(backup_path)
+                            user_serverfiles_path.rename(backup_path)
+                            await log(f"✓ {user_serverfiles_path} átnevezve: {backup_path}")
+                            await log(f"⚠️ FONTOS: Manuálisan töröld ezt a mappát sudo-val: sudo rm -rf {backup_path}")
+                        except (PermissionError, OSError) as rename_e:
+                            await log(f"⚠️ Nem sikerült átnevezni {user_serverfiles_path}: {rename_e}")
+                            await log(f"⚠️ FONTOS: Manuálisan javítsd a jogosultságokat sudo-val: sudo chown -R {target_uid}:{target_gid} {user_serverfiles_path}")
+            except (PermissionError, OSError):
+                pass
+        
         # FONTOS: Lépésenként hozzuk létre a mappákat, hogy minden lépés után beállíthassuk a jogosultságokat!
         # Így elkerüljük, hogy root jogosultságokkal jöjjenek létre
         current_path = install_path

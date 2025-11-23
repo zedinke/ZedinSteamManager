@@ -30,6 +30,41 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
         if user:
             return RedirectResponse(url="/dashboard", status_code=302)
     
+    # FONTOS: Ellenőrizzük, hogy ne jöjjön létre root jogosultságokkal mappa
+    # Ha van session-ben user_id, ellenőrizzük a mappát
+    if user_id:
+        try:
+            import os
+            import stat
+            from pathlib import Path
+            from app.config import settings
+            from app.services.symlink_service import get_user_serverfiles_path
+            
+            user_serverfiles_path = get_user_serverfiles_path(user_id)
+            if user_serverfiles_path.exists():
+                try:
+                    stat_info = user_serverfiles_path.stat()
+                    current_uid = os.getuid()
+                    if stat_info.st_uid == 0 and current_uid != 0:
+                        # Root jogosultságokkal létezik, próbáljuk meg javítani
+                        try:
+                            os.chmod(user_serverfiles_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                            os.chown(user_serverfiles_path, current_uid, os.getgid())
+                        except (PermissionError, OSError):
+                            # Ha nem sikerül, próbáljuk meg átnevezni
+                            try:
+                                backup_path = user_serverfiles_path.parent / f"{user_serverfiles_path.name}.root_backup"
+                                if backup_path.exists():
+                                    import shutil
+                                    shutil.rmtree(backup_path)
+                                user_serverfiles_path.rename(backup_path)
+                            except:
+                                pass
+                except (PermissionError, OSError):
+                    pass
+        except Exception:
+            pass  # Ne akadályozza a login oldal betöltését
+    
     from app.main import get_templates
     templates = get_templates()
     return templates.TemplateResponse("auth/login.html", {"request": request})
