@@ -313,7 +313,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         f'RCON_ENABLED={"True" if config_values.get("RCON_ENABLED", True) else "False"}',
                         f'BATTLEEYE={"True" if config_values.get("BATTLEEYE", False) else "False"}',
                         f'API={"True" if config_values.get("API", False) else "False"}',
-                        f'ARK_SERVER_DIR={container_work_dir}',
+                        f'ARK_SERVER_DIR={container_work_dir}',  # A mountolt mappa, ahol a ServerFiles található
                         f'UPDATE_SERVER=False',  # Ne telepítsen újra, ha a fájlok már a hoston vannak
                     ],
                 }
