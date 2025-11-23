@@ -90,6 +90,12 @@ async def show_config(
     config_data = {}
     if config_file_path and config_file_path.exists():
         config_data = parse_ini_file(config_file_path)
+        print(f"DEBUG: Config fájl beolvasva: {config_file_path}")
+        print(f"DEBUG: Sections: {list(config_data.keys())}")
+        for section, items in config_data.items():
+            print(f"DEBUG: Section '{section}' - {len(items)} beállítás")
+    else:
+        print(f"DEBUG: Config fájl nem létezik: {config_file_path}")
     
     # Beállítások formázása a template-hez - kategóriák szerint csoportosítva
     settings_by_category = {}
@@ -98,6 +104,12 @@ async def show_config(
             is_bool = is_boolean_setting(section, key, value)
             description = get_setting_description(section, key)
             category = get_setting_category(section, key)
+            
+            # Debug információk
+            if not description:
+                print(f"DEBUG: Nincs leírás: {section}.{key}")
+            if category == "Egyéb":
+                print(f"DEBUG: Egyéb kategória: {section}.{key}")
             
             if category not in settings_by_category:
                 settings_by_category[category] = []

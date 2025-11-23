@@ -413,8 +413,18 @@ def get_setting_description(section: str, key: str) -> str:
     Returns:
         Leírás vagy üres string
     """
+    # Próbáljuk meg a section-t
     descriptions = SETTING_DESCRIPTIONS.get(section, {})
-    return descriptions.get(key, "")
+    description = descriptions.get(key, "")
+    
+    # Ha nincs leírás, próbáljuk meg más section-öket is (Game.ini és GameUserSettings.ini is használhatja ugyanazokat a section-öket)
+    if not description:
+        # Próbáljuk meg a "ServerSettings" section-t is (mert Game.ini is használhatja)
+        if section != "ServerSettings":
+            server_settings_descriptions = SETTING_DESCRIPTIONS.get("ServerSettings", {})
+            description = server_settings_descriptions.get(key, "")
+    
+    return description
 
 def is_boolean_setting(section: str, key: str, value: Any) -> bool:
     """
