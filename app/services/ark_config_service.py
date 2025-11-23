@@ -477,3 +477,83 @@ def get_server_config_files(server_path: Path) -> Tuple[Optional[Path], Optional
     game_ini = dedicated_config_path / "Game.ini"
     
     return game_user_settings, game_ini
+
+def update_config_from_server_settings(
+    server_path: Path,
+    session_name: Optional[str] = None,
+    server_admin_password: Optional[str] = None,
+    server_password: Optional[str] = None,
+    max_players: Optional[int] = None,
+    rcon_enabled: Optional[bool] = None,
+    motd: Optional[str] = None,
+    motd_duration: Optional[int] = None
+) -> bool:
+    """
+    Konfigurációs fájlok frissítése szerver beállítások alapján
+    
+    Args:
+        server_path: Szerver útvonal (symlink)
+        session_name: Szerver munkamenet neve
+        server_admin_password: Szerver admin jelszó
+        server_password: Szerver jelszó
+        max_players: Maximum játékosok száma
+        rcon_enabled: RCON engedélyezve
+        motd: MOTD üzenet
+        motd_duration: MOTD időtartam másodpercben
+    
+    Returns:
+        True ha sikeres, False egyébként
+    """
+    try:
+        # Konfigurációs fájlok útvonalai
+        game_user_settings_path, _ = get_server_config_files(server_path)
+        
+        if not game_user_settings_path:
+            print(f"GameUserSettings.ini útvonal nem található")
+            return False
+        
+        # Fájl beolvasása
+        config_data = parse_ini_file(game_user_settings_path)
+        
+        # ServerSettings section biztosítása
+        if "ServerSettings" not in config_data:
+            config_data["ServerSettings"] = {}
+        
+        # Beállítások frissítése (csak ha meg vannak adva)
+        if session_name is not None:
+            config_data["ServerSettings"]["SessionName"] = session_name
+        
+        if server_admin_password is not None and server_admin_password.strip():
+            config_data["ServerSettings"]["ServerAdminPassword"] = server_admin_password
+        
+        if server_password is not None:
+            # Ha üres string, akkor töröljük a beállítást (nyilvános szerver)
+            if server_password.strip():
+                config_data["ServerSettings"]["ServerPassword"] = server_password
+            else:
+                # Üres jelszó = nyilvános szerver, töröljük a beállítást
+                config_data["ServerSettings"].pop("ServerPassword", None)
+        
+        if max_players is not None:
+            config_data["ServerSettings"]["MaxPlayers"] = max_players
+        
+        if rcon_enabled is not None:
+            config_data["ServerSettings"]["RCONEnabled"] = rcon_enabled
+        
+        if motd is not None:
+            if motd.strip():
+                config_data["ServerSettings"]["MessageOfTheDay"] = motd
+            else:
+                # Üres MOTD = töröljük a beállítást
+                config_data["ServerSettings"].pop("MessageOfTheDay", None)
+        
+        if motd_duration is not None:
+            config_data["ServerSettings"]["MOTDDuration"] = motd_duration
+        
+        # Fájl mentése
+        return save_ini_file(game_user_settings_path, config_data)
+    except Exception as e:
+        print(f"Hiba a konfigurációs fájlok frissítésekor: {e}")
+        import traceback
+        traceback.print_exc()
+        return False

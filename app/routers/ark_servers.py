@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, asc
 from app.database import get_db, User, Game, ServerInstance, ServerStatus, Token, TokenType, Cluster, UserServerFiles
 from app.services.port_service import find_available_port, get_query_port, get_rcon_port
-from app.services.symlink_service import create_server_symlink, remove_server_symlink
+from app.services.symlink_service import create_server_symlink, remove_server_symlink, get_server_path
+from app.services.ark_config_service import update_config_from_server_settings
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -605,6 +606,58 @@ async def edit_server(
     server.active_mods = active_mods_list
     server.passive_mods = passive_mods_list
     
+    # Config JSON frissítése
+    server_config = server.config if server.config else {}
+    
+    # Beállítások frissítése a config JSON-ban
+    if timezone:
+        server_config["TZ"] = timezone
+    if map_name:
+        server_config["MAP_NAME"] = map_name
+    if session_name:
+        server_config["SESSION_NAME"] = session_name
+    if server_admin_password and server_admin_password.strip():
+        server_config["ServerAdminPassword"] = server_admin_password
+    if server_password is not None:
+        if server_password.strip():
+            server_config["ServerPassword"] = server_password
+        else:
+            server_config.pop("ServerPassword", None)
+    if battleeye:
+        server_config["BATTLEEYE"] = battleeye == "true"
+    if api:
+        server_config["API"] = api == "true"
+    if rcon_enabled:
+        server_config["RCON_ENABLED"] = rcon_enabled == "true"
+    if display_pok_monitor_message:
+        server_config["DISPLAY_POK_MONITOR_MESSAGE"] = display_pok_monitor_message == "true"
+    if random_startup_delay:
+        server_config["RANDOM_STARTUP_DELAY"] = random_startup_delay == "true"
+    if cpu_optimization:
+        server_config["CPU_OPTIMIZATION"] = cpu_optimization == "true"
+    if update_server:
+        server_config["UPDATE_SERVER"] = update_server == "true"
+    if enable_motd:
+        server_config["ENABLE_MOTD"] = enable_motd == "true"
+    if show_admin_commands_in_chat:
+        server_config["SHOW_ADMIN_COMMANDS_IN_CHAT"] = show_admin_commands_in_chat == "true"
+    if motd:
+        server_config["MOTD"] = motd
+    if motd_duration is not None:
+        server_config["MOTD_DURATION"] = motd_duration
+    if check_for_update_interval is not None:
+        server_config["CHECK_FOR_UPDATE_INTERVAL"] = check_for_update_interval
+    if update_window_minimum_time:
+        server_config["UPDATE_WINDOW_MINIMUM_TIME"] = update_window_minimum_time
+    if update_window_maximum_time:
+        server_config["UPDATE_WINDOW_MAXIMUM_TIME"] = update_window_maximum_time
+    if restart_notice_minutes is not None:
+        server_config["RESTART_NOTICE_MINUTES"] = restart_notice_minutes
+    if custom_server_args:
+        server_config["CUSTOM_SERVER_ARGS"] = custom_server_args.strip()
+    
+    server.config = server_config
+    
     # Ha változott a cluster, akkor újra kell hozni a symlink-et
     if old_cluster_id != cluster.id:
         # Régi cluster ID lekérése
@@ -615,8 +668,27 @@ async def edit_server(
         server_path = create_server_symlink(server.id, cluster.cluster_id, db)
         if server_path:
             server.server_path = str(server_path)
+    else:
+        # Ha nem változott a cluster, akkor is lekérjük a szerver útvonalat
+        if server.server_path:
+            server_path = Path(server.server_path)
+        else:
+            server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
     
     db.commit()
+    
+    # Konfigurációs fájlok frissítése
+    if server_path and (server_path.exists() or server_path.is_symlink()):
+        update_config_from_server_settings(
+            server_path=server_path,
+            session_name=session_name or server_config.get("SESSION_NAME"),
+            server_admin_password=server_admin_password if server_admin_password and server_admin_password.strip() else None,
+            server_password=server_password if server_password is not None else None,
+            max_players=server.max_players,
+            rcon_enabled=rcon_enabled == "true" if rcon_enabled else server_config.get("RCON_ENABLED", True),
+            motd=motd or server_config.get("MOTD"),
+            motd_duration=motd_duration if motd_duration is not None else server_config.get("MOTD_DURATION")
+        )
     
     return RedirectResponse(
         url=f"/ark/servers?success=Szerver+módosítva",
