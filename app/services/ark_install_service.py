@@ -116,18 +116,37 @@ async def install_ark_server_files(
         # Visszafelé haladunk (a legfelső mappától a legalsóig)
         parts.reverse()
         
-        # Először javítjuk a már létező mappák jogosultságait
+        # Lépésenként hozzuk létre/javítjuk a mappákat
         for path in parts:
             if path.exists():
+                # Ha a mappa létezik, ellenőrizzük a tulajdonjogot
                 try:
-                    os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
                     if os.name != 'nt':
-                        os.chown(path, target_uid, target_gid)
+                        stat_info = os.stat(path)
+                        current_owner_uid = stat_info.st_uid
+                        # Ha root tulajdonjoggal van (UID 0), akkor töröljük és újra létrehozzuk
+                        if current_owner_uid == 0 and target_uid != 0:
+                            await log(f"⚠️ {path} root jogosultságokkal létezik, törlés és újralétrehozás...")
+                            try:
+                                import shutil
+                                # Próbáljuk meg törölni
+                                shutil.rmtree(path)
+                                await log(f"✓ {path} törölve, újralétrehozás...")
+                            except (PermissionError, OSError) as e:
+                                await log(f"⚠️ {path} törlése sikertelen: {e}")
+                                # Ha nem sikerül törölni, próbáljuk meg átnevezni
+                                try:
+                                    backup_path = path.parent / f"{path.name}.root_backup"
+                                    if backup_path.exists():
+                                        shutil.rmtree(backup_path)
+                                    path.rename(backup_path)
+                                    await log(f"✓ {path} átnevezve: {backup_path}")
+                                except Exception:
+                                    pass
                 except (PermissionError, OSError):
                     pass
-        
-        # Most lépésenként hozzuk létre a mappákat
-        for path in parts:
+            
+            # Ha nem létezik (vagy töröltük), létrehozzuk
             if not path.exists():
                 path.mkdir(exist_ok=True)
                 # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
@@ -135,8 +154,20 @@ async def install_ark_server_files(
                     os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
                     if os.name != 'nt':
                         os.chown(path, target_uid, target_gid)
+                    await log(f"✓ {path} létrehozva megfelelő jogosultságokkal")
                 except (PermissionError, OSError) as e:
                     await log(f"⚠️ Jogosultságok beállítása sikertelen {path}: {e}")
+            else:
+                # Ha létezik, próbáljuk meg javítani a jogosultságokat
+                try:
+                    os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                    if os.name != 'nt':
+                        os.chown(path, target_uid, target_gid)
+                except (PermissionError, OSError) as e:
+                    # Ha nem sikerül, csak logoljuk, de ne akadályozza a telepítést
+                    # A SteamCMD telepítés után újra megpróbáljuk beállítani a jogosultságokat rekurzívan
+                    await log(f"⚠️ Jogosultságok javítása sikertelen {path}: {e}")
+                    await log("ℹ️ Folytatjuk a telepítést - a SteamCMD telepítés után újra megpróbáljuk beállítani a jogosultságokat")
         
         # AZONNAL beállítjuk a jogosultságokat (0x602 hiba elkerülésére)
         # FONTOS: A mappa létrehozása után azonnal kell beállítani!
