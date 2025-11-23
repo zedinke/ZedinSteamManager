@@ -152,7 +152,11 @@ def create_docker_compose_file(server: ServerInstance, server_path: Path, saved_
         instance_dir = get_instance_dir(server)
         instance_dir.mkdir(parents=True, exist_ok=True)
         
-        # Saved mappa létrehozása ha nem létezik
+        # A POK Manager script szerint az Instance_{server_id}/Saved mappa NEM kell,
+        # mert a Saved mappa a dedikált Saved mappában van (user_{user_id}/server_{server_id}_saved)
+        # A Docker Compose fájlban a saved_path-et közvetlenül használjuk
+        # DE: a POK Manager script létrehozza az Instance_{server_id}/Saved mappát, szóval mi is
+        # (bár valójában nem használjuk, de kompatibilitás miatt létrehozzuk)
         saved_dir = instance_dir / "Saved"
         if not saved_dir.exists():
             saved_dir.mkdir(parents=True, exist_ok=True)
