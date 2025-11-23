@@ -149,8 +149,12 @@ async def install_ark_server_files(
             if line_text:
                 await log(line_text)
         
-        # Visszatérési kód ellenőrzése
+        # Visszatérési kód ellenőrzése - várjuk meg, amíg a folyamat teljesen befejeződik
         return_code = await process.wait()
+        
+        # Folyamat befejeződése után várunk, hogy a fájlrendszer műveletek befejeződjenek
+        await log("SteamCMD folyamat befejeződött, várakozás a fájlrendszer stabilizálódására...")
+        await asyncio.sleep(2)  # Rövid várakozás a fájlrendszer műveletek befejezésére
         
         # SteamCMD néhány exit code esetén is sikeres lehet (pl. 8 = részben sikeres)
         # Ellenőrizzük, hogy a bináris létezik-e, mert az a fontos
@@ -255,45 +259,45 @@ async def install_ark_server_files(
             await log(f"⚠️ SteamCMD exit code 8 (gyakori, nem feltétlenül hiba)")
             await log("Ellenőrizzük, hogy a telepítés sikeres volt-e...")
             
-            # Várunk többet, hogy a fájlrendszer teljesen frissüljön (verification után)
-            await log("Várakozás a fájlrendszer frissülésére...")
-            await asyncio.sleep(10)  # Hosszabb várakozás, mert a verification után még írhat fájlokat
-            
             # Ellenőrizzük, hogy a Windows bináris létezik-e (csak Windows bináris van)
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
-            # Részletes ellenőrzés - többször próbáljuk
-            for attempt in range(3):
-                await log(f"Ellenőrzés (próbálkozás {attempt + 1}/3)...")
-                
+            # Várunk, amíg a bináris létrejön (max 60 másodperc, de csak akkor várunk, ha még nincs)
+            max_wait_time = 60  # Maximum 60 másodperc
+            check_interval = 2  # 2 másodpercenként ellenőrzünk
+            waited_time = 0
+            
+            while waited_time < max_wait_time:
+                # Részletes ellenőrzés
                 shooter_game = install_path / "ShooterGame"
                 if shooter_game.exists():
-                    await log(f"✓ ShooterGame mappa létezik")
                     binaries = shooter_game / "Binaries"
                     if binaries.exists():
-                        await log(f"✓ Binaries mappa létezik")
-                        binaries_contents = [item.name for item in binaries.iterdir()] if binaries.exists() else []
-                        await log(f"  - Binaries tartalma: {binaries_contents}")
                         win64_path = binaries / "Win64"
                         if win64_path.exists():
-                            await log(f"✓ Win64 mappa létezik")
-                            win64_contents = [item.name for item in win64_path.iterdir()] if win64_path.exists() else []
-                            await log(f"  - Win64 tartalma: {win64_contents[:20]}")
-                            
-                            # Ellenőrizzük a binárist
                             if win64_binary.exists():
                                 await log(f"✓ Windows bináris megtalálva: {win64_binary}")
                                 await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
                                 await log("ℹ️ Windows binárist használunk Wine-nal")
                                 return True, '\n'.join(log_lines)
                 
-                # Ha még nincs, várunk és újra próbáljuk
-                if attempt < 2:  # Utolsó próbálkozás előtt ne várjunk
-                    await log(f"⚠️ Bináris még nem található, várakozás további 10 másodpercet...")
-                    await asyncio.sleep(10)
+                # Ha még nincs, várunk és újra ellenőrizzük
+                if waited_time == 0:
+                    await log("Várakozás a bináris létrejöttére...")
+                await asyncio.sleep(check_interval)
+                waited_time += check_interval
+                
+                # Minden 10 másodpercben logoljuk az állapotot
+                if waited_time % 10 == 0:
+                    await log(f"Várakozás... ({waited_time}/{max_wait_time} másodperc)")
+                    if shooter_game.exists():
+                        binaries = shooter_game / "Binaries"
+                        if binaries.exists():
+                            binaries_contents = [item.name for item in binaries.iterdir()] if binaries.exists() else []
+                            await log(f"  - Binaries tartalma: {binaries_contents}")
             
-            # Ha mindhárom próbálkozás után sincs bináris
-            error_msg = f"Telepítés sikertelen (exit code 8, Windows bináris nem található 30 másodperc után sem)"
+            # Ha a maximális várakozási idő után sincs bináris
+            error_msg = f"Telepítés sikertelen (exit code 8, Windows bináris nem található {max_wait_time} másodperc után sem)"
             await log(f"✗ {error_msg}")
             await log("Próbáld meg újratelepíteni a szerverfájlokat!")
             return False, '\n'.join(log_lines)
