@@ -607,7 +607,7 @@ async def edit_server(
     battleeye: str = Form(None),
     api: str = Form(None),
     rcon_enabled: str = Form(None),
-    display_pok_monitor_message: str = Form(None),
+    display_manager_monitor_message: str = Form(None),
     random_startup_delay: str = Form(None),
     cpu_optimization: str = Form(None),
     enable_motd: str = Form(None),
@@ -727,8 +727,8 @@ async def edit_server(
         server_config["API"] = api == "true"
     if rcon_enabled:
         server_config["RCON_ENABLED"] = rcon_enabled == "true"
-    if display_pok_monitor_message:
-        server_config["DISPLAY_POK_MONITOR_MESSAGE"] = display_pok_monitor_message == "true"
+    if display_manager_monitor_message:
+        server_config["DISPLAY_MANAGER_MONITOR_MESSAGE"] = display_manager_monitor_message == "true"
     if random_startup_delay:
         server_config["RANDOM_STARTUP_DELAY"] = random_startup_delay == "true"
     if cpu_optimization:
