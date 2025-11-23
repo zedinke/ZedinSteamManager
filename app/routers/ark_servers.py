@@ -712,9 +712,6 @@ async def edit_server(
     
     # Debug: ellenőrizzük, hogy mentődött-e a config
     print(f"DEBUG: Server config mentés előtt: {server.config}")
-    db.commit()
-    db.refresh(server)
-    print(f"DEBUG: Server config mentés után: {server.config}")
     
     # Ha változott a cluster, akkor újra kell hozni a symlink-et
     if old_cluster_id != cluster.id:
@@ -733,7 +730,12 @@ async def edit_server(
         else:
             server_path = get_server_path(server.id, cluster.cluster_id, server.server_admin_id)
     
+    # Commit előtt még egyszer ellenőrizzük
+    print(f"DEBUG: Server config commit előtt: {server.config}")
     db.commit()
+    # Refresh után ellenőrizzük
+    db.refresh(server)
+    print(f"DEBUG: Server config commit után: {server.config}")
     
     # Konfigurációs fájlok frissítése
     if server_path and (server_path.exists() or server_path.is_symlink()):
