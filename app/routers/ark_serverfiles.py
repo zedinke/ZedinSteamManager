@@ -78,17 +78,35 @@ async def show_install_form(
 @router.post("/install")
 async def start_install(
     request: Request,
-    version: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Szerverfájlok telepítés indítása"""
+    """Server Admin: Szerverfájlok telepítés indítása (mindig legfrissebb verzió)"""
     current_user = require_server_admin(request, db)
+    
+    # Mindig "latest" verziót használunk
+    version = "latest"
     
     # Telepítési útvonal
     user_serverfiles = get_user_serverfiles_path(current_user.id)
     install_path = user_serverfiles / version
     
-    # Ellenőrizzük, hogy létezik-e már
+    # Ellenőrizzük, hogy van-e már telepítés folyamatban
+    existing_pending = db.query(UserServerFiles).filter(
+        and_(
+            UserServerFiles.user_id == current_user.id,
+            UserServerFiles.version == version,
+            UserServerFiles.installation_status.in_(["pending", "installing"])
+        )
+    ).first()
+    
+    if existing_pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Már van telepítés folyamatban. Várj, amíg befejeződik!"
+        )
+    
+    # Ha van már "latest" verzió, akkor újratelepítésként kezeljük
+    # (a régi verziót töröljük, ha nincs aktív)
     existing = db.query(UserServerFiles).filter(
         and_(
             UserServerFiles.user_id == current_user.id,
@@ -96,11 +114,13 @@ async def start_install(
         )
     ).first()
     
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Ez a verzió ({version}) már telepítve van"
-        )
+    if existing and not existing.is_active:
+        # Ha nem aktív, töröljük a régi rekordot
+        install_path_obj = Path(existing.install_path)
+        if install_path_obj.exists():
+            delete_ark_server_files(install_path_obj)
+        db.delete(existing)
+        db.commit()
     
     # Új rekord létrehozása
     serverfiles = UserServerFiles(

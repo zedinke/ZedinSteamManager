@@ -24,6 +24,7 @@
                 <strong><i class="fas fa-info-circle"></i> Fontos:</strong>
                 <ul style="margin: 10px 0 0 20px;">
                     <li>A telepítés SteamCMD-vel történik</li>
+                    <li>Mindig a <strong>legfrissebb verzió</strong> töltődik le</li>
                     <li>A szerverfájlok a felhasználó serverfiles mappájába kerülnek</li>
                     <li>A telepítés folyamata élőben követhető a terminálban</li>
                     <li>A telepítés hosszabb időt vehet igénybe (több GB letöltés)</li>
@@ -31,14 +32,8 @@
             </div>
             
             <form id="installForm" style="margin-top: 20px;">
-                <div class="form-group">
-                    <label for="version">
-                        <i class="fas fa-tag"></i> Verzió <span style="color: red;">*</span>
-                    </label>
-                    <input type="text" id="version" name="version" required 
-                           placeholder="pl. 1.0.0 vagy latest" 
-                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
-                    <small style="color: #666;">A szerverfájlok verziója (pl. 1.0.0) vagy "latest" a legújabb verzióhoz</small>
+                <div class="alert alert-info" style="margin-bottom: 20px;">
+                    <i class="fas fa-info-circle"></i> A telepítés automatikusan a <strong>legfrissebb verziót</strong> tölti le SteamCMD-vel.
                 </div>
                 
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -79,15 +74,9 @@ let serverfilesId = null;
 document.getElementById('installForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const version = document.getElementById('version').value;
     const installBtn = document.getElementById('installBtn');
     const terminalCard = document.getElementById('terminalCard');
     const terminal = document.getElementById('terminal');
-    
-    if (!version) {
-        alert('Kérlek, add meg a verziót!');
-        return;
-    }
     
     // Gomb letiltása
     installBtn.disabled = true;
@@ -95,12 +84,11 @@ document.getElementById('installForm').addEventListener('submit', async function
     
     // Terminál megjelenítése
     terminalCard.style.display = 'block';
-    terminal.innerHTML = '<div style="color: #4ec9b0;">Telepítés indítása...</div>';
+    terminal.innerHTML = '<div style="color: #4ec9b0;">Telepítés indítása (legfrissebb verzió)...</div>';
     
     try {
-        // Telepítés indítása
+        // Telepítés indítása (nincs verzió mező, mindig latest)
         const formData = new FormData();
-        formData.append('version', version);
         
         const response = await fetch('/ark/serverfiles/install', {
             method: 'POST',
