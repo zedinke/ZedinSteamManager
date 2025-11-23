@@ -581,7 +581,6 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             }
         
         # Várakozás, hogy a konténer elinduljon (2 másodperc)
-        import time
         time.sleep(2)
         
         # Ellenőrizzük, hogy a konténer ténylegesen fut-e
