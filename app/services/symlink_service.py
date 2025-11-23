@@ -350,6 +350,27 @@ def create_dedicated_saved_folder(serverfiles_link: Path) -> bool:
                         item.unlink()
         
         # Symlink létrehozása: a tényleges szerver Saved mappája -> dedikált Saved mappa
+        # Ha már létezik a symlink, ellenőrizzük, hogy helyes-e
+        if real_saved_path.exists() or real_saved_path.is_symlink():
+            if real_saved_path.is_symlink():
+                # Ha már symlink, ellenőrizzük, hogy a cél helyes-e
+                current_target = real_saved_path.readlink()
+                if current_target == dedicated_saved_path:
+                    print(f"Saved mappa symlink már létezik és helyes: {real_saved_path} -> {dedicated_saved_path}")
+                    return True
+                else:
+                    # Ha rossz célra mutat, töröljük és újra létrehozzuk
+                    print(f"Saved mappa symlink rossz célra mutat, törlés és újralétrehozás...")
+                    real_saved_path.unlink()
+            else:
+                # Ha nem symlink, de létezik, akkor töröljük (nem kellene itt lennie)
+                print(f"Saved mappa nem symlink, de létezik, törlés...")
+                if real_saved_path.is_dir():
+                    import shutil
+                    shutil.rmtree(real_saved_path)
+                else:
+                    real_saved_path.unlink()
+        
         real_saved_path.symlink_to(dedicated_saved_path)
         
         print(f"Saved mappa symlink létrehozva/frissítve: {real_saved_path} -> {dedicated_saved_path}")
@@ -421,7 +442,12 @@ def copy_default_config_files(serverfiles_link: Path) -> bool:
         # De a tényleges szerver Saved mappája symlink, szóval a config mappa is a symlink mögött lesz
         real_saved_path = get_server_saved_path(serverfiles_link)
         real_config_path = real_saved_path / "Config" / "WindowsServer"
-        real_config_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # A symlink mögött nem lehet mappát létrehozni, csak a dedikált Saved mappában
+        # A Config mappát a dedikált Saved mappában hozzuk létre (ha még nincs)
+        dedicated_config_path = dedicated_saved_path / "Config" / "WindowsServer"
+        if not dedicated_config_path.exists():
+            dedicated_config_path.mkdir(parents=True, exist_ok=True)
         
         # Ha már létezik config mappa vagy symlink, töröljük
         if real_config_path.exists() or real_config_path.is_symlink():
