@@ -321,11 +321,20 @@ async def list_extension_requests(
     ).order_by(TokenExtensionRequest.created_at.desc()).all()
     
     # Új lejárat számítása minden kéréshez
+    from app.services.pricing_service import period_months_to_days
     for req in extension_requests:
-        if req.token.expires_at:
-            req.new_expires_at = req.token.expires_at + timedelta(days=req.requested_days)
+        # Period_months prioritásos, ha nincs, akkor requested_days (backward compatibility)
+        if req.period_months:
+            days = period_months_to_days(req.period_months)
+        elif req.requested_days:
+            days = req.requested_days
         else:
-            req.new_expires_at = datetime.now() + timedelta(days=req.requested_days)
+            days = 30  # Alapértelmezett
+        
+        if req.token.expires_at:
+            req.new_expires_at = req.token.expires_at + timedelta(days=days)
+        else:
+            req.new_expires_at = datetime.now() + timedelta(days=days)
     
     from app.main import get_templates
     templates = get_templates()
@@ -358,10 +367,19 @@ async def process_extension_request(
         if not token:
             raise HTTPException(status_code=404, detail="Token nem található")
         
-        if token.expires_at and token.expires_at > datetime.now():
-            new_expires_at = token.expires_at + timedelta(days=extension_request.requested_days)
+        # Period_months prioritásos, ha nincs, akkor requested_days (backward compatibility)
+        from app.services.pricing_service import period_months_to_days
+        if extension_request.period_months:
+            days = period_months_to_days(extension_request.period_months)
+        elif extension_request.requested_days:
+            days = extension_request.requested_days
         else:
-            new_expires_at = datetime.now() + timedelta(days=extension_request.requested_days)
+            days = 30  # Alapértelmezett
+        
+        if token.expires_at and token.expires_at > datetime.now():
+            new_expires_at = token.expires_at + timedelta(days=days)
+        else:
+            new_expires_at = datetime.now() + timedelta(days=days)
         
         token.expires_at = new_expires_at
         
@@ -388,7 +406,7 @@ async def process_extension_request(
             extension_request.user_id,
             "token_extension_approved",
             "Token hosszabbítás jóváhagyva",
-            f"A token hosszabbítási kérelmed jóváhagyásra került.\n\nHosszabbítás: {extension_request.requested_days} nap\nÚj lejárat: {new_expires_at.strftime('%Y-%m-%d %H:%M')}"
+            f"A token hosszabbítási kérelmed jóváhagyásra került.\n\nHosszabbítás: {extension_request.period_months if extension_request.period_months else extension_request.requested_days} {'hónap' if extension_request.period_months else 'nap'}\nÚj lejárat: {new_expires_at.strftime('%Y-%m-%d %H:%M')}"
         )
         
         return RedirectResponse(
@@ -493,7 +511,8 @@ async def extend_token(
 async def request_token_extension(
     request: Request,
     token_id: int = Form(...),
-    requested_days: int = Form(...),
+    period_months: int = Form(None),
+    requested_days: int = Form(None),  # Deprecated, backward compatibility
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -506,8 +525,18 @@ async def request_token_extension(
     if not current_user or current_user.role.value != "server_admin":
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
-    if requested_days < 1 or requested_days > 365:
-        raise HTTPException(status_code=400, detail="A hosszabbítás 1 és 365 nap között lehet")
+    # Periódus ellenőrzése
+    from app.services.pricing_service import AVAILABLE_PERIODS
+    if period_months and period_months not in AVAILABLE_PERIODS:
+        raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
+    
+    # Backward compatibility: ha nincs period_months, de van requested_days
+    if not period_months and requested_days:
+        if requested_days < 1 or requested_days > 365:
+            raise HTTPException(status_code=400, detail="A hosszabbítás 1 és 365 nap között lehet")
+    
+    if not period_months and not requested_days:
+        raise HTTPException(status_code=400, detail="Válassz egy periódust vagy add meg a napok számát")
     
     # Token ellenőrzése - csak a saját tokenjeit kérheti
     token = db.query(Token).filter(
@@ -536,7 +565,8 @@ async def request_token_extension(
         user_id=current_user.id,
         item_type="token_extension",
         token_id=token_id,
-        requested_days=requested_days,
+        period_months=period_months,
+        requested_days=requested_days if not period_months else None,  # Backward compatibility
         notes=notes
     )
     

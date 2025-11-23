@@ -5,7 +5,7 @@ Token árazás kezelő router - Manager Admin
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
-from app.database import get_db, User, TokenPricingRule, TokenBasePrice, TokenType
+from app.database import get_db, User, TokenPricingRule, TokenBasePrice, TokenPeriodPrice, TokenType
 from app.dependencies import require_manager_admin
 from datetime import datetime
 from typing import Optional

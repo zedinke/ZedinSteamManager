@@ -372,7 +372,8 @@ class TokenExtensionRequest(Base):
     id = Column(Integer, primary_key=True, index=True)
     token_id = Column(Integer, ForeignKey("tokens.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    requested_days = Column(Integer, nullable=False)  # Hány napra szeretné meghosszabbítani
+    requested_days = Column(Integer, nullable=True)  # Hány napra szeretné meghosszabbítani (deprecated, használd period_months helyette)
+    period_months = Column(Integer, nullable=True)  # Periódus hónapokban (1, 3, 6, vagy 12) - prioritásos
     status = Column(String(20), default="pending", nullable=False, index=True)  # pending, approved, rejected
     notes = Column(Text, nullable=True)  # Opcionális megjegyzés
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)

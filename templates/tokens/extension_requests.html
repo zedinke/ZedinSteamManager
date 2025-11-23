@@ -64,7 +64,21 @@
                                         <span class="text-muted">Nincs lejárat</span>
                                     {% endif %}
                                 </td>
-                                <td><strong>{{ req.requested_days }}</strong> nap</td>
+                                <td>
+                                    {% if req.period_months %}
+                                        <strong>
+                                            {% if req.period_months == 1 %}1 hónap
+                                            {% elif req.period_months == 3 %}3 hónap
+                                            {% elif req.period_months == 6 %}6 hónap
+                                            {% elif req.period_months == 12 %}1 év
+                                            {% else %}{{ req.period_months }} hónap{% endif %}
+                                        </strong>
+                                    {% elif req.requested_days %}
+                                        <strong>{{ req.requested_days }} nap</strong>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if req.new_expires_at %}
                                         <strong>{{ req.new_expires_at.strftime("%Y-%m-%d %H:%M") }}</strong>

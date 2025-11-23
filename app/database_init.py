@@ -557,7 +557,8 @@ def init_db():
                             id {id_type} NOT NULL AUTO_INCREMENT,
                             token_id {tokens_id_type} NOT NULL,
                             user_id {id_type} NOT NULL,
-                            requested_days INT NOT NULL,
+                            requested_days INT NULL,
+                            period_months INT NULL,
                             status VARCHAR(20) NOT NULL DEFAULT 'pending',
                             notes TEXT NULL,
                             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -580,6 +581,47 @@ def init_db():
                 print("✓ token_extension_requests tábla létrehozva")
             except Exception as e:
                 print(f"  Figyelmeztetés: token_extension_requests tábla: {e}")
+        
+        # Ha a token_extension_requests tábla már létezik, ellenőrizzük az új oszlopokat
+        if 'token_extension_requests' in inspector.get_table_names():
+            existing_columns = [col['name'] for col in inspector.get_columns('token_extension_requests')]
+            
+            # period_months oszlop hozzáadása, ha nincs
+            if 'period_months' not in existing_columns:
+                print("period_months oszlop hozzáadása a token_extension_requests táblához...")
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("""
+                            ALTER TABLE token_extension_requests 
+                            ADD COLUMN period_months INT NULL
+                        """))
+                        conn.commit()
+                    print("✓ period_months oszlop hozzáadva")
+                except Exception as e:
+                    print(f"  Figyelmeztetés: period_months oszlop: {e}")
+            
+            # requested_days oszlop módosítása NULL-ra, ha még NOT NULL
+            if 'requested_days' in existing_columns:
+                try:
+                    with engine.connect() as conn:
+                        # Ellenőrizzük, hogy NOT NULL-e
+                        result = conn.execute(text("""
+                            SELECT IS_NULLABLE 
+                            FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_SCHEMA = DATABASE() 
+                            AND TABLE_NAME = 'token_extension_requests' 
+                            AND COLUMN_NAME = 'requested_days'
+                        """))
+                        row = result.fetchone()
+                        if row and row[0] == 'NO':
+                            conn.execute(text("""
+                                ALTER TABLE token_extension_requests 
+                                MODIFY COLUMN requested_days INT NULL
+                            """))
+                            conn.commit()
+                            print("✓ requested_days oszlop módosítva NULL-ra")
+                except Exception as e:
+                    print(f"  Figyelmeztetés: requested_days oszlop módosítása: {e}")
         
         # Cart items tábla
         if 'cart_items' not in existing_tables:
