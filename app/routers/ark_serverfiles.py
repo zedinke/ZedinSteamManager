@@ -416,10 +416,10 @@ async def activate_serverfiles(
     serverfiles.is_active = True
     db.commit()
     
-    return JSONResponse({
-        "success": True,
-        "message": "Szerverfájlok aktiválva"
-    })
+    return RedirectResponse(
+        url=f"/ark/serverfiles?success=Szerverfájlok+sikeresen+aktiválva",
+        status_code=302
+    )
 
 @router.get("/check-updates")
 async def check_updates_api(
