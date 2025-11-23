@@ -111,6 +111,11 @@ async def install_ark_server_files(
     # Ark Survival Ascended App ID: 2430930
     app_id = "2430930"
     
+    # Platform detektálása - Linux-on Linux verziót, Windows-on Windows verziót töltünk le
+    # Megjegyzés: Linux-on általában nem kell a platform type paraméter, mert a SteamCMD automatikusan
+    # a megfelelő platformot választja, de explicit módon is megadhatjuk
+    platform_type = "linux" if os.name != 'nt' else "windows"
+    
     # SteamCMD parancsok argumentumként
     # Ark Survival Ascended szerverfájlok telepítése
     # A parancsokat közvetlenül argumentumként adjuk át, nem script fájlként
@@ -120,7 +125,7 @@ async def install_ark_server_files(
         str(steamcmd_path),
         "+login", "anonymous",
         "+force_install_dir", str(install_path.absolute()),
-        "+@sSteamCmdForcePlatformType", "windows",  # Kényszerítjük a Windows verzió letöltését
+        "+@sSteamCmdForcePlatformType", platform_type,  # Platform-specifikus verzió letöltése
         "+app_update", app_id,  # Teljes telepítés (validate nélkül = minden fájlt letölt)
         "+quit"
     ]
@@ -191,11 +196,13 @@ async def install_ark_server_files(
                         # Újratelepítés
                         await asyncio.sleep(2)
                         # Újratelepítés SteamCMD-vel
+                        # Platform detektálása
+                        platform_type = "linux" if os.name != 'nt' else "windows"
                         process2 = await asyncio.create_subprocess_exec(
                             str(steamcmd_path),
                             "+login", "anonymous",
                             "+force_install_dir", str(install_path.absolute()),
-                            "+@sSteamCmdForcePlatformType", "windows",  # Kényszerítjük a Windows verzió letöltését
+                            "+@sSteamCmdForcePlatformType", platform_type,  # Platform-specifikus verzió letöltése
                             "+app_update", app_id,
                             "+quit",
                             stdout=asyncio.subprocess.PIPE,
