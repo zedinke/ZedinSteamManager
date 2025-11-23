@@ -185,8 +185,13 @@ async def install_ark_server_files(
                         await log("✓ ShooterGame mappa törölve, újratelepítés indítása...")
                         # Újratelepítés
                         await asyncio.sleep(2)
+                        # Újratelepítés SteamCMD-vel
                         process2 = await asyncio.create_subprocess_exec(
-                            *steamcmd_args,
+                            str(steamcmd_path),
+                            "+login", "anonymous",
+                            "+force_install_dir", str(install_path.absolute()),
+                            "+app_update", app_id,
+                            "+quit",
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.STDOUT,
                             cwd=str(install_path.parent),
