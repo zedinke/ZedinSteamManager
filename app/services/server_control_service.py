@@ -181,6 +181,7 @@ def get_docker_compose_file(server: ServerInstance) -> Path:
 def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, saved_path: Path) -> bool:
     """
     Docker Compose fájl létrehozása (új struktúra: Servers/server_{server_id}/docker-compose.yaml)
+    A konfigurációkat a Saved/Config/WindowsServer mappából olvassa be
     
     Args:
         server: ServerInstance objektum
@@ -212,8 +213,59 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         # Docker Compose fájl útvonala
         compose_file = get_docker_compose_file(server)
         
-        # Konfiguráció
-        config = server.config or {}
+        # Konfiguráció beolvasása a Saved/Config/WindowsServer mappából
+        config_path = saved_path / "Config" / "WindowsServer"
+        game_user_settings_path = config_path / "GameUserSettings.ini"
+        
+        # Konfiguráció beolvasása INI fájlból
+        config_values = {}
+        if game_user_settings_path.exists():
+            try:
+                from app.services.ark_config_service import parse_ini_file
+                ini_data = parse_ini_file(game_user_settings_path)
+                server_settings = ini_data.get("ServerSettings", {})
+                session_settings = ini_data.get("SessionSettings", {})
+                
+                # Beállítások kiolvasása (a kulcsok lehetnek különböző formátumokban)
+                # MAP_NAME a config-ból vagy alapértelmezett
+                config_values["MAP_NAME"] = server.config.get("MAP_NAME", "TheIsland") if server.config else "TheIsland"
+                config_values["SESSION_NAME"] = session_settings.get("SessionName") or server_settings.get("SessionName") or server.name
+                config_values["ServerAdminPassword"] = server_settings.get("ServerAdminPassword") or server.config.get("ServerAdminPassword", "") if server.config else ""
+                config_values["ServerPassword"] = server_settings.get("ServerPassword") or server.config.get("ServerPassword", "") if server.config else ""
+                
+                # Boolean értékek kezelése
+                rcon_enabled = server_settings.get("RCONEnabled")
+                if rcon_enabled is None:
+                    rcon_enabled = server.config.get("RCON_ENABLED", True) if server.config else True
+                config_values["RCON_ENABLED"] = str(rcon_enabled).lower() in ("true", "1", "yes", "on")
+                
+                battleeye = server_settings.get("BATTLEEYE")
+                if battleeye is None:
+                    battleeye = server.config.get("BATTLEEYE", False) if server.config else False
+                config_values["BATTLEEYE"] = str(battleeye).lower() in ("true", "1", "yes", "on")
+                
+                api = server_settings.get("API")
+                if api is None:
+                    api = server.config.get("API", False) if server.config else False
+                config_values["API"] = str(api).lower() in ("true", "1", "yes", "on")
+                
+                config_values["MAX_PLAYERS"] = server_settings.get("MaxPlayers") or server.max_players or 70
+            except Exception as e:
+                logger.warning(f"Konfiguráció beolvasása sikertelen, alapértelmezett értékeket használunk: {e}")
+        
+        # Ha nincs konfiguráció, akkor az adatbázisból vagy alapértelmezett értékeket használunk
+        if not config_values:
+            config = server.config or {}
+            config_values = {
+                "MAP_NAME": config.get("MAP_NAME", "TheIsland"),
+                "SESSION_NAME": config.get("SESSION_NAME", server.name),
+                "ServerAdminPassword": config.get("ServerAdminPassword", ""),
+                "ServerPassword": config.get("ServerPassword", ""),
+                "RCON_ENABLED": config.get("RCON_ENABLED", True),
+                "BATTLEEYE": config.get("BATTLEEYE", False),
+                "API": config.get("API", False),
+                "MAX_PLAYERS": server.max_players or 70,
+            }
         
         # Portok
         port = server.port or settings.ark_default_port
@@ -222,9 +274,9 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         
         # Docker Compose YAML összeállítása
         compose_data = {
-            'version': '3.8',
+            'version': '2.4',
             'services': {
-                f'asa_{server.id}': {
+                'asaserver': {
                     'image': 'acekorneya/asa_server:2_1_latest',
                     'container_name': f'asa_{server.id}',
                     'restart': 'unless-stopped',
@@ -240,42 +292,43 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                     'working_dir': '/home/pok/arkserver',
                     'environment': [
                         f'INSTANCE_NAME={server.id}',
-                        f'MAP_NAME={config.get("MAP_NAME", "TheIsland")}',
-                        f'PORT={port}',
+                        f'MAP_NAME={config_values.get("MAP_NAME", "TheIsland")}',
+                        f'ASA_PORT={port}',
                         f'QUERY_PORT={query_port}',
                         f'RCON_PORT={rcon_port}',
-                        f'SESSION_NAME={config.get("SESSION_NAME", server.name)}',
-                        f'MAX_PLAYERS={server.max_players or 70}',
-                        f'RCON_ENABLED={"True" if config.get("RCON_ENABLED", True) else "False"}',
-                        f'BATTLEEYE={"True" if config.get("BATTLEEYE", False) else "False"}',
-                        f'API={"True" if config.get("API", False) else "False"}',
+                        f'SESSION_NAME={config_values.get("SESSION_NAME", server.name)}',
+                        f'MAX_PLAYERS={config_values.get("MAX_PLAYERS", server.max_players or 70)}',
+                        f'RCON_ENABLED={"True" if config_values.get("RCON_ENABLED", True) else "False"}',
+                        f'BATTLEEYE={"True" if config_values.get("BATTLEEYE", False) else "False"}',
+                        f'API={"True" if config_values.get("API", False) else "False"}',
                     ],
                 }
             }
         }
         
         # Server Admin Password
-        if config.get("ServerAdminPassword"):
-            compose_data['services'][f'asa_{server.id}']['environment'].append(
-                f'SERVER_ADMIN_PASSWORD={config.get("ServerAdminPassword")}'
+        if config_values.get("ServerAdminPassword"):
+            compose_data['services']['asaserver']['environment'].append(
+                f'SERVER_ADMIN_PASSWORD={config_values.get("ServerAdminPassword")}'
             )
         
         # Server Password
-        if config.get("ServerPassword"):
-            compose_data['services'][f'asa_{server.id}']['environment'].append(
-                f'SERVER_PASSWORD={config.get("ServerPassword")}'
+        if config_values.get("ServerPassword"):
+            compose_data['services']['asaserver']['environment'].append(
+                f'SERVER_PASSWORD={config_values.get("ServerPassword")}'
             )
         
         # Mods
         if server.active_mods:
             mods_str = ",".join(str(mod_id) for mod_id in server.active_mods)
-            compose_data['services'][f'asa_{server.id}']['environment'].append(
-                f'ACTIVE_MODS={mods_str}'
+            compose_data['services']['asaserver']['environment'].append(
+                f'MOD_IDS={mods_str}'
             )
         
         # Custom Server Args
+        config = server.config or {}
         if config.get("CUSTOM_SERVER_ARGS"):
-            compose_data['services'][f'asa_{server.id}']['environment'].append(
+            compose_data['services']['asaserver']['environment'].append(
                 f'CUSTOM_SERVER_ARGS={config.get("CUSTOM_SERVER_ARGS")}'
             )
         
@@ -285,23 +338,23 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         if total_ram_gb > 0:
             # Docker memória limit: GB -> MB konverzió
             memory_limit_mb = total_ram_gb * 1024
-            compose_data['services'][f'asa_{server.id}']['deploy'] = {
-                'resources': {
-                    'limits': {
-                        'memory': f'{memory_limit_mb}M'
-                    }
-                }
-            }
+            compose_data['services']['asaserver']['mem_limit'] = f'{memory_limit_mb}M'
         
         # YAML fájl írása
         with open(compose_file, 'w') as f:
             yaml.dump(compose_data, f, default_flow_style=False, sort_keys=False)
         
         logger.info(f"Docker Compose fájl létrehozva: {compose_file}")
+        
+        # Indítási parancs fájl létrehozása/frissítése
+        update_start_command_file(server, compose_file, compose_data)
+        
         return True
         
     except Exception as e:
         logger.error(f"Hiba a Docker Compose fájl létrehozásakor: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
@@ -401,16 +454,13 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             }
         
         # Docker Compose fájl létrehozása/frissítése
+        # Mindig frissítjük, hogy a konfigurációk szinkronban legyenek
         compose_file = get_docker_compose_file(server)
-        if not compose_file.exists():
-            if not create_docker_compose_file(server, serverfiles_link, saved_path):
-                return {
-                    "success": False,
-                    "message": "Docker Compose fájl létrehozása sikertelen"
-                }
-        else:
-            # Ha létezik, frissítjük
-            create_docker_compose_file(server, serverfiles_link, saved_path)
+        if not create_docker_compose_file(server, serverfiles_link, saved_path):
+            return {
+                "success": False,
+                "message": "Docker Compose fájl létrehozása/frissítése sikertelen"
+            }
         
         # Docker Compose indítás
         compose_cmd = docker_compose_cmd.split() + ["-f", str(compose_file), "up", "-d"]
@@ -539,18 +589,93 @@ def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             "message": f"Hiba a szerver újraindításakor: {str(e)}"
         }
 
+def update_start_command_file(server: ServerInstance, compose_file: Path, compose_data: dict) -> None:
+    """
+    Indítási parancs fájl létrehozása/frissítése, ami tartalmazza az összes argumentumot
+    Ez a fájl csak akkor változik, ha a beállítások változnak
+    
+    Args:
+        server: ServerInstance objektum
+        compose_file: Docker Compose fájl útvonala
+        compose_data: Docker Compose adatok
+    """
+    try:
+        instance_dir = get_instance_dir(server)
+        command_file = instance_dir / "start_command.txt"
+        
+        docker_compose_cmd = get_docker_compose_cmd() or "docker compose"
+        
+        # Environment változók összegyűjtése
+        env_vars = compose_data.get('services', {}).get('asaserver', {}).get('environment', [])
+        
+        # Teljes indítási parancs összeállítása
+        command_lines = [
+            f"# Szerver indítási parancs - Szerver ID: {server.id}",
+            f"# Ez a parancs csak akkor változik, ha a beállítások változnak",
+            "",
+            f"{docker_compose_cmd} -f {compose_file} up -d",
+            "",
+            "# Environment változók:",
+        ]
+        
+        for env_var in env_vars:
+            command_lines.append(f"#   {env_var}")
+        
+        # Portok
+        ports = compose_data.get('services', {}).get('asaserver', {}).get('ports', [])
+        if ports:
+            command_lines.append("")
+            command_lines.append("# Portok:")
+            for port in ports:
+                command_lines.append(f"#   {port}")
+        
+        # Volumes
+        volumes = compose_data.get('services', {}).get('asaserver', {}).get('volumes', [])
+        if volumes:
+            command_lines.append("")
+            command_lines.append("# Volumes:")
+            for volume in volumes:
+                command_lines.append(f"#   {volume}")
+        
+        # Memória limit
+        mem_limit = compose_data.get('services', {}).get('asaserver', {}).get('mem_limit')
+        if mem_limit:
+            command_lines.append("")
+            command_lines.append(f"# Memória limit: {mem_limit}")
+        
+        # Fájl írása
+        with open(command_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(command_lines))
+        
+        logger.info(f"Indítási parancs fájl frissítve: {command_file}")
+    except Exception as e:
+        logger.warning(f"Hiba az indítási parancs fájl létrehozásakor: {e}")
+
 def get_start_command_string(server: ServerInstance, db: Session) -> Optional[str]:
     """
     Szerver indítási parancs string formában (megjelenítéshez)
+    A parancsot a start_command.txt fájlból olvassa be, ami csak akkor változik, ha a beállítások változnak
+    A teljes fájlt adja vissza, hogy minden argumentum látható legyen
     
     Args:
         server: ServerInstance objektum
         db: Database session
     
     Returns:
-        String formában a parancs vagy None
+        String formában a teljes parancs argumentumokkal vagy None
     """
     try:
+        instance_dir = get_instance_dir(server)
+        command_file = instance_dir / "start_command.txt"
+        
+        # Ha létezik a fájl, olvassuk be a teljes tartalmat
+        if command_file.exists():
+            with open(command_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    return content
+        
+        # Ha nincs fájl, generáljuk a parancsot
         docker_compose_cmd = get_docker_compose_cmd()
         if not docker_compose_cmd:
             return None
