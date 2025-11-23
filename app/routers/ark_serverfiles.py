@@ -312,9 +312,9 @@ async def delete_serverfiles(
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
     if serverfiles.is_active:
-        raise HTTPException(
-            status_code=400,
-            detail="Az aktív verzió nem törölhető. Először aktiválj egy másik verziót!"
+        return RedirectResponse(
+            url=f"/ark/serverfiles?cluster_id={cluster.id}&error=Az+aktív+verzió+nem+törölhető.+Először+aktiválj+egy+másik+verziót!",
+            status_code=302
         )
     
     # Fájlok törlése
@@ -323,13 +323,14 @@ async def delete_serverfiles(
         delete_ark_server_files(install_path)
     
     # Rekord törlése
+    cluster_id = serverfiles.cluster_id
     db.delete(serverfiles)
     db.commit()
     
-    return JSONResponse({
-        "success": True,
-        "message": "Szerverfájlok törölve"
-    })
+    return RedirectResponse(
+        url=f"/ark/serverfiles?cluster_id={cluster_id}&success=Szerverfájlok+sikeresen+törölve",
+        status_code=302
+    )
 
 @router.post("/{serverfiles_id}/activate")
 async def activate_serverfiles(
