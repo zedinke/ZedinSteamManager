@@ -120,6 +120,7 @@ async def install_ark_server_files(
         str(steamcmd_path),
         "+login", "anonymous",
         "+force_install_dir", str(install_path.absolute()),
+        "+@sSteamCmdForcePlatformType", "windows",  # Kényszerítjük a Windows verzió letöltését
         "+app_update", app_id,  # Teljes telepítés (validate nélkül = minden fájlt letölt)
         "+quit"
     ]
@@ -190,6 +191,7 @@ async def install_ark_server_files(
                             str(steamcmd_path),
                             "+login", "anonymous",
                             "+force_install_dir", str(install_path.absolute()),
+                            "+@sSteamCmdForcePlatformType", "windows",  # Kényszerítjük a Windows verzió letöltését
                             "+app_update", app_id,
                             "+quit",
                             stdout=asyncio.subprocess.PIPE,
