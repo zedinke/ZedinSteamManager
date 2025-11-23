@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from app.config import settings
 from app.database import ArkServerFiles, SessionLocal
 
