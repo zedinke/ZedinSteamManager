@@ -57,18 +57,14 @@ async def list_serverfiles(
     ).order_by(desc(UserServerFiles.installed_at)).all()
     
     # Aktív szerverfájlok ellenőrzése frissítésre
+    # Megjegyzés: A frissítés ellenőrzés hosszú ideig tart, ezért nem blokkoljuk a listázást
+    # A frissítés ellenőrzés külön endpoint-on történik vagy háttérben
     has_update = False
     active_serverfiles = None
     if serverfiles:
         active_serverfiles = next((sf for sf in serverfiles if sf.is_active and sf.installation_status == "completed"), None)
-        if active_serverfiles:
-            install_path = Path(active_serverfiles.install_path)
-            if install_path.exists():
-                # Gyors ellenőrzés (nem blokkoló)
-                try:
-                    has_update, _ = await check_for_updates(install_path)
-                except:
-                    has_update = False
+        # A frissítés ellenőrzés kikapcsolva a listázásnál, mert túl hosszú
+        # Külön endpoint-on lehet ellenőrizni: /ark/serverfiles/check-updates
     
     return templates.TemplateResponse("ark/serverfiles/list.html", {
         "request": request,
@@ -408,6 +404,49 @@ async def activate_serverfiles(
         "success": True,
         "message": "Szerverfájlok aktiválva"
     })
+
+@router.get("/check-updates")
+async def check_updates_api(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Frissítés ellenőrzése API endpoint"""
+    current_user = require_server_admin(request, db)
+    
+    # Aktív szerverfájlok lekérése
+    active_serverfiles = db.query(UserServerFiles).filter(
+        and_(
+            UserServerFiles.user_id == current_user.id,
+            UserServerFiles.is_active == True,
+            UserServerFiles.installation_status == "completed"
+        )
+    ).first()
+    
+    if not active_serverfiles:
+        return JSONResponse({
+            "has_update": False,
+            "message": "Nincs aktív szerverfájl telepítve"
+        })
+    
+    install_path = Path(active_serverfiles.install_path)
+    if not install_path.exists():
+        return JSONResponse({
+            "has_update": True,
+            "message": "Telepítési útvonal nem létezik"
+        })
+    
+    # Frissítés ellenőrzése (hosszú művelet, de külön endpoint)
+    try:
+        has_update, _ = await check_for_updates(install_path)
+        return JSONResponse({
+            "has_update": has_update,
+            "message": "Frissítés elérhető" if has_update else "Nincs frissítés"
+        })
+    except Exception as e:
+        return JSONResponse({
+            "has_update": False,
+            "message": f"Ellenőrzési hiba: {str(e)}"
+        })
 
 @router.post("/update")
 async def start_update(

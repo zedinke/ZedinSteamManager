@@ -18,6 +18,9 @@ engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=300,
+    pool_size=20,  # Növelt pool méret
+    max_overflow=40,  # Növelt overflow
+    pool_timeout=60,  # Növelt timeout
     echo=False
 )
 
