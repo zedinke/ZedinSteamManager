@@ -157,7 +157,54 @@ async def install_ark_server_files(
             await log("✓ SteamCMD telepítés sikeresen befejeződött!")
             
             # Várunk egy kicsit, hogy a fájlrendszer frissüljön
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
+            
+            # Ha a SteamCMD azt mondta "already up to date", de nincs Binaries mappa,
+            # akkor töröljük a ShooterGame mappát és újratelepítjük
+            shooter_game = install_path / "ShooterGame"
+            binaries = shooter_game / "Binaries" if shooter_game.exists() else None
+            if shooter_game.exists() and (not binaries or not binaries.exists()):
+                await log("⚠️ SteamCMD 'already up to date' üzenetet adott, de nincs Binaries mappa!")
+                await log("⚠️ Töröljük a ShooterGame mappát és újratelepítjük...")
+                try:
+                    import subprocess
+                    # Jogosultságok javítása
+                    subprocess.run(
+                        ["sudo", "chown", "-R", f"{os.getuid()}:{os.getgid()}", str(shooter_game)],
+                        capture_output=True,
+                        timeout=10
+                    )
+                    # Törlés
+                    result = subprocess.run(
+                        ["sudo", "rm", "-rf", str(shooter_game)],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    if result.returncode == 0:
+                        await log("✓ ShooterGame mappa törölve, újratelepítés indítása...")
+                        # Újratelepítés
+                        await asyncio.sleep(2)
+                        process2 = await asyncio.create_subprocess_exec(
+                            *steamcmd_args,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.STDOUT,
+                            cwd=str(install_path.parent),
+                            bufsize=0
+                        )
+                        while True:
+                            line = await process2.stdout.readline()
+                            if not line:
+                                break
+                            line_text = line.decode('utf-8', errors='ignore').strip()
+                            if line_text:
+                                await log(line_text)
+                        return_code = await process2.wait()
+                        await asyncio.sleep(3)  # Várunk, hogy a fájlrendszer frissüljön
+                    else:
+                        await log(f"⚠️ ShooterGame mappa törlése sikertelen: {result.stderr}")
+                except Exception as e:
+                    await log(f"⚠️ Újratelepítés sikertelen: {e}")
             
             # Ellenőrizzük, hogy a bináris létezik-e
             binary_path = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
