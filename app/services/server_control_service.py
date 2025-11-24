@@ -211,6 +211,10 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         # FONTOS: Először ellenőrizzük és javítjuk a base mappát (ServerFiles)!
         # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
         base_path = Path(settings.ark_serverfiles_base)
+        
+        # Real server path meghatározása (symlink célja)
+        real_server_path = serverfiles_link.resolve() if serverfiles_link.is_symlink() else serverfiles_link
+        
         if base_path.exists():
             try:
                 stat_info = base_path.stat()
