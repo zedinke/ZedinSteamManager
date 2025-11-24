@@ -114,19 +114,47 @@ async def send_verification_email(email: str, username: str, token: str, request
     
     # Ha van request, mindig használjuk azt (ez a legmegbízhatóbb)
     if request:
-        base_url = f"{request.url.scheme}://{request.url.hostname}"
-        if request.url.port and request.url.port not in [80, 443]:
-            base_url += f":{request.url.port}"
+        # Használjuk a request teljes URL-jét, de csak a base részét (scheme + hostname + port)
+        scheme = request.url.scheme or "http"
+        hostname = request.url.hostname
+        
+        # Ha nincs hostname, próbáljuk meg a headers-ből
+        if not hostname:
+            hostname = request.headers.get("host") or request.headers.get("Host")
+            if hostname and ":" in hostname:
+                hostname = hostname.split(":")[0]
+        
+        if not hostname:
+            logger.error(f"Email verifikáció: nem sikerült meghatározni a hostname-t. Request URL: {request.url}")
+            return False
+        
+        base_url = f"{scheme}://{hostname}"
+        
+        # Port hozzáadása, ha van és nem standard port
+        port = request.url.port
+        if port and port not in [80, 443]:
+            base_url += f":{port}"
+        elif not port and request.headers.get("host") and ":" in request.headers.get("host", ""):
+            # Ha a port a Host header-ben van
+            host_header = request.headers.get("host", "")
+            if ":" in host_header:
+                port_from_header = host_header.split(":")[1]
+                try:
+                    port_int = int(port_from_header)
+                    if port_int not in [80, 443]:
+                        base_url += f":{port_int}"
+                except ValueError:
+                    pass
     else:
         # Ha nincs request, próbáljuk meg a settings.base_url-t használni
         base_url = settings.base_url
         # Ha a base_url üres, rossz formátumú, vagy localhost, akkor hiba
         if not base_url or base_url.startswith("http:///") or base_url.startswith("https:///") or base_url.startswith("http://localhost") or base_url.startswith("https://localhost"):
-            logger.error(f"RCON email: base_url nem érvényes: '{base_url}'. Request szükséges az email link generálásához.")
+            logger.error(f"Email verifikáció: base_url nem érvényes: '{base_url}'. Request szükséges az email link generálásához.")
             return False
     
     verification_link = f"{base_url}/verify-email?token={token}"
-    logger.info(f"Email verifikációs link generálva: {verification_link}")
+    logger.info(f"Email verifikációs link generálva: {verification_link} (base_url: {base_url})")
     
     # Gamer design template
     body = f"""
