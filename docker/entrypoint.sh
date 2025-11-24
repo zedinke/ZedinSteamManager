@@ -234,7 +234,9 @@ echo "Szerver indítása..."
 if [ "${USE_WINE}" = "true" ]; then
     echo "Wine használata Windows bináris futtatásához..."
     # Wine konfiguráció
-    export WINEPREFIX="${ARK_SERVER_DIR}/.wine"
+    # FONTOS: A Wine prefix-et a konténerben lévő home directory-ba tesszük,
+    # nem a volume mount-ba, mert a volume mount nem a konténerben futó felhasználó tulajdona
+    export WINEPREFIX="${HOME}/.wine"
     export DISPLAY=:99
     export WINEDEBUG=-all  # Wine debug üzenetek kikapcsolása (csak hibák)
     
