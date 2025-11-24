@@ -663,6 +663,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         # Játék típus meghatározása (Ark Survival Evolved vagy Ark Survival Ascended)
         is_evolved = False
         ark_app_id = "2430930"  # Ark Survival Ascended alapértelmezett
+        server_binary = "ArkAscendedServer.exe"  # Alapértelmezett
         if db:
             try:
                 from app.database import Game
@@ -670,6 +671,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
                     is_evolved = True
                     ark_app_id = "376030"  # Ark Survival Evolved dedikált szerver App ID
+                    server_binary = "ShooterGameServer"  # Ark Survival Evolved bináris
             except Exception:
                 # Ha hiba van, az eredeti értékeket használjuk
                 pass
@@ -716,6 +718,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         f'ARK_SERVER_DIR={container_work_dir}',  # A mountolt mappa, ahol a ServerFiles található
                         f'UPDATE_SERVER=False',  # Ne telepítsen újra, ha a fájlok már a hoston vannak
                         f'ARK_APP_ID={ark_app_id}',  # Steam App ID (2430930 = Ascended, 376030 = Evolved)
+                        f'SERVER_BINARY={server_binary}',  # Server bináris (ArkAscendedServer.exe vagy ShooterGameServer)
                     ],
                 }
             }

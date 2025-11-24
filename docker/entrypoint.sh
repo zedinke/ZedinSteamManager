@@ -28,20 +28,58 @@ CLUSTER_ID="${CLUSTER_ID:-}"
 CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
 UPDATE_SERVER="${UPDATE_SERVER:-True}"
 
-# Ellenőrizzük, hogy a szerverfájlok léteznek-e
-# Először próbáljuk meg a linux64/ mappában lévő binárist, majd a Windows binárist Wine-nal
-# A Linux bináris a linux64/ mappában van (vagy nincs, csak .so fájlok)
-# A Windows bináris a ShooterGame/Binaries/Win64/ArkAscendedServer.exe (nem ShooterGameServer.exe!)
-if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
-    SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
-    USE_WINE=false
-elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe" ]; then
-    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
-    USE_WINE=true
+# SERVER_BINARY environment változóból jön (ha be van állítva)
+# Ha nincs beállítva, automatikusan meghatározzuk
+if [ -n "${SERVER_BINARY}" ]; then
+    # Ha SERVER_BINARY be van állítva, használjuk azt
+    # De ellenőrizzük, hogy létezik-e
+    if [ "${SERVER_BINARY}" = "ShooterGameServer" ]; then
+        # Ark Survival Evolved: Linux bináris
+        if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
+            SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+            USE_WINE=false
+        else
+            echo "HIBA: ShooterGameServer nem található: ${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+            exit 1
+        fi
+    elif [ "${SERVER_BINARY}" = "ArkAscendedServer.exe" ]; then
+        # Ark Survival Ascended: Windows bináris Wine-nal
+        if [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe" ]; then
+            SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
+            USE_WINE=true
+        else
+            echo "HIBA: ArkAscendedServer.exe nem található: ${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
+            exit 1
+        fi
+    else
+        # Egyedi útvonal (teljes path)
+        if [ -f "${SERVER_BINARY}" ]; then
+            # Ha teljes path, használjuk azt
+            USE_WINE=false
+            if [[ "${SERVER_BINARY}" == *.exe ]]; then
+                USE_WINE=true
+            fi
+        else
+            echo "HIBA: SERVER_BINARY nem található: ${SERVER_BINARY}"
+            exit 1
+        fi
+    fi
 else
-    # Alapértelmezett: próbáljuk meg a linux64/ mappát
-    SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
-    USE_WINE=false
+    # Automatikus meghatározás (backward compatibility)
+    # Először próbáljuk meg a linux64/ mappában lévő binárist, majd a Windows binárist Wine-nal
+    # A Linux bináris a linux64/ mappában van (vagy nincs, csak .so fájlok)
+    # A Windows bináris a ShooterGame/Binaries/Win64/ArkAscendedServer.exe (nem ShooterGameServer.exe!)
+    if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
+        SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+        USE_WINE=false
+    elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe" ]; then
+        SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
+        USE_WINE=true
+    else
+        # Alapértelmezett: próbáljuk meg a linux64/ mappát
+        SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+        USE_WINE=false
+    fi
 fi
 
 # FONTOS: NE hozzuk létre a mappát itt! A manager már létrehozza megfelelő jogosultságokkal.
