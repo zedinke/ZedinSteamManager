@@ -104,8 +104,12 @@ async def start_install(
     # Mindig "latest" verziót használunk
     version = "latest"
     
-    # Telepítési útvonal
-    user_serverfiles = get_user_serverfiles_path(current_user.id)
+    # Ark Survival Evolved játék lekérése az adatbázisból
+    ark_game = db.query(Game).filter(Game.name == "Ark Survival Evolved").first()
+    game_id = ark_game.id if ark_game else None
+    
+    # Telepítési útvonal (játék-specifikus)
+    user_serverfiles = get_user_serverfiles_path(current_user.id, game_id=game_id, db=db)
     install_path = user_serverfiles / version
     
     # Ellenőrizzük, hogy van-e már telepítés folyamatban
@@ -520,7 +524,12 @@ async def start_update(
         )
     
     # Telepítési útvonal
-    user_serverfiles = get_user_serverfiles_path(current_user.id)
+    # Ark Survival Evolved játék lekérése az adatbázisból
+    ark_game = db.query(Game).filter(Game.name == "Ark Survival Evolved").first()
+    game_id = ark_game.id if ark_game else None
+    
+    # Telepítési útvonal (játék-specifikus)
+    user_serverfiles = get_user_serverfiles_path(current_user.id, game_id=game_id, db=db)
     install_path = user_serverfiles / "latest"
     
     # Új rekord létrehozása frissítéshez

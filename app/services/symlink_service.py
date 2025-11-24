@@ -145,17 +145,29 @@ def ensure_permissions(path: Path, recursive: bool = False) -> bool:
         print(f"Figyelmeztetés: Jogosultságok beállítása hiba {path}: {e}")
         return False
 
-def get_user_serverfiles_path(user_id: int) -> Path:
+def get_user_serverfiles_path(user_id: int, game_id: Optional[int] = None, db: Optional[Session] = None) -> Path:
     """
     Felhasználó serverfiles mappa útvonala (régi struktúra, kompatibilitás)
     
     Args:
         user_id: User ID (Server Admin)
+        game_id: Game ID (opcionális, ha meg van adva, akkor játék-specifikus útvonalat használ)
+        db: Database session (opcionális, csak ha game_id meg van adva)
     
     Returns:
         Path objektum a felhasználó serverfiles mappájához
     """
-    base_path = Path(settings.ark_serverfiles_base)
+    # Játék-specifikus base path meghatározása
+    if db and game_id:
+        from app.database import Game
+        game = db.query(Game).filter(Game.id == game_id).first()
+        if game and game.name == "Ark Survival Evolved":
+            base_path = Path(settings.ark_evolved_serverfiles_base)
+        else:
+            base_path = Path(settings.ark_serverfiles_base)
+    else:
+        base_path = Path(settings.ark_serverfiles_base)
+    
     user_serverfiles_path = base_path / f"user_{user_id}"
     return user_serverfiles_path
 
