@@ -154,7 +154,7 @@ async def register(
         db.commit()
         
         # Email küldése
-        await send_verification_email(email, username, token)
+        await send_verification_email(email, username, token, request)
         
         from app.main import get_templates
         templates = get_templates()

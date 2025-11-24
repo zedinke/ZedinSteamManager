@@ -105,9 +105,19 @@ def get_email_template(template_name: str, **kwargs) -> str:
     # Alapértelmezett template
     return kwargs.get("body", "")
 
-async def send_verification_email(email: str, username: str, token: str) -> bool:
+async def send_verification_email(email: str, username: str, token: str, request: Request = None) -> bool:
     """Email verifikációs email küldése"""
-    verification_link = f"{settings.base_url}/verify-email?token={token}"
+    from fastapi import Request
+    
+    # Ha a base_url localhost, próbáljuk meg a request-ből meghatározni
+    base_url = settings.base_url
+    if (base_url.startswith("http://localhost") or base_url.startswith("https://localhost")) and request:
+        # Használjuk a request URL-jét
+        base_url = f"{request.url.scheme}://{request.url.hostname}"
+        if request.url.port and request.url.port not in [80, 443]:
+            base_url += f":{request.url.port}"
+    
+    verification_link = f"{base_url}/verify-email?token={token}"
     
     # Gamer design template
     body = f"""

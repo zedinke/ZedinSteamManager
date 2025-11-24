@@ -62,8 +62,15 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
         # Teljes packet: [4 byte length][header + body]
         auth_packet = struct.pack('<I', packet_length) + full_packet
         
-        logger.info(f"RCON autentikáció küldés: host={host}, port={port}, jelszó hossza={len(password_bytes)}, jelszó előnézet={password[:3] + '...' if len(password) > 3 else password}, packet hossza={len(auth_packet)}")
+        logger.info(f"RCON autentikáció küldés: host={host}, port={port}, jelszó hossza={len(password_bytes)}, jelszó előnézet={password[:3] + '...' if len(password) > 3 else password}, jelszó teljes={password if len(password) <= 20 else password[:20] + '...'}, packet hossza={len(auth_packet)}")
         logger.debug(f"RCON autentikáció packet hex: {auth_packet.hex()[:100]}...")
+        
+        # Ellenőrizzük, hogy a jelszó nem üres
+        if not password_bytes or len(password_bytes) == 0:
+            logger.error(f"RCON autentikáció: jelszó üres vagy nem került átadásra!")
+            sock.close()
+            return None
+        
         sock.send(auth_packet)
         
         # Válasz olvasása (2 packet: SERVERDATA_AUTH_RESPONSE és SERVERDATA_RESPONSE_VALUE)
