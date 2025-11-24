@@ -293,13 +293,16 @@ if [ "${USE_WINE}" = "true" ]; then
     fi
     
     # Wine prefix inicializálása (ha még nem teljes)
-    # A Wine automatikusan inicializálja, de ellenőrizzük, hogy a kernel32.dll létezik-e
-    if [ ! -f "${WINEPREFIX}/drive_c/windows/system32/kernel32.dll" ]; then
-        echo "Wine prefix inicializálása (kernel32.dll hiányzik)..."
+    # A Wine automatikusan inicializálja, de ellenőrizzük, hogy a Wine prefix létezik-e és inicializálva van-e
+    # A kernel32.dll ellenőrzése nem megbízható, mert a Wine prefix inicializálva lehet, de a DLL-ek más helyen lehetnek
+    # Egyszerűen ellenőrizzük, hogy a Wine prefix létezik-e és van-e benne system.reg
+    if [ ! -f "${WINEPREFIX}/system.reg" ]; then
+        echo "Wine prefix inicializálása (system.reg hiányzik)..."
         echo "Ez 30-60 másodpercet vehet igénybe..."
         # Próbáljuk meg inicializálni a Wine prefix-et timeout-tal
         # A wineboot --init időbe telhet, ezért timeout-ot használunk
-        if timeout 90 wineboot --init > /tmp/wine_init.log 2>&1; then
+        # A stderr-t is redirecteljük, hogy ne zavarjon
+        if timeout 90 sh -c 'WINEDLLOVERRIDES="mscoree,mshtml=" wineboot --init' > /tmp/wine_init.log 2>&1; then
             echo "✓ Wine prefix inicializálás sikeres"
         else
             EXIT_CODE=$?
@@ -309,8 +312,8 @@ if [ "${USE_WINE}" = "true" ]; then
                 tail -20 /tmp/wine_init.log || true
             fi
             # Mégis folytatjuk, mert a Wine prefix lehet, hogy létrejött
-            if [ -f "${WINEPREFIX}/drive_c/windows/system32/kernel32.dll" ]; then
-                echo "✓ Wine prefix inicializálva (kernel32.dll létezik)"
+            if [ -f "${WINEPREFIX}/system.reg" ]; then
+                echo "✓ Wine prefix inicializálva (system.reg létezik)"
             else
                 echo "FIGYELMEZTETÉS: Wine prefix inicializálás nem fejeződött be, de folytatjuk..."
                 echo "A Wine automatikusan inicializálja a prefix-et az első futtatáskor"
@@ -318,7 +321,7 @@ if [ "${USE_WINE}" = "true" ]; then
         fi
         sleep 1
     else
-        echo "✓ Wine prefix már inicializálva (kernel32.dll létezik)"
+        echo "✓ Wine prefix már inicializálva (system.reg létezik)"
     fi
     
     # Szerver indítása Wine-nal
