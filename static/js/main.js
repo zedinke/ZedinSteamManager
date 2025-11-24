@@ -84,16 +84,39 @@ document.addEventListener('DOMContentLoaded', function() {
     //     }, 5000);
     // });
     
-    // Form validation
+    // Form validation - csak akkor ellenőrizzük, ha a mezők nevei azt jelzik, hogy megerősítő mezők
+    // (pl. password és password_confirm, nem pedig server_admin_password és server_password)
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function(e) {
             const passwordInputs = form.querySelectorAll('input[type="password"]');
             if (passwordInputs.length === 2) {
-                const password = passwordInputs[0].value;
-                const passwordConfirm = passwordInputs[1].value;
+                const password1 = passwordInputs[0];
+                const password2 = passwordInputs[1];
                 
-                if (password !== passwordConfirm) {
+                // Csak akkor ellenőrizzük, ha a mezők nevei azt jelzik, hogy megerősítő mezők
+                // (pl. "password" és "password_confirm", nem pedig "server_admin_password" és "server_password")
+                const name1 = password1.name || password1.id || '';
+                const name2 = password2.name || password2.id || '';
+                
+                // Ha a mezők nevei tartalmaznak "confirm" vagy "password" és "password_confirm" páros,
+                // akkor ellenőrizzük az egyezést
+                const isPasswordConfirm = (
+                    (name1.includes('password') && name2.includes('confirm')) ||
+                    (name2.includes('password') && name1.includes('confirm')) ||
+                    (name1 === 'password' && name2 === 'password_confirm') ||
+                    (name1 === 'password_confirm' && name2 === 'password') ||
+                    (name1 === 'new_password' && name2 === 'confirm_password') ||
+                    (name1 === 'confirm_password' && name2 === 'new_password')
+                );
+                
+                // Ha NEM megerősítő mezők (pl. server_admin_password és server_password), akkor NEM ellenőrizzük
+                if (!isPasswordConfirm) {
+                    return; // Két különböző jelszó mező, nem kell ellenőrizni
+                }
+                
+                // Megerősítő mezők esetén ellenőrizzük az egyezést
+                if (password1.value !== password2.value) {
                     e.preventDefault();
                     alert('A jelszavak nem egyeznek!');
                     return false;

@@ -1358,6 +1358,10 @@ async def edit_server(
         server_config["MAP_NAME"] = map_name
     if session_name:
         server_config["SESSION_NAME"] = session_name
+    # FONTOS: A két jelszó teljesen független egymástól:
+    # - ServerAdminPassword: RCON és admin parancsokhoz használt jelszó (ingame admin)
+    # - ServerPassword: A szerver jelszava, amit a játékosoknak kell megadniuk, hogy csatlakozzanak
+    # Nincs ellenőrzés, hogy a két jelszó különböző legyen - lehet ugyanaz is.
     if server_admin_password and server_admin_password.strip():
         server_config["ServerAdminPassword"] = server_admin_password
     if server_password is not None:
