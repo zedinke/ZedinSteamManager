@@ -394,7 +394,7 @@ async def install_ark_server_files(
     
     # SteamCMD parancs összeállítása
     # Ark Survival Ascended App ID: 2430930
-    # Ark Survival Evolved App ID: 346110
+    # Ark Survival Evolved dedikált szerver App ID: 376030 (346110 = játék App ID, nem elérhető Linux-ra)
     if steam_app_id:
         app_id = steam_app_id
         await log(f"Steam App ID: {app_id} (megadott)")
