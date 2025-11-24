@@ -27,14 +27,11 @@ CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
 UPDATE_SERVER="${UPDATE_SERVER:-True}"
 
 # Ellenőrizzük, hogy a szerverfájlok léteznek-e
-# ARK: Survival Ascended jelenleg csak Windows-on támogatott, ezért Wine-t használunk
-# Először próbáljuk meg a linux64/ mappában lévő binárist, majd a ShooterGame/Binaries/Linux/ mappát, végül a Windows binárist Wine-nal
-# A Linux bináris lehet a linux64/ mappában vagy a ShooterGame/Binaries/Linux/ mappában
+# Először próbáljuk meg a linux64/ mappában lévő binárist, majd a Windows binárist Wine-nal
+# A Linux bináris a linux64/ mappában van (vagy nincs, csak .so fájlok)
+# A Windows bináris a ShooterGame/Binaries/Win64/ArkAscendedServer.exe (nem ShooterGameServer.exe!)
 if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
     SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
-    USE_WINE=false
-elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer" ]; then
-    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
     USE_WINE=false
 elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe" ]; then
     SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
