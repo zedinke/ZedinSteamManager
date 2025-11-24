@@ -3,7 +3,7 @@ Mod kezelő router - Server Admin mod csomagok kezelése
 """
 
 from fastapi import APIRouter, Request, Form, HTTPException, Depends
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 from app.database import get_db, User, UserMod
@@ -117,26 +117,26 @@ async def delete_mod(
     mod = db.query(UserMod).filter(UserMod.id == mod_id).first()
     
     if not mod:
-        return JSONResponse(
-            status_code=404,
-            content={"success": False, "detail": "Mod nem található"}
+        return RedirectResponse(
+            url="/mods?error=Mod+nem+található",
+            status_code=303
         )
     
     # Ellenőrizzük, hogy a mod a felhasználóhoz tartozik-e
     if mod.user_id != current_user.id:
-        return JSONResponse(
-            status_code=403,
-            content={"success": False, "detail": "Nincs jogosultságod ezt a modot törölni"}
+        return RedirectResponse(
+            url="/mods?error=Nincs+jogosultságod+ezt+a+modot+törölni",
+            status_code=303
         )
     
     mod_name = mod.name
     db.delete(mod)
     db.commit()
     
-    return JSONResponse({
-        "success": True,
-        "message": f"'{mod_name}' mod sikeresen törölve"
-    })
+    return RedirectResponse(
+        url=f"/mods?success={mod_name}+mod+sikeresen+törölve",
+        status_code=303
+    )
 
 @router.get("/api/list")
 async def api_list_mods(
