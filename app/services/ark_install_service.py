@@ -482,12 +482,18 @@ async def install_ark_server_files(
         # FONTOS: SteamCMD után AZONNAL beállítjuk a jogosultságokat (SteamCMD root-ként hozhatja létre a mappákat!)
         await log("Jogosultságok beállítása a SteamCMD által létrehozott mappákra...")
         try:
-            current_uid = os.getuid()
+            from app.services.symlink_service import ensure_permissions, ensure_docker_container_permissions
             
-            from app.services.symlink_service import ensure_permissions
-            # Rekurzívan beállítjuk az összes mappa és fájl jogosultságát
-            ensure_permissions(install_path, recursive=True)
-            await log("✓ Jogosultságok beállítva a SteamCMD telepítésre")
+            # FONTOS: Ha root-ként futunk, akkor a Docker konténer UID/GID-jét (1000:1000) kell használni!
+            # Mert a Docker konténer 1000:1000 UID/GID-vel fut, és a fájloknak ezzel kell rendelkezniük
+            if os.getuid() == 0:
+                await log("Root-ként futunk, Docker konténer jogosultságok beállítása (1000:1000)...")
+                ensure_docker_container_permissions(install_path, recursive=True)
+                await log("✓ Docker konténer jogosultságok beállítva (1000:1000)")
+            else:
+                # Ha nem root-ként futunk, akkor a jelenlegi felhasználó jogosultságait használjuk
+                ensure_permissions(install_path, recursive=True)
+                await log("✓ Jogosultságok beállítva a SteamCMD telepítésre")
         except Exception as e:
             await log(f"⚠️ Jogosultságok beállítása sikertelen: {e}")
             # Próbáljuk meg manuálisan is
@@ -647,9 +653,14 @@ async def install_ark_server_files(
                     await asyncio.sleep(3)  # Várunk, hogy a fájlrendszer frissüljön
                     # FONTOS: Újratelepítés után AZONNAL beállítjuk a jogosultságokat
                     try:
-                        from app.services.symlink_service import ensure_permissions
-                        ensure_permissions(install_path, recursive=True)
-                        await log("✓ Jogosultságok beállítva az újratelepítésre")
+                        from app.services.symlink_service import ensure_permissions, ensure_docker_container_permissions
+                        # FONTOS: Ha root-ként futunk, akkor a Docker konténer UID/GID-jét (1000:1000) kell használni!
+                        if os.getuid() == 0:
+                            ensure_docker_container_permissions(install_path, recursive=True)
+                            await log("✓ Docker konténer jogosultságok beállítva az újratelepítésre (1000:1000)")
+                        else:
+                            ensure_permissions(install_path, recursive=True)
+                            await log("✓ Jogosultságok beállítva az újratelepítésre")
                     except Exception as perm_e:
                         await log(f"⚠️ Jogosultságok beállítása sikertelen: {perm_e}")
                 except Exception as e:
