@@ -79,6 +79,18 @@ else
     echo "[UPDATE] ⚠️  Figyelmeztetés: build-image.sh nem található, Docker build kihagyva"
 fi
 
+# Cron job-ok automatikus beállítása
+echo "[UPDATE] Cron job-ok ellenőrzése és beállítása..."
+if [ -f "cron/setup_cron_jobs.sh" ]; then
+    chmod +x cron/setup_cron_jobs.sh
+    bash cron/setup_cron_jobs.sh "$PROJECT_DIR" "$PYTHON_CMD" || {
+        echo "[UPDATE] ⚠️  Figyelmeztetés: Cron job beállítás során hiba történt, de folytatjuk..."
+    }
+    echo "[UPDATE] ✓ Cron job-ok ellenőrzése befejezve"
+else
+    echo "[UPDATE] ⚠️  Figyelmeztetés: setup_cron_jobs.sh nem található, cron job beállítás kihagyva"
+fi
+
 # Service újraindítása
 echo "[UPDATE] Service újraindítása..."
 if systemctl is-active --quiet "$SERVICE_NAME"; then
