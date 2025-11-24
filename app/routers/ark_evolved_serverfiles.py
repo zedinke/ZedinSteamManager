@@ -260,10 +260,8 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
             steam_app_id = ark_game.steam_app_id
             await progress_callback(f"Játék: {ark_game.name} (Steam App ID: {steam_app_id})")
         else:
-            # Alapértelmezett: Ark Survival Evolved dedikált szerver App ID
-            # 346110 = játék App ID (nem elérhető Linux-ra)
-            # 376030 = dedikált szerver App ID (Linux-ra elérhető)
-            steam_app_id = "376030"
+            # Alapértelmezett: Ark Survival Evolved
+            steam_app_id = "346110"
             await progress_callback(f"Játék: Ark Survival Evolved (alapértelmezett Steam App ID: {steam_app_id})")
         
         # Telepítés vagy frissítés
