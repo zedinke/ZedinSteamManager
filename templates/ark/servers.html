@@ -920,44 +920,48 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event delegation használata - így működik, még ha a gombok később is jönnek létre
     document.addEventListener('click', function(e) {
+        console.log('Click event detected, target:', e.target, 'tagName:', e.target.tagName, 'className:', e.target.className);
+        
         // Logok gomb
-        if (e.target.closest('.logs-btn')) {
+        const logsBtn = e.target.closest('.logs-btn');
+        if (logsBtn) {
             e.preventDefault();
             e.stopPropagation();
-            const button = e.target.closest('.logs-btn');
-            const serverId = parseInt(button.getAttribute('data-server-id'));
+            const serverId = parseInt(logsBtn.getAttribute('data-server-id'));
             console.log('Logs button clicked via delegation, serverId:', serverId);
             if (serverId) {
                 if (window.showServerLogs) {
+                    console.log('Calling window.showServerLogs');
                     window.showServerLogs(serverId);
                 } else {
                     console.error('window.showServerLogs nem elérhető');
                     alert('Hiba: A logok függvény nem elérhető. Kérlek, frissítsd az oldalt.');
                 }
             } else {
-                console.error('Logs button: serverId nem található');
+                console.error('Logs button: serverId nem található, data-server-id:', logsBtn.getAttribute('data-server-id'));
             }
-            return;
+            return false;
         }
         
         // Shutdown gomb
-        if (e.target.closest('.shutdown-btn')) {
+        const shutdownBtn = e.target.closest('.shutdown-btn');
+        if (shutdownBtn) {
             e.preventDefault();
             e.stopPropagation();
-            const button = e.target.closest('.shutdown-btn');
-            const serverId = parseInt(button.getAttribute('data-server-id'));
+            const serverId = parseInt(shutdownBtn.getAttribute('data-server-id'));
             console.log('Shutdown button clicked via delegation, serverId:', serverId);
             if (serverId) {
                 if (window.showShutdownModal) {
+                    console.log('Calling window.showShutdownModal');
                     window.showShutdownModal(serverId);
                 } else {
                     console.error('window.showShutdownModal nem elérhető');
                     alert('Hiba: A shutdown függvény nem elérhető. Kérlek, frissítsd az oldalt.');
                 }
             } else {
-                console.error('Shutdown button: serverId nem található');
+                console.error('Shutdown button: serverId nem található, data-server-id:', shutdownBtn.getAttribute('data-server-id'));
             }
-            return;
+            return false;
         }
     });
     
