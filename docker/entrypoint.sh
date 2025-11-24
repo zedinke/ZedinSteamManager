@@ -105,18 +105,40 @@ fi
 
 # Modok letöltése (ha vannak beállítva)
 if [ -n "${MOD_IDS}" ]; then
-    echo "Modok letöltése SteamCMD-vel..."
+    echo "=========================================="
+    echo "MODOK LETÖLTÉSE KEZDŐDIK"
+    echo "=========================================="
     echo "Mod IDs: ${MOD_IDS}"
+    echo "ARK_SERVER_DIR: ${ARK_SERVER_DIR}"
+    echo "STEAMCMD_BIN: ${STEAMCMD_BIN}"
     
     # Ellenőrizzük, hogy a SteamCMD létezik-e
     if [ ! -f "${STEAMCMD_BIN}" ]; then
-        echo "FIGYELMEZTETÉS: SteamCMD nem található, modok letöltése kihagyva"
+        echo "HIBA: SteamCMD nem található: ${STEAMCMD_BIN}"
+        echo "Modok letöltése kihagyva"
     else
-        # Mods mappa létrehozása (ha még nem létezik)
-        MODS_DIR="${ARK_SERVER_DIR}/ShooterGame/Content/Mods"
+        echo "SteamCMD megtalálva, modok letöltése..."
+        
+        # ARK Survival Ascended modok a steamapps/workshop/content/2430930/ mappába kerülnek
+        # De a szerver a ShooterGame/Mods mappát használja (nem Content/Mods!)
+        # A SteamCMD workshop_download_item automatikusan a workshop/content mappába tölti le,
+        # de szimlinket kell létrehozni vagy másolni kell a modokat a ShooterGame/Mods mappába
+        
+        # Először ellenőrizzük, hogy létezik-e a workshop mappa
+        WORKSHOP_DIR="${ARK_SERVER_DIR}/steamapps/workshop/content/${ARK_APP_ID}"
+        MODS_DIR="${ARK_SERVER_DIR}/ShooterGame/Mods"
+        
+        echo "Workshop directory: ${WORKSHOP_DIR}"
+        echo "Mods directory: ${MODS_DIR}"
+        
+        # Mindkét mappát létrehozzuk
+        mkdir -p "${WORKSHOP_DIR}" || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a workshop mappát"
         mkdir -p "${MODS_DIR}" || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Mods mappát"
         
         # Jogosultságok beállítása
+        if [ -d "${WORKSHOP_DIR}" ]; then
+            chmod -R u+w "${WORKSHOP_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült beállítani a workshop mappa jogosultságait"
+        fi
         if [ -d "${MODS_DIR}" ]; then
             chmod -R u+w "${MODS_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült beállítani a Mods mappa jogosultságait"
         fi
@@ -127,15 +149,45 @@ if [ -n "${MOD_IDS}" ]; then
         for mod_id in "${MOD_ARRAY[@]}"; do
             mod_id=$(echo "${mod_id}" | xargs)  # Trim whitespace
             if [ -n "${mod_id}" ]; then
+                echo "----------------------------------------"
                 echo "Mod letöltése: ${mod_id}..."
+                echo "SteamCMD parancs: ${STEAMCMD_BIN} +force_install_dir ${ARK_SERVER_DIR} +login anonymous +workshop_download_item ${ARK_APP_ID} ${mod_id} +quit"
+                
+                # SteamCMD futtatása részletes outputtal
                 "${STEAMCMD_BIN}" +force_install_dir "${ARK_SERVER_DIR}" \
                     +login anonymous \
                     +workshop_download_item ${ARK_APP_ID} ${mod_id} \
-                    +quit
+                    +quit 2>&1 | tee -a /tmp/steamcmd_mod_${mod_id}.log
                 
                 WORKSHOP_EXIT=$?
+                echo "SteamCMD exit code: ${WORKSHOP_EXIT}"
+                
+                # Ellenőrizzük, hogy a mod letöltődött-e
+                MOD_WORKSHOP_PATH="${WORKSHOP_DIR}/${mod_id}"
+                if [ -d "${MOD_WORKSHOP_PATH}" ]; then
+                    echo "✓ Mod ${mod_id} letöltve a workshop mappába: ${MOD_WORKSHOP_PATH}"
+                    echo "Mod mappa tartalma:"
+                    ls -la "${MOD_WORKSHOP_PATH}" | head -10 || echo "Nem sikerült listázni a mod mappát"
+                    
+                    # Szimlink létrehozása vagy másolás a ShooterGame/Mods mappába
+                    MOD_TARGET="${MODS_DIR}/${mod_id}"
+                    if [ ! -e "${MOD_TARGET}" ]; then
+                        echo "Szimlink létrehozása: ${MOD_TARGET} -> ${MOD_WORKSHOP_PATH}"
+                        ln -sf "${MOD_WORKSHOP_PATH}" "${MOD_TARGET}" || {
+                            echo "Szimlink létrehozása sikertelen, másolás próbálása..."
+                            cp -r "${MOD_WORKSHOP_PATH}" "${MOD_TARGET}" || echo "Másolás is sikertelen"
+                        }
+                    else
+                        echo "Mod már létezik a célhelyen: ${MOD_TARGET}"
+                    fi
+                else
+                    echo "FIGYELMEZTETÉS: Mod ${mod_id} mappa nem található: ${MOD_WORKSHOP_PATH}"
+                    echo "Ellenőrizzük a workshop mappa tartalmát:"
+                    ls -la "${WORKSHOP_DIR}" | head -20 || echo "Workshop mappa nem létezik vagy üres"
+                fi
+                
                 if [ ${WORKSHOP_EXIT} -eq 0 ]; then
-                    echo "✓ Mod ${mod_id} letöltve"
+                    echo "✓ Mod ${mod_id} letöltési folyamat befejezve (exit code: 0)"
                 else
                     echo "FIGYELMEZTETÉS: Mod ${mod_id} letöltése sikertelen (exit code: ${WORKSHOP_EXIT})"
                 fi
@@ -145,10 +197,16 @@ if [ -n "${MOD_IDS}" ]; then
         # Jogosultságok újra beállítása a letöltött modokra
         if [ -d "${MODS_DIR}" ]; then
             chmod -R u+w "${MODS_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült beállítani a letöltött modok jogosultságait"
+            echo "Mods mappa végső tartalma:"
+            ls -la "${MODS_DIR}" | head -20 || echo "Mods mappa nem létezik vagy üres"
         fi
         
-        echo "Modok letöltése befejezve"
+        echo "=========================================="
+        echo "MODOK LETÖLTÉSE BEFEJEZVE"
+        echo "=========================================="
     fi
+else
+    echo "Nincs mod ID beállítva (MOD_IDS üres vagy nincs megadva)"
 fi
 
 # Ha a szerverfájlok még mindig nem léteznek, hiba
