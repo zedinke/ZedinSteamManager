@@ -290,15 +290,42 @@ async def process_token_request(
         # Ha user token típusú, akkor automatikusan server_admin rangot adunk
         # (csak akkor, ha még nem server_admin vagy manager_admin)
         role_changed = False
-        if token_request.token_type == TokenType.USER:
-            if user.role == UserRole.USER:
+        
+        # Ellenőrizzük, hogy user token típusú-e
+        # A token_type enumként van tárolva, de ellenőrizzük mindkét módon
+        token_type_enum = token_request.token_type
+        if isinstance(token_type_enum, str):
+            # Ha string, konvertáljuk enum-ra
+            token_type_enum = TokenType(token_type_enum)
+        
+        is_user_token = (token_type_enum == TokenType.USER or 
+                        (hasattr(token_type_enum, 'value') and token_type_enum.value == "user"))
+        
+        # Csak akkor frissítjük, ha user token ÉS még user rangú
+        if is_user_token:
+            # Ellenőrizzük a jelenlegi rangot
+            current_role = user.role
+            if isinstance(current_role, str):
+                current_role = UserRole(current_role)
+            
+            # Csak akkor frissítjük, ha user rangú
+            if current_role == UserRole.USER:
+                # Rang frissítése
                 user.role = UserRole.SERVER_ADMIN
                 role_changed = True
-        
-        db.commit()
-        
-        # Frissítjük a user objektumot, hogy megkapjuk a frissített rangot
-        db.refresh(user)
+                
+                # Azonnal commit, hogy biztosan mentésre kerüljön
+                db.commit()
+                
+                # Frissítjük a user objektumot
+                db.refresh(user)
+                
+                # Ellenőrizzük, hogy tényleg változott-e
+                if user.role != UserRole.SERVER_ADMIN:
+                    # Ha még mindig nem változott, próbáljuk meg újra
+                    user.role = UserRole.SERVER_ADMIN
+                    db.commit()
+                    db.refresh(user)
         
         # Token igénylés státusz frissítése
         token_request.status = "approved"
@@ -308,7 +335,16 @@ async def process_token_request(
         
         # Értesítés küldése
         role_message = ""
-        if token_request.token_type == TokenType.USER and role_changed:
+        # Ellenőrizzük a token_type-ot az értesítéshez is
+        token_type_for_notification = token_request.token_type
+        if isinstance(token_type_for_notification, str):
+            token_type_for_notification = TokenType(token_type_for_notification)
+        
+        is_user_token_for_notification = (token_type_for_notification == TokenType.USER or 
+                                         (hasattr(token_type_for_notification, 'value') and 
+                                          token_type_for_notification.value == "user"))
+        
+        if is_user_token_for_notification and role_changed:
             role_message = " A rangod automatikusan frissült Server Admin-re."
         
         create_notification(
