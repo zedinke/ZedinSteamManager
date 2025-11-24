@@ -137,9 +137,23 @@ async def activate(
     if not user_id:
         return RedirectResponse(url="/login", status_code=302)
     
+    # Felhasználó lekérése aktiválás előtt (a rang ellenőrzéshez)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    
+    old_role = user.role.value
+    
     result = await activate_token(db, token, user_id)
     
     if result["success"]:
+        # Frissítjük a felhasználót az adatbázisból, hogy megkapjuk a frissített rangot
+        db.refresh(user)
+        
+        # Ha a rang változott, frissítjük a session-t
+        if user.role.value != old_role:
+            request.session["user_role"] = user.role.value
+        
         create_notification(
             db,
             user_id,
@@ -168,9 +182,23 @@ async def activate_by_token(
     if not user_id:
         return RedirectResponse(url="/login", status_code=302)
     
+    # Felhasználó lekérése aktiválás előtt (a rang ellenőrzéshez)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    
+    old_role = user.role.value
+    
     result = await activate_token(db, token, user_id)
     
     if result["success"]:
+        # Frissítjük a felhasználót az adatbázisból, hogy megkapjuk a frissített rangot
+        db.refresh(user)
+        
+        # Ha a rang változott, frissítjük a session-t
+        if user.role.value != old_role:
+            request.session["user_role"] = user.role.value
+        
         create_notification(
             db,
             user_id,
