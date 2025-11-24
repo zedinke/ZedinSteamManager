@@ -178,11 +178,12 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                         <div class="form-group">
                             <label for="server_admin_password">
-                                <i class="fas fa-key"></i> Szerver Admin Jelszó
+                                <i class="fas fa-key"></i> Szerver Admin Jelszó <span style="color: red;">*</span>
                             </label>
                             <input type="text" id="server_admin_password" name="server_admin_password" 
                                    value="{{ config.get('ServerAdminPassword', '') }}" 
-                                   placeholder="Admin jelszó (üres = nem változik)" 
+                                   placeholder="Admin jelszó (kötelező)" 
+                                   required
                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
                         </div>
                         

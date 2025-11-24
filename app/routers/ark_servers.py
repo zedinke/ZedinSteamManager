@@ -691,6 +691,8 @@ async def create_server(
     show_admin_commands_in_chat: str = Form(None),
     motd: str = Form(None),
     motd_duration: int = Form(30),
+    server_admin_password: str = Form(...),  # Kötelező
+    server_password: str = Form(None),
     custom_server_args: str = Form(None),
     db: Session = Depends(get_db)
 ):
@@ -810,6 +812,19 @@ async def create_server(
         "ENABLE_MOTD": enable_motd == "true" if enable_motd else True,
         "SHOW_ADMIN_COMMANDS_IN_CHAT": show_admin_commands_in_chat == "true",
     }
+    
+    # Admin jelszó kötelező
+    if server_admin_password and server_admin_password.strip():
+        server_config["ServerAdminPassword"] = server_admin_password.strip()
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Szerver Admin Jelszó kötelező! Kérlek add meg az admin jelszót."
+        )
+    
+    # Szerver jelszó (opcionális)
+    if server_password and server_password.strip():
+        server_config["ServerPassword"] = server_password.strip()
     
     if motd:
         server_config["MOTD"] = motd
@@ -1359,11 +1374,18 @@ async def edit_server(
     if session_name:
         server_config["SESSION_NAME"] = session_name
     # FONTOS: A két jelszó teljesen független egymástól:
-    # - ServerAdminPassword: RCON és admin parancsokhoz használt jelszó (ingame admin)
+    # - ServerAdminPassword: RCON és admin parancsokhoz használt jelszó (ingame admin) - KÖTELEZŐ
     # - ServerPassword: A szerver jelszava, amit a játékosoknak kell megadniuk, hogy csatlakozzanak
     # Nincs ellenőrzés, hogy a két jelszó különböző legyen - lehet ugyanaz is.
+    # Admin jelszó kötelező - ha nincs megadva új érték, akkor a meglévőt használjuk, de legalább egynek lennie kell
     if server_admin_password and server_admin_password.strip():
         server_config["ServerAdminPassword"] = server_admin_password
+    elif not server_config.get("ServerAdminPassword"):
+        # Ha nincs új érték és nincs meglévő sem, akkor hiba
+        raise HTTPException(
+            status_code=400,
+            detail="Szerver Admin Jelszó kötelező! Kérlek add meg az admin jelszót."
+        )
     if server_password is not None:
         if server_password.strip():
             server_config["ServerPassword"] = server_password
