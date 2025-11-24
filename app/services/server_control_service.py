@@ -1426,8 +1426,10 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         if rcon_enabled == 'True':
             query_params.append('RCONEnabled=True')
             query_params.append(f'RCONPort={rcon_port}')
-            if server_admin_password:
-                query_params.append(f'ServerAdminPassword={server_admin_password}')
+        
+        # ServerAdminPassword mindig szerepeljen, ha van értéke (függetlenül az RCON állapotától)
+        if server_admin_password:
+            query_params.append(f'ServerAdminPassword={server_admin_password}')
         
         if server_password:
             query_params.append(f'ServerPassword={server_password}')
