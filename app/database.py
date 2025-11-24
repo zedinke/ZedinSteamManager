@@ -57,6 +57,26 @@ class EnumType(TypeDecorator):
         try:
             return self.enum_class(value)
         except ValueError:
+            # Backward compatibility: régi token típusok konvertálása
+            # Ellenőrizzük, hogy TokenType enum-ról van-e szó (string név alapján)
+            enum_class_name = self.enum_class.__name__ if hasattr(self.enum_class, '__name__') else str(self.enum_class)
+            if enum_class_name == "TokenType":
+                # Régi "server_admin" és "user" értékeket konvertáljuk "server_token"-re
+                if value in ["server_admin", "user"]:
+                    # Próbáljuk meg a "server_token" értékkel konvertálni
+                    try:
+                        return self.enum_class("server_token")
+                    except (ValueError, AttributeError):
+                        # Ha még nincs definiálva a TokenType, használjuk a globals()-t
+                        import sys
+                        current_module = sys.modules.get(self.enum_class.__module__)
+                        if current_module and hasattr(current_module, "TokenType"):
+                            return getattr(current_module, "TokenType").SERVER_TOKEN
+                        # Végül próbáljuk meg a globals()-t
+                        if "TokenType" in globals():
+                            return globals()["TokenType"].SERVER_TOKEN
+                        raise
+            
             # Ha nincs egyezés, próbáljuk meg a nagybetűs verziót
             for enum_item in self.enum_class:
                 if enum_item.value.lower() == value.lower():
