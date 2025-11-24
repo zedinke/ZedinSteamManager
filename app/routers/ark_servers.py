@@ -27,31 +27,101 @@ scheduled_shutdowns = {}
 shutdown_lock = threading.Lock()
 
 def schedule_server_shutdown(server_id: int, minutes: int, db: Session):
-    """Háttérfolyamat, ami késleltetve leállítja a szervert"""
+    """Háttérfolyamat, ami késleltetve leállítja a szervert - minden percnél és 30mp-től másodpercenként chat üzenetekkel"""
     def shutdown_task():
-        time.sleep(minutes * 60)  # Várakozás percekben
+        from app.database import SessionLocal
+        from app.services.server_control_service import send_rcon_command
         
-        # Ellenőrizzük, hogy még mindig ütemezve van-e
-        with shutdown_lock:
-            if server_id in scheduled_shutdowns:
-                shutdown_time = scheduled_shutdowns[server_id]
-                if datetime.now() >= shutdown_time:
-                    # Leállítjuk a szervert
-                    from app.database import SessionLocal
-                    shutdown_db = SessionLocal()
-                    try:
-                        server = shutdown_db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
-                        if server and server.status == ServerStatus.RUNNING:
+        shutdown_db = SessionLocal()
+        try:
+            server = shutdown_db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+            if not server or server.status != ServerStatus.RUNNING:
+                shutdown_db.close()
+                return
+            
+            # RCON beállítások
+            config = server.config or {}
+            rcon_enabled = config.get("RCON_ENABLED", True)
+            rcon_port = server.rcon_port or 27020
+            server_admin_password = config.get("SERVER_ADMIN_PASSWORD", "")
+            
+            if not rcon_enabled or not server_admin_password:
+                logger.warning(f"RCON nincs engedélyezve vagy nincs jelszó, shutdown chat üzenetek kihagyva")
+                shutdown_db.close()
+                return
+            
+            # Minden percnél chat üzenet (1-től minutes-ig)
+            for remaining_minutes in range(minutes, 0, -1):
+                # Ellenőrizzük, hogy még mindig ütemezve van-e
+                with shutdown_lock:
+                    if server_id not in scheduled_shutdowns:
+                        logger.info(f"Shutdown törölve, kilépés")
+                        shutdown_db.close()
+                        return
+                
+                if remaining_minutes == minutes:
+                    # Első üzenet
+                    message = f'[SERVER] A szerver {minutes} perc múlva leáll!'
+                elif remaining_minutes == 1:
+                    message = '[SERVER] A szerver 1 perc múlva leáll!'
+                else:
+                    message = f'[SERVER] A szerver {remaining_minutes} perc múlva leáll!'
+                
+                # Chat üzenet küldése
+                try:
+                    send_rcon_command("localhost", rcon_port, server_admin_password, f'ServerChat "{message}"')
+                    logger.info(f"Shutdown chat üzenet küldve: {message}")
+                except Exception as e:
+                    logger.warning(f"Chat üzenet küldése sikertelen: {e}")
+                
+                # Ha nem az utolsó perc, várunk 60 másodpercet
+                if remaining_minutes > 1:
+                    time.sleep(60)
+            
+            # 30 másodperctől másodpercenként visszaszámlálás
+            for remaining_seconds in range(30, 0, -1):
+                # Ellenőrizzük, hogy még mindig ütemezve van-e
+                with shutdown_lock:
+                    if server_id not in scheduled_shutdowns:
+                        logger.info(f"Shutdown törölve, kilépés")
+                        shutdown_db.close()
+                        return
+                
+                message = f'[SERVER] Leállítás {remaining_seconds} másodperc múlva!'
+                
+                # Chat üzenet küldése
+                try:
+                    send_rcon_command("localhost", rcon_port, server_admin_password, f'ServerChat "{message}"')
+                    logger.info(f"Shutdown chat üzenet küldve: {message}")
+                except Exception as e:
+                    logger.warning(f"Chat üzenet küldése sikertelen: {e}")
+                
+                time.sleep(1)
+            
+            # Ellenőrizzük, hogy még mindig ütemezve van-e
+            with shutdown_lock:
+                if server_id in scheduled_shutdowns:
+                    shutdown_time = scheduled_shutdowns[server_id]
+                    if datetime.now() >= shutdown_time:
+                        # Leállítjuk a szervert shutdown command-dal
+                        try:
+                            send_rcon_command("localhost", rcon_port, server_admin_password, "shutdown")
+                            logger.info(f"Shutdown parancs elküldve szerver {server_id}-re")
+                            time.sleep(5)  # Várunk 5 másodpercet, hogy a shutdown parancs feldolgozódjon
+                        except Exception as e:
+                            logger.warning(f"Shutdown parancs küldése sikertelen, stop_server-t használunk: {e}")
+                            # Ha a shutdown parancs nem működik, stop_server-t használunk
                             from app.services.server_control_service import stop_server
                             result = stop_server(server, shutdown_db)
                             logger.info(f"Scheduled shutdown executed for server {server_id}: {result}")
+                        
                         # Töröljük az ütemezett leállítást
                         if server_id in scheduled_shutdowns:
                             del scheduled_shutdowns[server_id]
-                    except Exception as e:
-                        logger.error(f"Error executing scheduled shutdown for server {server_id}: {e}")
-                    finally:
-                        shutdown_db.close()
+        except Exception as e:
+            logger.error(f"Error executing scheduled shutdown for server {server_id}: {e}")
+        finally:
+            shutdown_db.close()
     
     thread = threading.Thread(target=shutdown_task, daemon=True)
     thread.start()
@@ -289,6 +359,97 @@ async def get_server_logs(
             "success": False,
             "message": f"Log fájl olvasása sikertelen: {str(e)}"
         })
+
+@router.get("/servers/{server_id}/logs/page", response_class=HTMLResponse)
+async def server_logs_page(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db),
+    log_file: str = Query(None, description="Kiválasztott log fájl neve")
+):
+    """Server Admin: Szerver logok oldal - log fájlok listázása és megjelenítése"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    from app.services.symlink_service import get_server_path
+    server_path = get_server_path(server.id)
+    
+    # Log fájlok listázása
+    log_files = []
+    
+    # Startup logok
+    startup_logs = sorted(server_path.glob("startup_log_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
+    for log_file_path in startup_logs:
+        log_files.append({
+            "name": log_file_path.name,
+            "path": str(log_file_path),
+            "size": log_file_path.stat().st_size,
+            "modified": datetime.fromtimestamp(log_file_path.stat().st_mtime),
+            "type": "startup"
+        })
+    
+    # Saved/Logs könyvtár logok
+    saved_logs_dir = server_path / "Saved" / "Logs"
+    if saved_logs_dir.exists():
+        for log_file_path in saved_logs_dir.glob("*.log"):
+            log_files.append({
+                "name": log_file_path.name,
+                "path": str(log_file_path),
+                "size": log_file_path.stat().st_size,
+                "modified": datetime.fromtimestamp(log_file_path.stat().st_mtime),
+                "type": "server"
+            })
+    
+    # Kiválasztott log fájl tartalma
+    selected_log_content = None
+    selected_log_name = None
+    if log_file:
+        # Keresés a log fájlok között
+        for log_info in log_files:
+            if log_info["name"] == log_file:
+                try:
+                    with open(log_info["path"], 'r', encoding='utf-8', errors='ignore') as f:
+                        selected_log_content = f.read()
+                    selected_log_name = log_info["name"]
+                    break
+                except Exception as e:
+                    logger.error(f"Log fájl olvasása sikertelen: {e}")
+                    break
+    
+    # Docker konténer logok (ha fut a szerver)
+    container_name = f"ark-server-{server.id}"
+    docker_logs_available = False
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--filter", f"name={container_name}", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        docker_logs_available = container_name in result.stdout
+    except:
+        pass
+    
+    return templates.TemplateResponse(
+        "ark/server_logs.html",
+        {
+            "request": request,
+            "server": server,
+            "log_files": log_files,
+            "selected_log_content": selected_log_content,
+            "selected_log_name": selected_log_name,
+            "docker_logs_available": docker_logs_available
+        }
+    )
 
 # Template-ek inicializálása
 BASE_DIR = Path(__file__).parent.parent.parent

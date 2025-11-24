@@ -57,142 +57,185 @@ window.updateOperationStatus = function(message) {
     }
 };
 
-// Logs és Shutdown függvények - EGYSZERŰ, KÖZVETLEN IMPLEMENTÁCIÓ
-// Ezek a függvények azonnal elérhetők, még mielőtt a script blokk betöltődne
-
-window.showServerLogs = function(serverId) {
-    console.log('showServerLogs called, serverId:', serverId);
-    // Várunk, amíg a DOM betöltődik, ha még nem
-    function doShowLogs(retryCount = 0) {
-        const logsModal = document.getElementById('logsModal');
-        const logsContent = document.getElementById('logsContent');
-        
-        if (!logsModal || !logsContent) {
-            // Ha még nincs modal, próbáljuk meg újra (max 50x, 200ms-ig várva)
-            if (retryCount < 50) {
-                console.log('Logs modal elemek még nem találhatók, újrapróbálás...', retryCount + 1, '/50');
-                setTimeout(function() {
-                    doShowLogs(retryCount + 1);
-                }, 200);
-                return;
-            }
-            console.error('Logs modal elemek nem találhatók 50 próbálkozás után');
-            console.error('Available elements with id containing "logs":', 
-                Array.from(document.querySelectorAll('[id*="logs"]')).map(el => el.id));
-            alert('Hiba: A logok modal nem található. Kérlek, frissítsd az oldalt.');
-            return;
+// Shutdown függvények
+function scheduleShutdown(serverId) {
+    const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+    const statusDiv = document.getElementById(`shutdownStatus_${serverId}`);
+    const countdownDiv = document.getElementById(`shutdownCountdown_${serverId}`);
+    const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+    
+    if (!minutesInput) {
+        alert('Shutdown input mező nem található');
+        return;
+    }
+    
+    const minutes = parseInt(minutesInput.value);
+    if (isNaN(minutes) || minutes < 1 || minutes > 60) {
+        alert('Kérlek, adj meg egy érvényes számot 1-60 perc között!');
+        return;
+    }
+    
+    showOperationStatus('Shutdown ütemezés', `Leállítás ütemezése ${minutes} percre...`, 'warning');
+    
+    fetch(`/ark/servers/${serverId}/shutdown`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ minutes: minutes })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showOperationStatus('Shutdown ütemezve', `Leállítás ütemezve ${minutes} percre`, 'success');
+            if (statusDiv) statusDiv.style.display = 'block';
+            if (cancelBtn) cancelBtn.style.display = 'inline-block';
+            minutesInput.disabled = true;
+            
+            // Countdown indítása
+            startShutdownCountdown(serverId, minutes);
+        } else {
+            showOperationStatus('Hiba', data.message || 'Shutdown ütemezése sikertelen', 'danger');
         }
-        
-        // Megnyitjuk a modalt
-        logsModal.style.display = 'flex';
-        window.currentServerId = serverId;
-        logsContent.innerHTML = '<p>Logok betöltése...</p>';
-        
-        // Betöltjük a logokat
-        const logType = 'docker';
-        fetch(`/ark/servers/${serverId}/logs?log_type=${logType}`)
+    })
+    .catch(error => {
+        console.error('Shutdown hiba:', error);
+        showOperationStatus('Hiba', 'Shutdown ütemezése sikertelen', 'danger');
+    });
+}
+
+function cancelShutdown(serverId) {
+    fetch(`/ark/servers/${serverId}/shutdown/cancel`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showOperationStatus('Shutdown törölve', 'Az ütemezett leállítás törölve', 'info');
+            const statusDiv = document.getElementById(`shutdownStatus_${serverId}`);
+            const countdownDiv = document.getElementById(`shutdownCountdown_${serverId}`);
+            const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+            const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+            
+            if (statusDiv) statusDiv.style.display = 'none';
+            if (countdownDiv) countdownDiv.textContent = '';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (minutesInput) minutesInput.disabled = false;
+            
+            // Countdown leállítása
+            if (window.shutdownIntervals && window.shutdownIntervals[serverId]) {
+                clearInterval(window.shutdownIntervals[serverId]);
+                delete window.shutdownIntervals[serverId];
+            }
+        } else {
+            alert(data.message || 'Shutdown törlése sikertelen');
+        }
+    })
+    .catch(error => {
+        console.error('Shutdown törlés hiba:', error);
+        alert('Shutdown törlése sikertelen');
+    });
+}
+
+function startShutdownCountdown(serverId, minutes) {
+    // Countdown intervallumok tárolása
+    if (!window.shutdownIntervals) {
+        window.shutdownIntervals = {};
+    }
+    
+    // Ha már van countdown, töröljük
+    if (window.shutdownIntervals[serverId]) {
+        clearInterval(window.shutdownIntervals[serverId]);
+    }
+    
+    const countdownDiv = document.getElementById(`shutdownCountdown_${serverId}`);
+    if (!countdownDiv) return;
+    
+    let totalSeconds = minutes * 60;
+    
+    // Frissítés másodpercenként
+    window.shutdownIntervals[serverId] = setInterval(function() {
+        // Ellenőrizzük a státuszt
+        fetch(`/ark/servers/${serverId}/shutdown/status`)
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    let html = `<div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
-                        <strong>Log típus:</strong> Docker konténer logok<br>
-                        <strong>Konténer:</strong> ${data.container_name || 'N/A'}<br>
-                        <strong>Státusz:</strong> <span class="badge ${data.container_status === 'running' ? 'badge-success' : 'badge-secondary'}">${data.container_status === 'running' ? 'Fut' : 'Leállítva'}</span><br>
-                        <strong>Sorok:</strong> ${data.log_lines || 0}
-                    </div>`;
-                    html += `<textarea readonly style="width: 100%; height: 500px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; white-space: pre-wrap; background: #1e1e1e; color: #d4d4d4; overflow-y: auto;">${escapeHtml(data.log_content)}</textarea>`;
-                    logsContent.innerHTML = html;
-                    
-                    // Auto-scroll
-                    const textarea = logsContent.querySelector('textarea');
-                    if (textarea) {
-                        textarea.scrollTop = textarea.scrollHeight;
-                    }
+                if (!data.success || !data.scheduled) {
+                    // Shutdown törölve
+                    clearInterval(window.shutdownIntervals[serverId]);
+                    delete window.shutdownIntervals[serverId];
+                    const statusDiv = document.getElementById(`shutdownStatus_${serverId}`);
+                    const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+                    const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+                    if (statusDiv) statusDiv.style.display = 'none';
+                    if (countdownDiv) countdownDiv.textContent = '';
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    if (minutesInput) minutesInput.disabled = false;
+                    return;
+                }
+                
+                // Számoljuk a hátralévő időt
+                const shutdownTime = new Date(data.shutdown_time);
+                const now = new Date();
+                const remaining = Math.max(0, Math.floor((shutdownTime - now) / 1000));
+                
+                if (remaining <= 0) {
+                    clearInterval(window.shutdownIntervals[serverId]);
+                    delete window.shutdownIntervals[serverId];
+                    countdownDiv.textContent = 'Leállítás...';
+                    return;
+                }
+                
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                
+                if (remaining <= 30) {
+                    // 30 másodperctől másodpercenként
+                    countdownDiv.textContent = `Leállítás ${secs} másodperc múlva!`;
                 } else {
-                    logsContent.innerHTML = `<div class="alert alert-error">${data.message || 'Logok betöltése sikertelen'}</div>`;
+                    // Percekben
+                    countdownDiv.textContent = `Leállítás ${mins}:${secs.toString().padStart(2, '0')} múlva`;
                 }
             })
             .catch(error => {
-                logsContent.innerHTML = `<div class="alert alert-error">Hiba a logok betöltése során: ${error.message}</div>`;
+                console.error('Shutdown status hiba:', error);
             });
-    }
-    
-    // Várunk, amíg a DOM teljesen betöltődik
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOMContentLoaded fired for logs, waiting 500ms...');
-            setTimeout(doShowLogs, 500); // Extra 500ms késleltetés
-        });
-    } else {
-        // Ha már betöltődött, várunk egy kicsit, hogy biztosan létezzenek az elemek
-        console.log('DOM already loaded for logs, waiting 500ms...');
-        setTimeout(doShowLogs, 500);
-    }
-};
-
-window.showShutdownModal = function(serverId) {
-    console.log('showShutdownModal called, serverId:', serverId);
-    console.log('Document readyState:', document.readyState);
-    console.log('Looking for shutdownModal element...');
-    
-    // Várunk, amíg a DOM betöltődik, ha még nem
-    function doShowShutdown(retryCount = 0) {
-        const shutdownModal = document.getElementById('shutdownModal');
-        console.log('Attempt', retryCount + 1, '- shutdownModal found:', !!shutdownModal);
-        
-        if (!shutdownModal) {
-            // Ha még nincs modal, próbáljuk meg újra (max 50x, 200ms-ig várva)
-            if (retryCount < 50) {
-                console.log('Shutdown modal még nem található, újrapróbálás...', retryCount + 1, '/50');
-                setTimeout(function() {
-                    doShowShutdown(retryCount + 1);
-                }, 200);
-                return;
-            }
-            console.error('Shutdown modal nem található 50 próbálkozás után');
-            console.error('Available elements with id containing "shutdown":', 
-                Array.from(document.querySelectorAll('[id*="shutdown"]')).map(el => el.id));
-            alert('Hiba: A shutdown modal nem található. Kérlek, frissítsd az oldalt.');
-            return;
-        }
-        
-        console.log('Shutdown modal megtalálva, megnyitás...');
-        // Megnyitjuk a modalt
-        shutdownModal.style.display = 'flex';
-        window.shutdownServerId = serverId;
-        
-        // Reset input
-        const minutesInput = document.getElementById('shutdownMinutes');
-        if (minutesInput) {
-            minutesInput.value = 5;
-        }
-        
-        // Elrejtjük a countdown-t
-        const countdownDiv = document.getElementById('shutdownCountdown');
-        if (countdownDiv) {
-            countdownDiv.style.display = 'none';
-        }
-    }
-    
-    // Várunk, amíg a DOM teljesen betöltődik
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOMContentLoaded fired, waiting 500ms before trying to find modal...');
-            setTimeout(doShowShutdown, 500); // Extra 500ms késleltetés
-        });
-    } else {
-        // Ha már betöltődött, várunk egy kicsit, hogy biztosan létezzenek az elemek
-        console.log('DOM already loaded, waiting 500ms before trying to find modal...');
-        setTimeout(doShowShutdown, 500);
-    }
-};
-
-// Helper függvény HTML escape-hez
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    }, 1000);
 }
+
+// Oldal betöltésekor ellenőrizzük a shutdown státuszokat
+document.addEventListener('DOMContentLoaded', function() {
+    // Minden futó szerverhez ellenőrizzük a shutdown státuszt
+    const shutdownStatusDivs = document.querySelectorAll('[id^="shutdownStatus_"]');
+    shutdownStatusDivs.forEach(function(div) {
+        const serverId = div.id.replace('shutdownStatus_', '');
+        fetch(`/ark/servers/${serverId}/shutdown/status`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.scheduled) {
+                    const shutdownTime = new Date(data.shutdown_time);
+                    const now = new Date();
+                    const remaining = Math.max(0, Math.floor((shutdownTime - now) / 1000));
+                    
+                    if (remaining > 0) {
+                        const minutes = Math.floor(remaining / 60);
+                        div.style.display = 'block';
+                        const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+                        const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+                        if (cancelBtn) cancelBtn.style.display = 'inline-block';
+                        if (minutesInput) minutesInput.disabled = true;
+                        startShutdownCountdown(serverId, minutes);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Shutdown status ellenőrzés hiba:', error);
+            });
+    });
+});
+
+// Logs és Shutdown függvények - EGYSZERŰ, KÖZVETLEN IMPLEMENTÁCIÓ
+// Ezek a függvények azonnal elérhetők, még mielőtt a script blokk betöltődne
+
 </script>
 {% endblock %}
 
@@ -350,9 +393,6 @@ function escapeHtml(text) {
                                                     <i class="fas fa-stop"></i> Leállítás
                                                 </button>
                                             </form>
-                                            <button type="button" class="btn btn-sm btn-warning shutdown-btn" data-server-id="{{ server.id }}" onclick="console.log('Shutdown gomb kattintás, serverId:', {{ server.id }}); try { if(typeof window.showShutdownModal === 'function') { window.showShutdownModal({{ server.id }}); } else { console.error('showShutdownModal nem függvény:', typeof window.showShutdownModal); alert('Shutdown funkció nem elérhető. Kérlek, frissítsd az oldalt.'); } } catch(e) { console.error('Hiba a showShutdownModal hívásakor:', e); alert('Hiba történt: ' + e.message); } return false;" title="Késleltetett leállítás">
-                                                <i class="fas fa-clock"></i> Shutdown
-                                            </button>
                                             <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;" onsubmit="showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info'); return true;">
                                                 <button type="submit" class="btn btn-sm btn-info" title="Szerver újraindítása">
                                                     <i class="fas fa-redo"></i> Újraindítás
@@ -368,19 +408,31 @@ function escapeHtml(text) {
                                         <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary" title="Szerver szerkesztése">
                                             <i class="fas fa-edit"></i> Szerkesztés
                                         </a>
-                                        <button type="button" class="btn btn-sm btn-info logs-btn" data-server-id="{{ server.id }}" onclick="console.log('Logok gomb kattintás, serverId:', {{ server.id }}); try { if(typeof window.showServerLogs === 'function') { window.showServerLogs({{ server.id }}); } else { console.error('showServerLogs nem függvény:', typeof window.showServerLogs); alert('Logok funkció nem elérhető. Kérlek, frissítsd az oldalt.'); } } catch(e) { console.error('Hiba a showServerLogs hívásakor:', e); alert('Hiba történt: ' + e.message); } return false;" title="Indítási logok megtekintése">
+                                        <a href="/ark/servers/{{ server.id }}/logs/page" class="btn btn-sm btn-info" title="Szerver logok megtekintése">
                                             <i class="fas fa-file-alt"></i> Logok
-                                        </button>
+                                        </a>
                                         <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
                                               style="display: inline;"
                                               onsubmit="return confirm('Biztosan törlöd ezt a szervert? Ez a művelet nem visszavonható!');">
                                             <button type="submit" class="btn btn-sm btn-danger" title="Szerver törlése">
                                                 <i class="fas fa-trash"></i> Törlés
                                             </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
+                                            </form>
+                                        </div>
+                                        {% if server.status.value == 'running' %}
+                                        <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; display: flex; gap: 10px; align-items: center;">
+                                            <label style="margin: 0; font-weight: bold;">Shutdown (perc):</label>
+                                            <input type="number" id="shutdownMinutes_{{ server.id }}" min="1" max="60" value="5" style="width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                                            <button type="button" class="btn btn-sm btn-warning" onclick="scheduleShutdown({{ server.id }})" title="Késleltetett leállítás">
+                                                <i class="fas fa-clock"></i> Shutdown
+                                            </button>
+                                            <div id="shutdownStatus_{{ server.id }}" style="margin-left: 10px; font-weight: bold; color: #dc3545; display: none;">
+                                                <span id="shutdownCountdown_{{ server.id }}"></span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
                             {% if item.start_command %}
                             <tr class="command-row" style="background-color: #f8f9fa;">
                                 <td colspan="12" style="padding: 10px;">
@@ -506,60 +558,6 @@ function showRamPurchaseModal(serverId, currentPurchased) {
     }
 }
 {% endif %}
-
-<!-- Shutdown Modal -->
-<div id="shutdownModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; position: relative;">
-        <button onclick="closeShutdownModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">
-            <i class="fas fa-times"></i>
-        </button>
-        <h3 style="margin-top: 0;"><i class="fas fa-clock"></i> Késleltetett Leállítás</h3>
-        <div style="margin-bottom: 15px;">
-            <label for="shutdownMinutes" style="display: block; margin-bottom: 5px; font-weight: bold;">Leállítás késleltetése (perc):</label>
-            <input type="number" id="shutdownMinutes" min="1" max="60" value="5" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
-            <small style="color: #666;">1-60 perc között</small>
-        </div>
-        <div id="shutdownCountdown" style="display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center;">
-            <strong style="font-size: 18px; color: #dc3545;">Leállítás: <span id="countdownTime">--:--</span></strong>
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-            <button onclick="closeShutdownModal()" class="btn btn-secondary" id="shutdownCancelBtn">Mégse</button>
-            <button onclick="confirmShutdown()" class="btn btn-warning" id="shutdownConfirmBtn">Leállítás Beállítása</button>
-            <button onclick="cancelScheduledShutdown()" class="btn btn-danger" id="shutdownCancelScheduledBtn" style="display: none;">Mégse</button>
-        </div>
-    </div>
-</div>
-
-<!-- Logok Modal -->
-<div id="logsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 90%; max-height: 90vh; overflow: auto; position: relative;">
-        <button onclick="closeLogsModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">
-            <i class="fas fa-times"></i> Bezárás
-        </button>
-        <h3 style="margin-top: 0;"><i class="fas fa-file-alt"></i> Szerver Logok</h3>
-        <div style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center;">
-            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                <input type="checkbox" id="liveLogsToggle" onchange="toggleLiveLogs()" checked>
-                <span>Live frissítés</span>
-            </label>
-            <select id="logTypeSelect" onchange="changeLogType()" style="padding: 5px 10px; border-radius: 4px; border: 1px solid #ddd;">
-                <option value="docker">Docker konténer logok (futó szerver)</option>
-                <option value="startup">Indítási logok</option>
-            </select>
-        </div>
-        <div id="logsContent" style="margin-top: 20px;">
-            <p>Logok betöltése...</p>
-        </div>
-        <div style="margin-top: 10px; display: flex; gap: 10px;">
-            <button onclick="refreshLogs()" class="btn btn-primary">
-                <i class="fas fa-sync-alt"></i> Frissítés
-            </button>
-            <button onclick="closeLogsModal()" class="btn btn-secondary">
-                Bezárás
-            </button>
-        </div>
-    </div>
-</div>
 
 <script>
 // FONTOS: A függvényeket előre definiáljuk, hogy biztosan elérhetők legyenek
