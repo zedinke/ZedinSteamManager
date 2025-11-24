@@ -129,6 +129,30 @@ Add hozzá:
 0 0 * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/check_token_expiry.py
 ```
 
+### Lejárt tokenekkel rendelkező szerverek automatikus leállítása
+
+```bash
+crontab -e
+```
+
+Add hozzá (ajánlott: óránként vagy 30 percenként):
+
+```
+*/30 * * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/stop_expired_token_servers.py
+```
+
+Vagy óránként:
+
+```
+0 * * * * /usr/bin/python3 /path/to/zedinarkmanager/cron/stop_expired_token_servers.py
+```
+
+**Megjegyzés:** Ha virtual environment-et használsz, használd a venv Python-ját:
+
+```
+*/30 * * * * /path/to/zedinarkmanager/venv/bin/python3 /path/to/zedinarkmanager/cron/stop_expired_token_servers.py
+```
+
 ### Automatikus repo frissítés
 
 Az automatikus frissítés beállításához add hozzá a crontab-hoz:
