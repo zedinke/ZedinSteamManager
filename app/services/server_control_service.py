@@ -468,7 +468,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             try:
                 from app.database import Game
                 game = db.query(Game).filter(Game.id == server.game_id).first()
-                if game and game.name == "Ark Survival Evolved":
+                if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
                     base_path = Path(settings.ark_evolved_serverfiles_base)
             except Exception:
                 # Ha hiba van, az eredeti base path-et használjuk
@@ -1145,8 +1145,15 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Várakozás, hogy a konténer elinduljon (2 másodperc)
         time.sleep(2)
         
+        # Container név meghatározása játék típus alapján
+        from app.database import Game
+        game = db.query(Game).filter(Game.id == server.game_id).first()
+        if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
+            container_name = f"zedin_ase_{server.id}"
+        else:
+            container_name = f"zedin_asa_{server.id}"
+        
         # Ellenőrizzük, hogy a konténer ténylegesen fut-e
-        container_name = f"zedin_asa_{server.id}"
         check_result = subprocess.run(
             ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
             capture_output=True,
