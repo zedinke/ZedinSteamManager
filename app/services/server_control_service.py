@@ -48,12 +48,22 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
         logger.debug(f"RCON kapcsolat létrejött: {host}:{port}")
         
         # RCON autentikáció
-        # SERVERDATA_AUTH packet
-        # ID: 0 (autentikációhoz), Type: 3 (SERVERDATA_AUTH), Body: password + null terminátorok
+        # Source RCON protokoll: [4 byte length][4 byte ID][4 byte type][body + 2 null bytes]
+        # ID: egyedi ID (használjunk 1-et), Type: 3 (SERVERDATA_AUTH), Body: password + 2 null terminátor
         password_bytes = password.encode('utf-8')
-        auth_packet = struct.pack('<III', 0, 3, len(password_bytes)) + password_bytes + b'\x00\x00'
-        auth_packet = struct.pack('<I', len(auth_packet)) + auth_packet
-        logger.debug(f"RCON autentikáció küldés: jelszó hossza={len(password_bytes)}, packet hossza={len(auth_packet)}")
+        # Packet body: password + 2 null byte
+        packet_body = password_bytes + b'\x00\x00'
+        # Packet header: ID=1, Type=3 (SERVERDATA_AUTH), Body length
+        packet_header = struct.pack('<III', 1, 3, len(packet_body))
+        # Teljes packet: header + body
+        full_packet = packet_header + packet_body
+        # Packet length (header + body hossza)
+        packet_length = len(full_packet)
+        # Teljes packet: [4 byte length][header + body]
+        auth_packet = struct.pack('<I', packet_length) + full_packet
+        
+        logger.info(f"RCON autentikáció küldés: host={host}, port={port}, jelszó hossza={len(password_bytes)}, jelszó előnézet={password[:3] + '...' if len(password) > 3 else password}, packet hossza={len(auth_packet)}")
+        logger.debug(f"RCON autentikáció packet hex: {auth_packet.hex()[:100]}...")
         sock.send(auth_packet)
         
         # Válasz olvasása (2 packet: SERVERDATA_AUTH_RESPONSE és SERVERDATA_RESPONSE_VALUE)
@@ -67,6 +77,8 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
             
             # Válasz packet struktúra: [4 byte length][4 byte ID][4 byte type][body]
             response_length = struct.unpack('<I', response[0:4])[0]
+            logger.info(f"RCON autentikáció válasz: teljes hossz={len(response)} byte, packet hossz={response_length} byte")
+            
             if len(response) < 12:
                 logger.warning(f"RCON autentikáció válasz túl rövid a header-hez: {len(response)} byte")
                 sock.close()
@@ -76,12 +88,19 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
             # Ha a válasz ID -1 (0xFFFFFFFF), akkor sikertelen volt
             response_id = struct.unpack('<I', response[4:8])[0]
             response_type = struct.unpack('<I', response[8:12])[0]
-            logger.debug(f"RCON autentikáció válasz: ID={response_id} (0x{response_id:08X}), Type={response_type}, Length={response_length}")
+            logger.info(f"RCON autentikáció válasz: ID={response_id} (0x{response_id:08X}), Type={response_type}, Length={response_length}")
+            logger.debug(f"RCON autentikáció válasz teljes hex: {response.hex()[:200]}...")
             
+            # Ha az ID -1, akkor sikertelen autentikáció
             if response_id == 0xFFFFFFFF:
-                logger.warning(f"RCON autentikáció sikertelen: {host}:{port} - rossz jelszó vagy RCON nincs engedélyezve")
+                logger.error(f"RCON autentikáció sikertelen: {host}:{port} - rossz jelszó vagy RCON nincs engedélyezve. Válasz ID: {response_id}, Type: {response_type}")
                 sock.close()
                 return None
+            
+            # Ha az ID nem -1 és nem 0, akkor valószínűleg sikeres (de lehet, hogy más ID-t használ)
+            # Az ARK szerverek általában 2 packet-et küldenek: egy AUTH_RESPONSE-t (ID=request ID, Type=2) és egy RESPONSE_VALUE-t
+            if response_id != 1 and response_id != 0xFFFFFFFF:
+                logger.warning(f"RCON autentikáció válasz ID nem várható: {response_id}, de folytatjuk...")
             
             # Ha az ID 0 és a Type 2 (SERVERDATA_AUTH_RESPONSE), akkor sikeres
             # De az ARK szerverek 2 packet-et küldenek: egy AUTH_RESPONSE-t és egy RESPONSE_VALUE-t
