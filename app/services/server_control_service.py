@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict
 from sqlalchemy.orm import Session
-from app.database import ServerInstance, ServerStatus
+from app.database import ServerInstance, ServerStatus, Cluster
 from app.services.symlink_service import get_server_path, get_server_dedicated_saved_path
 from app.config import settings
 import json
@@ -180,7 +180,7 @@ def get_docker_compose_file(server: ServerInstance) -> Path:
     instance_dir = get_instance_dir(server)
     return instance_dir / "docker-compose.yaml"
 
-def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, saved_path: Path) -> bool:
+def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, saved_path: Path, db: Optional[Session] = None) -> bool:
     """
     Docker Compose fájl létrehozása (új struktúra: Servers/server_{server_id}/docker-compose.yaml)
     A konfigurációkat a Saved/Config/WindowsServer mappából olvassa be
@@ -189,6 +189,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         server: ServerInstance objektum
         serverfiles_link: ServerFiles symlink útvonala (Servers/server_{server_id}/ServerFiles)
         saved_path: Dedikált Saved mappa útvonala (Servers/server_{server_id}/Saved/)
+        db: Database session (opcionális, csak cluster_id lekéréséhez szükséges)
     
     Returns:
         True ha sikeres, False egyébként
@@ -435,8 +436,23 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 f'MOD_IDS={mods_str}'
             )
         
-        # Custom Server Args
+        # Passive Mods
         config = server.config or {}
+        if config.get("PASSIVE_MODS"):
+            passive_mods_str = config.get("PASSIVE_MODS")
+            compose_data['services']['asaserver']['environment'].append(
+                f'PASSIVE_MODS={passive_mods_str}'
+            )
+        
+        # Cluster ID
+        if server.cluster_id and db:
+            cluster = db.query(Cluster).filter(Cluster.id == server.cluster_id).first()
+            if cluster and cluster.cluster_id:
+                compose_data['services']['asaserver']['environment'].append(
+                    f'CLUSTER_ID={cluster.cluster_id}'
+                )
+        
+        # Custom Server Args
         if config.get("CUSTOM_SERVER_ARGS"):
             compose_data['services']['asaserver']['environment'].append(
                 f'CUSTOM_SERVER_ARGS={config.get("CUSTOM_SERVER_ARGS")}'
@@ -711,7 +727,7 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Mindig frissítjük, hogy a konfigurációk szinkronban legyenek
         compose_file = get_docker_compose_file(server)
         try:
-            if not create_docker_compose_file(server, serverfiles_link, saved_path):
+            if not create_docker_compose_file(server, serverfiles_link, saved_path, db):
                 error_details = f"Docker Compose fájl létrehozása sikertelen. Ellenőrizd a logokat."
                 logger.error(error_details)
                 return {

@@ -672,7 +672,7 @@ async def create_server(
         from app.services.server_control_service import create_docker_compose_file
         try:
             if saved_path.exists():
-                create_docker_compose_file(server_instance, serverfiles_link, saved_path)
+                create_docker_compose_file(server_instance, serverfiles_link, saved_path, db)
                 print(f"Docker Compose fájl létrehozva szerver létrehozásakor: {server_instance.id}")
             else:
                 print(f"Figyelmeztetés: Saved mappa nem található: {saved_path}")
@@ -1329,7 +1329,7 @@ async def set_ram_limit(
         saved_path = server_path / "Saved"
         
         if serverfiles_link.exists() and saved_path.exists():
-            create_docker_compose_file(server, serverfiles_link, saved_path)
+            create_docker_compose_file(server, serverfiles_link, saved_path, db)
             # Szerver újraindítása, hogy a memória limit életbe lépjen
             from app.services.server_control_service import restart_server
             restart_server(server, db)

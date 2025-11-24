@@ -23,6 +23,8 @@ API="${API:-False}"
 SERVER_ADMIN_PASSWORD="${SERVER_ADMIN_PASSWORD:-}"
 SERVER_PASSWORD="${SERVER_PASSWORD:-}"
 MOD_IDS="${MOD_IDS:-}"
+PASSIVE_MODS="${PASSIVE_MODS:-}"
+CLUSTER_ID="${CLUSTER_ID:-}"
 CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
 UPDATE_SERVER="${UPDATE_SERVER:-True}"
 
@@ -157,50 +159,94 @@ echo "Jelenlegi mappa: $(pwd)"
 echo "Szerver bináris létezik: $([ -f "${SERVER_BINARY}" ] && echo "IGEN" || echo "NEM")"
 
 # Alap parancs
-SERVER_ARGS=""
+# FONTOS: ARK szerver parancssori formátum:
+# MapName ?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -ActiveMods=...
 
-# Map
-SERVER_ARGS="${SERVER_ARGS} ${MAP_NAME}"
+# Első rész: MapName_WP ?listen?SessionName=...?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
+# FONTOS: A map név után kötelező a _WP utótag
+MAP_NAME_WP="${MAP_NAME}"
+if [[ ! "${MAP_NAME_WP}" =~ _WP$ ]]; then
+    MAP_NAME_WP="${MAP_NAME}_WP"
+fi
 
-# Listen flag (dedicated server)
-SERVER_ARGS="${SERVER_ARGS} -listen"
+QUERY_PARAMS=()
+QUERY_PARAMS+=("listen")
+QUERY_PARAMS+=("SessionName=\"${SESSION_NAME}\"")
 
-# Portok
-SERVER_ARGS="${SERVER_ARGS} -Port=${ASA_PORT}"
-SERVER_ARGS="${SERVER_ARGS} -QueryPort=${QUERY_PORT}"
-
-# RCON
 if [ "${RCON_ENABLED}" = "True" ]; then
-    SERVER_ARGS="${SERVER_ARGS} -RCONEnabled=True -RCONPort=${RCON_PORT}"
+    QUERY_PARAMS+=("RCONEnabled=True")
+    QUERY_PARAMS+=("RCONPort=${RCON_PORT}")
     if [ -n "${SERVER_ADMIN_PASSWORD}" ]; then
-        SERVER_ARGS="${SERVER_ARGS} -ServerAdminPassword=${SERVER_ADMIN_PASSWORD}"
+        QUERY_PARAMS+=("ServerAdminPassword=${SERVER_ADMIN_PASSWORD}")
     fi
 fi
 
-# Session Name
-SERVER_ARGS="${SERVER_ARGS} -SessionName=\"${SESSION_NAME}\""
-
-# Max Players
-SERVER_ARGS="${SERVER_ARGS} -MaxPlayers=${MAX_PLAYERS}"
-
-# Server Password
 if [ -n "${SERVER_PASSWORD}" ]; then
-    SERVER_ARGS="${SERVER_ARGS} -ServerPassword=${SERVER_PASSWORD}"
+    QUERY_PARAMS+=("ServerPassword=${SERVER_PASSWORD}")
 fi
+
+# Query string összeállítása
+QUERY_STRING=""
+for param in "${QUERY_PARAMS[@]}"; do
+    if [ -z "${QUERY_STRING}" ]; then
+        QUERY_STRING="?${param}"
+    else
+        QUERY_STRING="${QUERY_STRING}?${param}"
+    fi
+done
+
+# Első rész: MapName_WP + query string
+FIRST_PART="${MAP_NAME_WP}${QUERY_STRING}"
+
+# Második rész: -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=...
+SECOND_PART_ARGS=()
+SECOND_PART_ARGS+=("-Port=${ASA_PORT}")
+SECOND_PART_ARGS+=("-QueryPort=${QUERY_PORT}")
+SECOND_PART_ARGS+=("-WinLiveMaxPlayers=${MAX_PLAYERS}")
+
+# Cluster ID (ha van)
+if [ -n "${CLUSTER_ID}" ]; then
+    SECOND_PART_ARGS+=("-clusterid=${CLUSTER_ID}")
+fi
+
+SECOND_PART="${SECOND_PART_ARGS[*]}"
+
+# Harmadik rész: -UseBattlEye -ActiveMods=... -passivemods=... custom args
+THIRD_PART_ARGS=()
 
 # BattleEye
 if [ "${BATTLEEYE}" = "True" ]; then
-    SERVER_ARGS="${SERVER_ARGS} -UseBattlEye"
+    THIRD_PART_ARGS+=("-UseBattlEye")
+else
+    THIRD_PART_ARGS+=("-NoBattlEye")
 fi
 
 # Mods
 if [ -n "${MOD_IDS}" ]; then
-    SERVER_ARGS="${SERVER_ARGS} -ActiveMods=${MOD_IDS}"
+    THIRD_PART_ARGS+=("-ActiveMods=${MOD_IDS}")
+fi
+
+# Passive Mods (ha van)
+if [ -n "${PASSIVE_MODS}" ]; then
+    THIRD_PART_ARGS+=("-passivemods=${PASSIVE_MODS}")
 fi
 
 # Custom Server Args
 if [ -n "${CUSTOM_SERVER_ARGS}" ]; then
-    SERVER_ARGS="${SERVER_ARGS} ${CUSTOM_SERVER_ARGS}"
+    THIRD_PART_ARGS+=("${CUSTOM_SERVER_ARGS}")
+fi
+
+THIRD_PART="${THIRD_PART_ARGS[*]}"
+
+# Teljes parancs összeállítása
+# FONTOS: A FIRST_PART (map név + query string) külön argumentum, hogy ne legyen szóköz a map név és a ? között
+# A második és harmadik részek külön argumentumok
+SERVER_ARGS="${FIRST_PART}"
+if [ -n "${SECOND_PART}" ]; then
+    SERVER_ARGS="${SERVER_ARGS} ${SECOND_PART}"
+fi
+if [ -n "${THIRD_PART}" ]; then
+    SERVER_ARGS="${SERVER_ARGS} ${THIRD_PART}"
 fi
 
 # Szerver indítása
@@ -352,7 +398,7 @@ if [ "${USE_WINE}" = "true" ]; then
     # Szerver indítása Wine-nal
     echo "Szerver indítása Wine-nal..."
     echo "Bináris: ${SERVER_BINARY}"
-    echo "Parancs: wine ${SERVER_BINARY} ${SERVER_ARGS}"
+    echo "Parancs: wine ${SERVER_BINARY} \"${FIRST_PART}\" ${SECOND_PART} ${THIRD_PART}"
     echo "Log fájl: ${LOG_FILE}"
     echo ""
     echo "=========================================="
@@ -362,11 +408,12 @@ if [ "${USE_WINE}" = "true" ]; then
     echo ""
     # A Wine inicializálása az első futtatáskor időbe telhet
     # A szerver kimenetét mind a stdout-ra, mind a log fájlba írjuk (ha lehet)
+    # FONTOS: A FIRST_PART-ot külön argumentumként adjuk át, hogy a map név és a ? között ne legyen szóköz
     if [ -w "${LOG_FILE}" ] || [ "${LOG_FILE}" = "/tmp/ark_server.log" ]; then
-        exec wine "${SERVER_BINARY}" ${SERVER_ARGS} 2>&1 | tee -a "${LOG_FILE}"
+        exec wine "${SERVER_BINARY}" "${FIRST_PART}" ${SECOND_PART} ${THIRD_PART} 2>&1 | tee -a "${LOG_FILE}"
     else
         # Ha nem tudunk írni a log fájlba, csak stdout-ra
-        exec wine "${SERVER_BINARY}" ${SERVER_ARGS}
+        exec wine "${SERVER_BINARY}" "${FIRST_PART}" ${SECOND_PART} ${THIRD_PART}
     fi
 else
     # Natív Linux bináris
@@ -379,7 +426,8 @@ else
     echo "Bináris: ${SERVER_BINARY}"
     echo "Parancs: ${SERVER_BINARY} ${SERVER_ARGS}"
     echo "Log fájl: ${LOGS_DIR}/server.log"
-    exec "${SERVER_BINARY}" ${SERVER_ARGS} 2>&1 | tee -a "${LOGS_DIR}/server.log"
+    # FONTOS: A FIRST_PART-ot külön argumentumként adjuk át, hogy a map név és a ? között ne legyen szóköz
+    exec "${SERVER_BINARY}" "${FIRST_PART}" ${SECOND_PART} ${THIRD_PART} 2>&1 | tee -a "${LOGS_DIR}/server.log"
 fi
 
 # Ha ide jutunk, akkor a szerver leállt
@@ -388,4 +436,5 @@ echo "=========================================="
 echo "ARK szerver leállt, kilépési kód: ${EXIT_CODE}"
 echo "=========================================="
 exit ${EXIT_CODE}
+
 
