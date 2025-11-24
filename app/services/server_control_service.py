@@ -1159,7 +1159,7 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
             cluster_id = server.cluster.cluster_id
         
         # ARK szerver indítási parancs összeállítása (hasonló a képen láthatóhoz)
-        # Formátum: ArkAscendedServer.exe MapName ?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -ActiveMods=...
+        # Formátum: ArkAscendedServer.exe MapName ?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -mods=... -passivemods=...
         
         # ?listen?SessionName="..."?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
         query_params = []
@@ -1197,14 +1197,22 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         second_part = ' '.join(second_part_parts)
         command_parts.append(second_part)
         
-        # Harmadik rész: -UseBattlEye -ActiveMods=... custom args
+        # Harmadik rész: -NoBattlEye -mods=... -passivemods=... custom args
         third_part_parts = []
         
         if battleeye == 'True':
             third_part_parts.append('-UseBattlEye')
+        else:
+            third_part_parts.append('-NoBattlEye')
         
+        # Aktív modok - helyes formátum: -mods=123456,789012
         if mod_ids:
-            third_part_parts.append(f'-ActiveMods={mod_ids}')
+            third_part_parts.append(f'-mods={mod_ids}')
+        
+        # Passzív modok - helyes formátum: -passivemods=123456,789012
+        passive_mods = env_dict.get('PASSIVE_MODS', '')
+        if passive_mods:
+            third_part_parts.append(f'-passivemods={passive_mods}')
         
         if custom_server_args:
             third_part_parts.append(custom_server_args)

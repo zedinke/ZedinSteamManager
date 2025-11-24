@@ -292,7 +292,7 @@ echo "Szerver bináris létezik: $([ -f "${SERVER_BINARY}" ] && echo "IGEN" || e
 
 # Alap parancs
 # FONTOS: ARK szerver parancssori formátum:
-# MapName ?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -ActiveMods=...
+# MapName ?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -mods=... -passivemods=...
 
 # Első rész: MapName_WP ?listen?SessionName=...?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
 # FONTOS: A map név után kötelező a _WP utótag
@@ -343,7 +343,7 @@ fi
 
 SECOND_PART="${SECOND_PART_ARGS[*]}"
 
-# Harmadik rész: -UseBattlEye -ActiveMods=... -passivemods=... custom args
+# Harmadik rész: -NoBattlEye -mods=... -passivemods=... custom args
 THIRD_PART_ARGS=()
 
 # BattleEye
@@ -353,12 +353,12 @@ else
     THIRD_PART_ARGS+=("-NoBattlEye")
 fi
 
-# Mods
+# Mods (aktív modok) - helyes formátum: -mods=123456,789012
 if [ -n "${MOD_IDS}" ]; then
-    THIRD_PART_ARGS+=("-ActiveMods=${MOD_IDS}")
+    THIRD_PART_ARGS+=("-mods=${MOD_IDS}")
 fi
 
-# Passive Mods (ha van)
+# Passive Mods (ha van) - helyes formátum: -passivemods=123456,789012
 if [ -n "${PASSIVE_MODS}" ]; then
     THIRD_PART_ARGS+=("-passivemods=${PASSIVE_MODS}")
 fi
