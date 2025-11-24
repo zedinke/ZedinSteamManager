@@ -156,7 +156,7 @@
                                                     <i class="fas fa-stop"></i> Leállítás
                                                 </button>
                                             </form>
-                                            <button type="button" class="btn btn-sm btn-warning" onclick="showShutdownModal({{ server.id }})" title="Késleltetett leállítás">
+                                            <button type="button" class="btn btn-sm btn-warning" onclick="showShutdownModal({{ server.id }}); return false;" title="Késleltetett leállítás">
                                                 <i class="fas fa-clock"></i> Shutdown
                                             </button>
                                             <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;" onsubmit="showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info'); return true;">
@@ -598,28 +598,70 @@ function initShutdownModal() {
     }
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initShutdownModal);
-} else {
+// DOM betöltése után inicializálás
+function initializeShutdownSystem() {
     initShutdownModal();
+    // Ellenőrizzük, hogy a modal elem létezik-e
+    if (!shutdownModal) {
+        console.warn('shutdownModal nem található inicializáláskor');
+    }
 }
 
-function showShutdownModal(serverId) {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeShutdownSystem);
+} else {
+    initializeShutdownSystem();
+}
+
+// Globális függvény, hogy elérhető legyen az onclick eseményhez
+window.showShutdownModal = function(serverId) {
+    console.log('showShutdownModal called with serverId:', serverId);
+    
+    // Inicializáljuk a modal elemeket
     initShutdownModal();
+    
+    // Ha még mindig nincs modal, próbáljuk meg újra
+    if (!shutdownModal) {
+        shutdownModal = document.getElementById('shutdownModal');
+    }
+    
     if (!shutdownModal) {
         console.error('Shutdown modal nem található');
+        console.error('shutdownModal:', shutdownModal);
+        alert('Hiba: A shutdown modal nem található. Kérlek, frissítsd az oldalt.');
         return;
     }
+    
+    console.log('Shutdown modal megtalálva, megnyitás...');
     shutdownServerId = serverId;
     shutdownModal.style.display = 'flex';
-    document.getElementById('shutdownMinutes').value = 5;
-    document.getElementById('shutdownCountdown').style.display = 'none';
-    document.getElementById('shutdownConfirmBtn').style.display = 'inline-block';
-    document.getElementById('shutdownCancelScheduledBtn').style.display = 'none';
-    document.getElementById('shutdownCancelBtn').style.display = 'inline-block';
+    
+    // Ellenőrizzük, hogy az input elemek léteznek-e
+    const minutesInput = document.getElementById('shutdownMinutes');
+    const countdownDiv = document.getElementById('shutdownCountdown');
+    const confirmBtn = document.getElementById('shutdownConfirmBtn');
+    const cancelScheduledBtn = document.getElementById('shutdownCancelScheduledBtn');
+    const cancelBtn = document.getElementById('shutdownCancelBtn');
+    
+    if (minutesInput) {
+        minutesInput.value = 5;
+    }
+    if (countdownDiv) {
+        countdownDiv.style.display = 'none';
+    }
+    if (confirmBtn) {
+        confirmBtn.style.display = 'inline-block';
+    }
+    if (cancelScheduledBtn) {
+        cancelScheduledBtn.style.display = 'none';
+    }
+    if (cancelBtn) {
+        cancelBtn.style.display = 'inline-block';
+    }
+    
     // Ellenőrizzük, hogy van-e már ütemezett leállítás
     checkScheduledShutdown(serverId);
-}
+};
 
 function closeShutdownModal() {
     if (shutdownModal) {
