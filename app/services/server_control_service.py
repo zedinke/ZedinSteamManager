@@ -667,7 +667,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             try:
                 from app.database import Game
                 game = db.query(Game).filter(Game.id == server.game_id).first()
-                if game and game.name == "Ark Survival Evolved":
+                if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
                     is_evolved = True
                     ark_app_id = "376030"  # Ark Survival Evolved dedikált szerver App ID
             except Exception:
@@ -897,7 +897,7 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Container név meghatározása játék típus alapján
         from app.database import Game
         game = db.query(Game).filter(Game.id == server.game_id).first()
-        if game and game.name == "Ark Survival Evolved":
+        if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
             container_name = f"zedin_ase_{server.id}"
         else:
             container_name = f"zedin_asa_{server.id}"
@@ -1365,7 +1365,7 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Container név és process pattern meghatározása játék típus alapján
         from app.database import Game
         game = db.query(Game).filter(Game.id == server.game_id).first()
-        if game and game.name == "Ark Survival Evolved":
+        if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
             container_name = f"zedin_ase_{server.id}"
             process_pattern = "ShooterGameServer"
         else:
@@ -1506,7 +1506,7 @@ def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Container név meghatározása játék típus alapján
         from app.database import Game
         game = db.query(Game).filter(Game.id == server.game_id).first()
-        if game and game.name == "Ark Survival Evolved":
+        if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
             container_name = f"zedin_ase_{server.id}"
         else:
             container_name = f"zedin_asa_{server.id}"
