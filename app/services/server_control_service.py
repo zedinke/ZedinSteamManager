@@ -420,8 +420,17 @@ def get_docker_compose_file(server: ServerInstance) -> Path:
 
 def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, saved_path: Path, db: Optional[Session] = None) -> bool:
     """
-    Docker Compose fájl létrehozása szerverhez.
-    Külön kezeli az Ark Survival Ascended-et és az Ark Survival Evolved-et.
+    Docker Compose fájl létrehozása (új struktúra: Servers/server_{server_id}/docker-compose.yaml)
+    A konfigurációkat a Saved/Config/WindowsServer mappából olvassa be
+    
+    Args:
+        server: ServerInstance objektum
+        serverfiles_link: ServerFiles symlink útvonala (Servers/server_{server_id}/ServerFiles)
+        saved_path: Dedikált Saved mappa útvonala (Servers/server_{server_id}/Saved/)
+        db: Database session (opcionális, csak cluster_id lekéréséhez szükséges)
+    
+    Returns:
+        True ha sikeres, False egyébként
     """
     """
     Docker Compose fájl létrehozása (új struktúra: Servers/server_{server_id}/docker-compose.yaml)
@@ -453,16 +462,17 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         
         # FONTOS: Először ellenőrizzük és javítjuk a base mappát (ServerFiles)!
         # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
-        # Játék típus alapján külön base path
-        from app.database import Game
+        # Ark Survival Evolved esetén külön base path, egyébként az eredeti
+        base_path = Path(settings.ark_serverfiles_base)
         if db:
-            game = db.query(Game).filter(Game.id == server.game_id).first()
-            if game and game.name == "Ark Survival Evolved":
-                base_path = Path(settings.ark_evolved_serverfiles_base)
-            else:
-                base_path = Path(settings.ark_serverfiles_base)
-        else:
-            base_path = Path(settings.ark_serverfiles_base)
+            try:
+                from app.database import Game
+                game = db.query(Game).filter(Game.id == server.game_id).first()
+                if game and game.name == "Ark Survival Evolved":
+                    base_path = Path(settings.ark_evolved_serverfiles_base)
+            except Exception:
+                # Ha hiba van, az eredeti base path-et használjuk
+                pass
         
         # Real server path meghatározása (symlink célja)
         real_server_path = serverfiles_link.resolve() if serverfiles_link.is_symlink() else serverfiles_link
@@ -650,16 +660,19 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         container_work_dir = '/home/ai_developer/arkserver'
         container_saved_path = '/home/ai_developer/arkserver/ShooterGame/Saved'
         
-        # Container név meghatározása játék típus alapján
-        from app.database import Game
+        # Container név: egyedi kell legyen, szerver ID alapján
+        # Prefix: 'zedin_asa_' hogy ne ütközzön más rendszerekkel
+        # Ark Survival Evolved esetén 'zedin_ase_', egyébként 'zedin_asa_'
+        container_name = f'zedin_asa_{server.id}'
         if db:
-            game = db.query(Game).filter(Game.id == server.game_id).first()
-            if game and game.name == "Ark Survival Evolved":
-                container_name = f'zedin_ase_{server.id}'
-            else:
-                container_name = f'zedin_asa_{server.id}'
-        else:
-            container_name = f'zedin_asa_{server.id}'
+            try:
+                from app.database import Game
+                game = db.query(Game).filter(Game.id == server.game_id).first()
+                if game and game.name == "Ark Survival Evolved":
+                    container_name = f'zedin_ase_{server.id}'
+            except Exception:
+                # Ha hiba van, az eredeti container nevet használjuk
+                pass
         
         # Docker Compose YAML összeállítása
         compose_data = {
