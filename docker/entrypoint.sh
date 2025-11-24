@@ -243,10 +243,35 @@ if [ "${USE_WINE}" = "true" ]; then
     # Wine prefix inicializálása (ha még nem létezik)
     if [ ! -d "${WINEPREFIX}" ]; then
         echo "Wine prefix inicializálása: ${WINEPREFIX}"
+        echo "Wine prefix mappa létrehozása..."
+        mkdir -p "${WINEPREFIX}" || {
+            echo "HIBA: Nem sikerült létrehozni a Wine prefix mappát: ${WINEPREFIX}"
+            exit 1
+        }
+        echo "Wine prefix inicializálása (wineboot --init)..."
         # Wine prefix inicializálása nem interaktív módon
-        WINEDLLOVERRIDES="mscoree,mshtml=" wineboot --init 2>&1 | head -20 || echo "Wine prefix inicializálás figyelmeztetések (normális lehet)"
-        # Várunk egy kicsit, hogy a Wine prefix inicializálódjon
-        sleep 2
+        # A wineboot --init időbe telhet, ezért timeout-ot használunk
+        # A stderr-t is redirecteljük, hogy ne zavarjon
+        if timeout 60 wineboot --init > /tmp/wine_init.log 2>&1; then
+            echo "✓ Wine prefix inicializálás sikeres"
+        else
+            EXIT_CODE=$?
+            echo "FIGYELMEZTETÉS: Wine prefix inicializálás kilépési kód: $EXIT_CODE"
+            if [ -f /tmp/wine_init.log ]; then
+                echo "Wine inicializálás részletei (utolsó 30 sor):"
+                tail -30 /tmp/wine_init.log || true
+            fi
+            # Mégis folytatjuk, mert a Wine prefix lehet, hogy létrejött
+            if [ -d "${WINEPREFIX}" ]; then
+                echo "✓ Wine prefix mappa létezik, folytatjuk..."
+            else
+                echo "HIBA: Wine prefix mappa nem létezik, kilépés"
+                exit 1
+            fi
+        fi
+        echo "Wine prefix inicializálás befejezve"
+        # Várunk egy kicsit, hogy a Wine prefix stabilizálódjon
+        sleep 1
     else
         echo "Wine prefix már létezik: ${WINEPREFIX}"
     fi
