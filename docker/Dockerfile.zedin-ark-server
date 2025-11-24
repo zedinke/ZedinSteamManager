@@ -47,7 +47,10 @@ RUN wget -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetric
     chmod +x /usr/local/bin/winetricks
 
 # SteamCMD letöltése és telepítése
-RUN cd ${STEAMCMD_DIR} && \
+# FONTOS: A STEAMCMD_DIR mappát a manager hozza létre megfelelő jogosultságokkal
+# Itt csak letöltjük és telepítjük a SteamCMD-t, ha a mappa létezik
+RUN mkdir -p ${STEAMCMD_DIR} && \
+    cd ${STEAMCMD_DIR} && \
     curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
     chown -R ai_developer:ai_developer ${STEAMCMD_DIR} && \
     chmod +x ${STEAMCMD_DIR}/steamcmd.sh && \
