@@ -113,31 +113,36 @@ def schedule_server_shutdown(server_id: int, minutes: int, db: Session):
                             if check_process_running_in_container(container_name, "ArkAscendedServer.exe"):
                                 # Végül küldjük a saveworld parancsot (mint a POK-manager.sh-ben)
                                 logger.info("Végső saveworld parancs küldése...")
-                                send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld", timeout=3)
-                                time.sleep(5)  # Várunk 5 másodpercet, hogy a save befejeződjön
+                                try:
+                                    send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld", timeout=3)
+                                    time.sleep(5)  # Várunk 5 másodpercet, hogy a save befejeződjön
+                                except Exception as save_error:
+                                    logger.warning(f"Saveworld parancs hiba: {save_error}, folytatjuk...")
                             
                             # Shutdown parancs küldése
                             logger.info(f"Shutdown parancs küldése szerver {server_id}-re...")
-                            send_rcon_command("localhost", rcon_port, server_admin_password, "shutdown", timeout=3)
+                            try:
+                                send_rcon_command("localhost", rcon_port, server_admin_password, "shutdown", timeout=3)
+                                logger.info("Shutdown parancs elküldve, várakozás 10 másodpercet...")
+                                time.sleep(10)  # Várunk 10 másodpercet, hogy a shutdown parancs feldolgozódjon
+                            except Exception as shutdown_error:
+                                logger.warning(f"Shutdown parancs küldése sikertelen: {shutdown_error}, folytatjuk a konténer leállításával")
                             
-                            # Várjuk meg, hogy a folyamat leálljon (max 3 perc, mint a POK-manager.sh-ben)
-                            logger.info("Várakozás, hogy a szerver leálljon...")
-                            process_stopped = wait_for_process_shutdown(container_name, "ArkAscendedServer.exe", max_wait_seconds=180)
+                            # Várjuk meg, hogy a folyamat leálljon (max 30 másodperc, nem 3 perc)
+                            logger.info("Várakozás, hogy a szerver leálljon (max 30 másodperc)...")
+                            process_stopped = wait_for_process_shutdown(container_name, "ArkAscendedServer.exe", max_wait_seconds=30)
                             
                             if not process_stopped:
-                                logger.warning("A folyamat nem állt le időben, folytatjuk a konténer leállításával")
-                            
-                            # Végül leállítjuk a konténert
-                            from app.services.server_control_service import stop_server
-                            result = stop_server(server, shutdown_db)
-                            logger.info(f"Scheduled shutdown executed for server {server_id}: {result}")
+                                logger.warning("A folyamat nem állt le 30 másodperc alatt, folytatjuk a konténer leállításával")
                             
                         except Exception as e:
-                            logger.warning(f"Shutdown parancs küldése vagy várakozás sikertelen, stop_server-t használunk: {e}")
-                            # Ha a shutdown parancs nem működik, stop_server-t használunk
-                            from app.services.server_control_service import stop_server
-                            result = stop_server(server, shutdown_db)
-                            logger.info(f"Scheduled shutdown executed for server {server_id}: {result}")
+                            logger.warning(f"Shutdown folyamat hiba: {e}, folytatjuk a konténer leállításával")
+                        
+                        # Végül mindig leállítjuk a konténert (akár működött a shutdown parancs, akár nem)
+                        logger.info("Konténer leállítása...")
+                        from app.services.server_control_service import stop_server
+                        result = stop_server(server, shutdown_db)
+                        logger.info(f"Scheduled shutdown executed for server {server_id}: {result}")
                         
                         # Töröljük az ütemezett leállítást
                         if server_id in scheduled_shutdowns:
