@@ -35,11 +35,34 @@ if [ -n "${SERVER_BINARY}" ]; then
     # De ellenőrizzük, hogy létezik-e
     if [ "${SERVER_BINARY}" = "ShooterGameServer" ]; then
         # Ark Survival Evolved: Linux bináris
+        # Próbáljuk meg több helyen is
         if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
             SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
             USE_WINE=false
+        elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer" ]; then
+            SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+            USE_WINE=false
+        elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64/ShooterGameServer" ]; then
+            SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64/ShooterGameServer"
+            USE_WINE=false
         else
-            echo "HIBA: ShooterGameServer nem található: ${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+            echo "HIBA: ShooterGameServer nem található az alábbi helyeken:"
+            echo "  - ${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+            echo "  - ${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+            echo "  - ${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64/ShooterGameServer"
+            echo ""
+            echo "ARK_SERVER_DIR tartalma:"
+            ls -la "${ARK_SERVER_DIR}" 2>/dev/null || echo "Mappa nem létezik vagy nem elérhető"
+            if [ -d "${ARK_SERVER_DIR}/ShooterGame" ]; then
+                echo ""
+                echo "ShooterGame mappa tartalma:"
+                ls -la "${ARK_SERVER_DIR}/ShooterGame" 2>/dev/null || echo "ShooterGame mappa nem elérhető"
+                if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries" ]; then
+                    echo ""
+                    echo "Binaries mappa tartalma:"
+                    ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries" 2>/dev/null || echo "Binaries mappa nem elérhető"
+                fi
+            fi
             exit 1
         fi
     elif [ "${SERVER_BINARY}" = "ArkAscendedServer.exe" ]; then
@@ -71,6 +94,12 @@ else
     # A Windows bináris a ShooterGame/Binaries/Win64/ArkAscendedServer.exe (nem ShooterGameServer.exe!)
     if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
         SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+        USE_WINE=false
+    elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer" ]; then
+        SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+        USE_WINE=false
+    elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64/ShooterGameServer" ]; then
+        SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64/ShooterGameServer"
         USE_WINE=false
     elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe" ]; then
         SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
