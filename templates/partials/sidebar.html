@@ -102,11 +102,11 @@
                     <i class="fas fa-chevron-down nav-category-icon"></i>
                 </div>
                 <div class="nav-category-content">
-                    {% if game.name == "Ark Survival Ascended" %}
+                    {% if "Ascended" in game.name or game.name == "Ark Survival Ascended" or game.name == "Ark: Survival Ascended" %}
                     <a href="/admin/ark/files" class="nav-item nav-sub-item">
                         <i class="fas fa-server"></i> Szerverfájlok kezelése
                     </a>
-                    {% elif game.name == "Ark Survival Evolved" %}
+                    {% elif "Evolved" in game.name or game.name == "Ark Survival Evolved" or game.name == "Ark: Survival Evolved" %}
                     <a href="/admin/ark/files?game_id={{ game.id }}" class="nav-item nav-sub-item">
                         <i class="fas fa-server"></i> Szerverfájlok kezelése
                     </a>
@@ -140,7 +140,7 @@
                     <i class="fas fa-chevron-down nav-category-icon"></i>
                 </div>
                 <div class="nav-category-content">
-                    {% if game.name == "Ark Survival Ascended" %}
+                    {% if "Ascended" in game.name or game.name == "Ark Survival Ascended" or game.name == "Ark: Survival Ascended" %}
                     <a href="/ark/clusters" class="nav-item nav-sub-item">
                         <i class="fas fa-network-wired"></i> Cluster-ek
                     </a>
@@ -153,7 +153,7 @@
                     <a href="/mods" class="nav-item nav-sub-item">
                         <i class="fas fa-box"></i> Mod Tároló
                     </a>
-                    {% elif game.name == "Ark Survival Evolved" %}
+                    {% elif "Evolved" in game.name or game.name == "Ark Survival Evolved" or game.name == "Ark: Survival Evolved" %}
                     <a href="/ark-evolved/clusters" class="nav-item nav-sub-item">
                         <i class="fas fa-network-wired"></i> Cluster-ek
                     </a>
