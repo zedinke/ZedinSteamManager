@@ -98,13 +98,7 @@ async def add_mod(
     
     return JSONResponse({
         "success": True,
-        "message": "Mod hozzáadva",
-        "mod": {
-            "id": user_mod.id,
-            "mod_id": user_mod.mod_id,
-            "name": user_mod.name,
-            "icon_url": user_mod.icon_url
-        }
+        "message": "Mod hozzáadva"
     })
 
 @router.post("/{mod_id}/delete")

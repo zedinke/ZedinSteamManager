@@ -149,19 +149,16 @@
             const data = await response.json();
             
             if (data.success) {
+                // Sikeres hozzáadás - redirect üzenettel
                 window.location.href = '/mods?success=Mod+hozzáadva';
             } else {
-                alert('Hiba: ' + (data.detail || 'Ismeretlen hiba'));
-                isSubmitting = false;
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalText;
+                // Hiba esetén redirect hibaüzenettel
+                const errorMsg = data.detail || 'Ismeretlen hiba';
+                window.location.href = '/mods?error=' + encodeURIComponent(errorMsg);
             }
         } catch (error) {
             console.error('Hiba:', error);
-            alert('Hiba történt a mod hozzáadásakor.');
-            isSubmitting = false;
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalText;
+            window.location.href = '/mods?error=Hiba+történt+a+mod+hozzáadásakor';
         }
     });
 })();
