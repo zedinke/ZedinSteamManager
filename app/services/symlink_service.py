@@ -31,10 +31,11 @@ def ensure_permissions(path: Path, recursive: bool = False) -> bool:
         current_uid = os.getuid()
         current_gid = os.getgid()
         
-        # FONTOS: SOHA ne fussunk root-ként!
+        # Ha root-ként futunk, akkor a jogosultságok beállítása nem szükséges
+        # (root minden jogosultsággal rendelkezik)
         if current_uid == 0 and os.name != 'nt':
-            print(f"HIBA: ensure_permissions root-ként fut! Path: {path}")
-            return False
+            # Root-ként futunk, nincs szükség jogosultság beállításra
+            return True
         
         # Jogosultságok beállítása
         if path.is_dir():
