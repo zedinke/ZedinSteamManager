@@ -161,8 +161,18 @@ def get_user_serverfiles_path(user_id: int, game_id: Optional[int] = None, db: O
     if db and game_id:
         from app.database import Game
         game = db.query(Game).filter(Game.id == game_id).first()
-        if game and game.name == "Ark Survival Evolved":
-            base_path = Path(settings.ark_evolved_serverfiles_base)
+        if game:
+            # Debug log
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"get_user_serverfiles_path: game_id={game_id}, game.name={game.name}")
+            
+            if game.name == "Ark Survival Evolved":
+                base_path = Path(settings.ark_evolved_serverfiles_base)
+                logger.info(f"get_user_serverfiles_path: Using Ark Evolved base path: {base_path}")
+            else:
+                base_path = Path(settings.ark_serverfiles_base)
+                logger.info(f"get_user_serverfiles_path: Using Ark Ascended base path: {base_path}")
         else:
             base_path = Path(settings.ark_serverfiles_base)
     else:
