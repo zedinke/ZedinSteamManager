@@ -702,10 +702,20 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         # Docker Compose fájl létrehozása/frissítése
         # Mindig frissítjük, hogy a konfigurációk szinkronban legyenek
         compose_file = get_docker_compose_file(server)
-        if not create_docker_compose_file(server, serverfiles_link, saved_path):
+        try:
+            if not create_docker_compose_file(server, serverfiles_link, saved_path):
+                error_details = f"Docker Compose fájl létrehozása sikertelen. Ellenőrizd a logokat."
+                logger.error(error_details)
+                return {
+                    "success": False,
+                    "message": error_details
+                }
+        except Exception as e:
+            error_details = f"Docker Compose fájl létrehozása hiba: {str(e)}"
+            logger.error(error_details, exc_info=True)
             return {
                 "success": False,
-                "message": "Docker Compose fájl létrehozása/frissítése sikertelen"
+                "message": error_details
             }
         
         # Log fájl létrehozása a szerver indításához
