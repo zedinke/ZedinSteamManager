@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Szerverfájlok - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-folder-open"></i> Szerverfájlok</h2>
+        <p>Szerverfájlok kezelése</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+        <a href="/ark-evolved/serverfiles/install" class="btn btn-primary">
+            <i class="fas fa-download"></i> Új Verzió Telepítése
+        </a>
+        {% if active_serverfiles %}
+            <button type="button" class="btn btn-info" id="checkUpdateBtn" onclick="checkForUpdates()">
+                <i class="fas fa-sync-alt"></i> Frissítés Ellenőrzése
+            </button>
+        {% endif %}
+        <form method="POST" action="/ark-evolved/serverfiles/update" style="display: none;" id="updateForm">
+            <button type="submit" class="btn btn-warning" id="updateBtn">
+                <i class="fas fa-sync-alt"></i> Frissítés
+            </button>
+        </form>
+    </div>
+    
+    <div class="alert alert-info" id="updateAlert" style="display: none;">
+        <i class="fas fa-info-circle"></i> <span id="updateMessage"></span>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list"></i> Telepített Verziók</h3>
+        </div>
+        <div class="card-body">
+            {% if serverfiles %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Verzió</th>
+                            <th>Telepítési Útvonal</th>
+                            <th>Státusz</th>
+                            <th>Telepítve</th>
+                            <th>Telepítette</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sf in serverfiles %}
+                            <tr>
+                                <td>
+                                    <strong>{{ sf.version }}</strong>
+                                    {% if sf.is_active %}
+                                        <span class="badge badge-success">Aktív</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <code style="font-size: 0.9rem;">
+                                        {% set path_parts = sf.install_path.split('/') %}
+                                        {% if path_parts|length > 3 %}
+                                            .../{{ path_parts[-3] }}/{{ path_parts[-2] }}/{{ path_parts[-1] }}
+                                        {% else %}
+                                            {{ sf.install_path }}
+                                        {% endif %}
+                                    </code>
+                                </td>
+                                <td>
+                                    {% if sf.installation_status == 'completed' %}
+                                        <span class="badge badge-success">Kész</span>
+                                    {% elif sf.installation_status == 'installing' %}
+                                        <span class="badge badge-warning">Telepítés alatt</span>
+                                    {% elif sf.installation_status == 'failed' %}
+                                        <span class="badge badge-danger">Sikertelen</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Függőben</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ sf.installed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if sf.installed_by %}
+                                        {{ sf.installed_by.username }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+                                        {% if sf.installation_status == 'completed' %}
+                                            <button type="button" class="btn btn-sm btn-info" onclick="verifyInstallation({{ sf.id }})" title="Telepítés ellenőrzése">
+                                                <i class="fas fa-check-circle"></i> Ellenőrzés
+                                            </button>
+                                        {% endif %}
+                                        {% if sf.installation_status == 'completed' and not sf.is_active %}
+                                            <form method="POST" action="/ark-evolved/serverfiles/{{ sf.id }}/activate" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    <i class="fas fa-check"></i> Aktiválás
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        {% if sf.is_active %}
+                                            <form method="POST" action="/ark-evolved/serverfiles/{{ sf.id }}/delete" 
+                                                  style="display: inline;"
+                                                  onsubmit="return confirm('FIGYELEM: Az aktív verziót törlöd! Először aktiválj egy másik verziót, vagy a szerverek nem fognak működni. Biztosan folytatod?');">
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Az aktív verzió törlése - először aktiválj egy másik verziót!">
+                                                    <i class="fas fa-trash"></i> Törlés
+                                                </button>
+                                            </form>
+                                        {% elif not sf.is_active %}
+                                            <form method="POST" action="/ark-evolved/serverfiles/{{ sf.id }}/delete" 
+                                                  style="display: inline;"
+                                                  onsubmit="return confirm('Biztosan törlöd ezt a verziót? A szerverfájlok is törlődnek!');">
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="fas fa-trash"></i> Törlés
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        {% if sf.installation_status == 'failed' %}
+                                            <span class="text-muted" style="font-size: 0.85rem;">
+                                                <i class="fas fa-exclamation-triangle"></i> Sikertelen telepítés
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Még nincs telepített verzió. 
+                    <a href="/ark-evolved/serverfiles/install">Telepíts egyet most!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Ellenőrzés Modal -->
+<div id="verifyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 800px; max-height: 80vh; overflow: auto; position: relative;">
+        <button onclick="closeVerifyModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">
+            <i class="fas fa-times"></i> Bezárás
+        </button>
+        <h3 style="margin-top: 0;"><i class="fas fa-check-circle"></i> Telepítés Ellenőrzés</h3>
+        <textarea id="verifyResult" readonly style="width: 100%; height: 400px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; white-space: pre-wrap;"></textarea>
+        <div style="margin-top: 10px; display: flex; gap: 10px;">
+            <button onclick="copyVerifyResult()" class="btn btn-primary">
+                <i class="fas fa-copy"></i> Másolás
+            </button>
+            <button onclick="closeVerifyModal()" class="btn btn-secondary">
+                Bezárás
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let verifyModal = document.getElementById('verifyModal');
+let verifyResult = document.getElementById('verifyResult');
+
+function closeVerifyModal() {
+    verifyModal.style.display = 'none';
+}
+
+function copyVerifyResult() {
+    verifyResult.select();
+    document.execCommand('copy');
+    alert('Szöveg másolva a vágólapra!');
+}
+
+async function verifyInstallation(serverfilesId) {
+    try {
+        verifyModal.style.display = 'flex';
+        verifyResult.value = 'Ellenőrzés folyamatban...';
+        
+        const response = await fetch(`/ark-evolved/serverfiles/${serverfilesId}/verify`);
+        const data = await response.json();
+        
+        let message = `Telepítés ellenőrzés:\n\n`;
+        message += `Telepítési útvonal: ${data.install_path}\n`;
+        message += `Útvonal létezik: ${data.install_path_exists ? 'IGEN' : 'NEM'}\n\n`;
+        message += `Bináris útvonal: ${data.binary_path}\n`;
+        message += `Bináris létezik: ${data.binary_exists ? 'IGEN ✓' : 'NEM ✗'}\n\n`;
+        
+        if (data.details) {
+            if (data.details.install_path_contents) {
+                message += `Telepítési mappa tartalma:\n${data.details.install_path_contents.join(', ')}\n\n`;
+            }
+            if (data.details.shooter_game_exists !== undefined) {
+                message += `ShooterGame mappa: ${data.details.shooter_game_exists ? 'Létezik' : 'NEM létezik'}\n`;
+                if (data.details.shooter_game_contents) {
+                    message += `ShooterGame tartalma: ${data.details.shooter_game_contents.join(', ')}\n\n`;
+                }
+            }
+            if (data.details.binaries_exists !== undefined) {
+                message += `Binaries mappa: ${data.details.binaries_exists ? 'Létezik' : 'NEM létezik'}\n`;
+                if (data.details.binaries_contents) {
+                    message += `Binaries tartalma: ${data.details.binaries_contents.join(', ')}\n\n`;
+                }
+            }
+            if (data.details.linux_exists !== undefined) {
+                message += `Linux mappa: ${data.details.linux_exists ? 'Létezik' : 'NEM létezik'}\n`;
+                if (data.details.linux_contents) {
+                    message += `Linux mappa tartalma: ${data.details.linux_contents.join(', ')}\n\n`;
+                }
+                if (data.details.binaries_subdirs) {
+                    message += `Binaries almappái: ${data.details.binaries_subdirs.join(', ')}\n`;
+                }
+            }
+        }
+        
+        if (!data.binary_exists) {
+            message += `\n⚠️ HIBA: A ShooterGameServer bináris nem található!\n`;
+            message += `Telepítsd újra a szerverfájlokat!`;
+        }
+        
+        verifyResult.value = message;
+    } catch (error) {
+        verifyResult.value = `Hiba az ellenőrzés során: ${error.message}`;
+    }
+}
+
+// Modal bezárása kattintásra a háttérre
+verifyModal.addEventListener('click', function(e) {
+    if (e.target === verifyModal) {
+        closeVerifyModal();
+    }
+});
+</script>
+{% endblock %}
+

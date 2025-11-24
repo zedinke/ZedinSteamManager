@@ -790,38 +790,57 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                     logger.warning(f"Binaries mappa nem létezik: {binaries_path}")
                     logger.warning(f"  - ShooterGame tartalma: {[item.name for item in shooter_game_path.iterdir()] if shooter_game_path.exists() else 'N/A'}")
                 else:
+                    # Játék típus alapján különböző binárisok ellenőrzése
+                    is_evolved = False
+                    if db:
+                        try:
+                            from app.database import Game
+                            game = db.query(Game).filter(Game.id == server.game_id).first()
+                            if game and game.name == "Ark Survival Evolved":
+                                is_evolved = True
+                        except Exception:
+                            pass
+                    
                     # Ellenőrizzük a Linux binárist (csak linux64/ mappa létezik, ShooterGame/Binaries/Linux nem)
                     linux_binary_linux64 = real_server_path / "linux64" / "ShooterGameServer"
-                    # Ellenőrizzük a Windows binárist is (ArkAscendedServer.exe, nem ShooterGameServer.exe)
-                    win64_binary = binaries_path / "Win64" / "ArkAscendedServer.exe"
                     
-                    # Csak a linux64/ mappát ellenőrizzük
-                    linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
-                    
-                    # Nézzük meg, mi van a Binaries mappában
-                    binaries_contents = [item.name for item in binaries_path.iterdir()] if binaries_path.exists() else []
-                    logger.info(f"Binaries mappa tartalma: {binaries_contents}")
-                    
-                    if linux_binary:
-                        logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
-                    elif win64_binary.exists():
-                        logger.info(f"Windows ArkAscendedServer.exe bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
+                    if is_evolved:
+                        # Ark Survival Evolved: csak Linux bináris (ShooterGameServer)
+                        linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
+                        logger.info(f"Ark Survival Evolved - Linux bináris ellenőrzése: {linux_binary_linux64}")
+                        if linux_binary:
+                            logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
+                        else:
+                            logger.warning(f"Bináris nem található:")
+                            logger.warning(f"  - Linux (linux64/ShooterGameServer): {linux_binary_linux64}")
                     else:
-                        logger.warning(f"Bináris nem található:")
-                        logger.warning(f"  - Linux (linux64/ShooterGameServer): {linux_binary_linux64}")
-                        logger.warning(f"  - Windows (ShooterGame/Binaries/Win64/ArkAscendedServer.exe): {win64_binary}")
-                        logger.warning(f"  - Windows: {win64_binary}")
-                        logger.warning(f"  - Binaries mappa tartalma: {binaries_contents}")
-                        if binaries_path.exists():
-                            # Nézzük meg részletesebben, mi van a Binaries mappában
-                            for item in binaries_path.iterdir():
-                                if item.is_dir():
-                                    sub_contents = [subitem.name for subitem in item.iterdir()] if item.exists() else []
-                                    logger.warning(f"  - {item.name}/ tartalma: {sub_contents[:10]}")
-                        # Ellenőrizzük a linux64/ mappát is
-                        if (real_server_path / "linux64").exists():
-                            linux64_contents = [item.name for item in (real_server_path / "linux64").iterdir()] if (real_server_path / "linux64").exists() else []
-                            logger.warning(f"  - linux64/ mappa tartalma: {linux64_contents[:10]}")
+                        # Ark Survival Ascended: Linux és Windows bináris
+                        win64_binary = binaries_path / "Win64" / "ArkAscendedServer.exe"
+                        linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
+                        
+                        # Nézzük meg, mi van a Binaries mappában
+                        binaries_contents = [item.name for item in binaries_path.iterdir()] if binaries_path.exists() else []
+                        logger.info(f"Binaries mappa tartalma: {binaries_contents}")
+                        
+                        if linux_binary:
+                            logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
+                        elif win64_binary.exists():
+                            logger.info(f"Windows ArkAscendedServer.exe bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
+                        else:
+                            logger.warning(f"Bináris nem található:")
+                            logger.warning(f"  - Linux (linux64/ShooterGameServer): {linux_binary_linux64}")
+                            logger.warning(f"  - Windows (ShooterGame/Binaries/Win64/ArkAscendedServer.exe): {win64_binary}")
+                            logger.warning(f"  - Binaries mappa tartalma: {binaries_contents}")
+                            if binaries_path.exists():
+                                # Nézzük meg részletesebben, mi van a Binaries mappában
+                                for item in binaries_path.iterdir():
+                                    if item.is_dir():
+                                        sub_contents = [subitem.name for subitem in item.iterdir()] if item.exists() else []
+                                        logger.warning(f"  - {item.name}/ tartalma: {sub_contents[:10]}")
+                            # Ellenőrizzük a linux64/ mappát is
+                            if (real_server_path / "linux64").exists():
+                                linux64_contents = [item.name for item in (real_server_path / "linux64").iterdir()] if (real_server_path / "linux64").exists() else []
+                                logger.warning(f"  - linux64/ mappa tartalma: {linux64_contents[:10]}")
         
         # YAML fájl írása
         with open(compose_file, 'w') as f:
@@ -866,8 +885,13 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 "message": "Docker Compose nem elérhető. Telepítsd a Docker Compose-t."
             }
         
-        # Ellenőrizzük, hogy már fut-e
-        container_name = f"zedin_asa_{server.id}"
+        # Container név meghatározása játék típus alapján
+        from app.database import Game
+        game = db.query(Game).filter(Game.id == server.game_id).first()
+        if game and game.name == "Ark Survival Evolved":
+            container_name = f"zedin_ase_{server.id}"
+        else:
+            container_name = f"zedin_asa_{server.id}"
         try:
             result = subprocess.run(
                 ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
@@ -1053,7 +1077,14 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         with open(log_file, 'w', encoding='utf-8') as log_f:
             log_f.write(f"=== Szerver indítás log - {datetime.now().isoformat()} ===\n")
             log_f.write(f"Szerver ID: {server.id}\n")
-            log_f.write(f"Container name: zedin_asa_{server.id}\n")
+            # Container név meghatározása játék típus alapján
+            from app.database import Game
+            game = db.query(Game).filter(Game.id == server.game_id).first()
+            if game and game.name == "Ark Survival Evolved":
+                container_name_log = f"zedin_ase_{server.id}"
+            else:
+                container_name_log = f"zedin_asa_{server.id}"
+            log_f.write(f"Container name: {container_name_log}\n")
             log_f.write(f"Compose file: {compose_file}\n")
             # Real server path (symlink célja)
             real_server_path = serverfiles_link.resolve() if serverfiles_link.is_symlink() else serverfiles_link
@@ -1322,8 +1353,17 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 "message": "A szerver nem futott"
             }
         
+        # Container név és process pattern meghatározása játék típus alapján
+        from app.database import Game
+        game = db.query(Game).filter(Game.id == server.game_id).first()
+        if game and game.name == "Ark Survival Evolved":
+            container_name = f"zedin_ase_{server.id}"
+            process_pattern = "ShooterGameServer"
+        else:
+            container_name = f"zedin_asa_{server.id}"
+            process_pattern = "ArkAscendedServer.exe"
+        
         # Ellenőrizzük, hogy a konténer fut-e
-        container_name = f"zedin_asa_{server.id}"
         try:
             result = subprocess.run(
                 ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
@@ -1454,8 +1494,15 @@ def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         Dict az eredménnyel
     """
     try:
+        # Container név meghatározása játék típus alapján
+        from app.database import Game
+        game = db.query(Game).filter(Game.id == server.game_id).first()
+        if game and game.name == "Ark Survival Evolved":
+            container_name = f"zedin_ase_{server.id}"
+        else:
+            container_name = f"zedin_asa_{server.id}"
+        
         # Ellenőrizzük, hogy a konténer fut-e
-        container_name = f"zedin_asa_{server.id}"
         try:
             result = subprocess.run(
                 ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],

@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_update %}Szerverfájlok Frissítése{% else %}Szerverfájlok Telepítése{% endif %} - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-{% if is_update %}sync-alt{% else %}download{% endif %}"></i> {% if is_update %}Szerverfájlok Frissítése{% else %}Szerverfájlok Telepítése{% endif %}</h2>
+        <p>Ark Survival Evolved szerverfájlok {% if is_update %}frissítése{% else %}telepítése{% endif %} SteamCMD-vel</p>
+    </div>
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-info-circle"></i> Telepítési Információ</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Fontos:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li>A telepítés SteamCMD-vel történik</li>
+                    <li>Mindig a <strong>legfrissebb verzió</strong> töltődik le</li>
+                    <li>A szerverfájlok a felhasználó serverfiles mappájába kerülnek</li>
+                    <li>A telepítés folyamata élőben követhető a terminálban</li>
+                    <li>A telepítés hosszabb időt vehet igénybe (több GB letöltés)</li>
+                </ul>
+            </div>
+            
+            <form id="installForm" style="margin-top: 20px;">
+                <div class="alert alert-info" style="margin-bottom: 20px;">
+                    <i class="fas fa-info-circle"></i> A telepítés automatikusan a <strong>legfrissebb verziót</strong> tölti le SteamCMD-vel.
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary" id="installBtn">
+                        <i class="fas fa-download"></i> Telepítés Indítása
+                    </button>
+                    <a href="/ark-evolved/serverfiles" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Telepítési terminál -->
+    <div class="card" id="terminalCard" style="display: none; margin-top: 20px;">
+        <div class="card-header">
+            <h3><i class="fas fa-terminal"></i> Telepítési Folyamat</h3>
+        </div>
+        <div class="card-body">
+            <div id="terminal" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 14px; max-height: 500px; overflow-y: auto; min-height: 300px;">
+                <div style="color: #4ec9b0;">Telepítés inicializálása...</div>
+            </div>
+            <div style="margin-top: 10px;">
+                <button type="button" class="btn btn-secondary" id="closeTerminalBtn" style="display: none;">
+                    <i class="fas fa-times"></i> Bezárás
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+let websocket = null;
+let serverfilesId = null;
+
+// Ha van serverfiles_id (update esetén), automatikusan indítsuk
+{% if serverfiles_id %}
+document.addEventListener('DOMContentLoaded', function() {
+    const terminalCard = document.getElementById('terminalCard');
+    const terminal = document.getElementById('terminal');
+    const installBtn = document.getElementById('installBtn');
+    
+    if (terminalCard && terminal) {
+        terminalCard.style.display = 'block';
+        terminal.innerHTML = '<div style="color: #4ec9b0;">Frissítés indítása...</div>';
+        
+        // Automatikusan indítsuk a WebSocket kapcsolatot
+        startWebSocket({{ serverfiles_id }});
+    }
+});
+{% endif %}
+
+function startWebSocket(serverfilesId) {
+    const terminal = document.getElementById('terminal');
+    const installBtn = document.getElementById('installBtn');
+    const terminalCard = document.getElementById('terminalCard');
+    
+    if (!terminal || !serverfilesId) return;
+    
+    // WebSocket kapcsolat létrehozása
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ark-evolved/serverfiles/install/${serverfilesId}/stream`;
+    
+    websocket = new WebSocket(wsUrl);
+    
+    websocket.onmessage = function(event) {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'progress') {
+            const line = document.createElement('div');
+            line.textContent = message.message;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        } else if (message.type === 'complete') {
+            const line = document.createElement('div');
+            line.style.color = message.success ? '#4ec9b0' : '#f48771';
+            line.textContent = message.message;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            if (message.success) {
+                setTimeout(() => {
+                    window.location.href = `/ark-evolved/serverfiles?success={% if is_update %}Frissítés{% else %}Telepítés{% endif %}+sikeres`;
+                }, 2000);
+            } else {
+                if (installBtn) {
+                    installBtn.disabled = false;
+                    installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+                }
+                document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+            }
+        } else if (message.type === 'error') {
+            const line = document.createElement('div');
+            line.style.color = '#f48771';
+            line.textContent = `Hiba: ${message.message}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            
+            if (installBtn) {
+                installBtn.disabled = false;
+                installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+            }
+            document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+        }
+    };
+    
+    websocket.onerror = function(error) {
+        terminal.innerHTML += '<div style="color: #f48771;">WebSocket hiba történt</div>';
+        if (installBtn) {
+            installBtn.disabled = false;
+            installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+        }
+    };
+    
+    websocket.onclose = function() {
+        console.log('WebSocket kapcsolat bezárva');
+    };
+}
+
+document.getElementById('installForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const installBtn = document.getElementById('installBtn');
+    const terminalCard = document.getElementById('terminalCard');
+    const terminal = document.getElementById('terminal');
+    
+    // Gomb letiltása
+    installBtn.disabled = true;
+    installBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Indítás...';
+    
+    // Terminál megjelenítése
+    terminalCard.style.display = 'block';
+    terminal.innerHTML = '<div style="color: #4ec9b0;">Telepítés indítása (legfrissebb verzió)...</div>';
+    
+    try {
+        // Telepítés indítása (nincs verzió mező, mindig latest)
+        const formData = new FormData();
+        
+        const response = await fetch('/ark-evolved/serverfiles/install', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            serverfilesId = data.serverfiles_id;
+            
+            // WebSocket kapcsolat létrehozása
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ark-evolved/serverfiles/install/${serverfilesId}/stream`;
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                
+                if (message.type === 'progress') {
+                    const line = document.createElement('div');
+                    line.textContent = message.message;
+                    terminal.appendChild(line);
+                    terminal.scrollTop = terminal.scrollHeight;
+                } else if (message.type === 'complete') {
+                    const line = document.createElement('div');
+                    line.style.color = message.success ? '#4ec9b0' : '#f48771';
+                    line.textContent = message.message;
+                    terminal.appendChild(line);
+                    terminal.scrollTop = terminal.scrollHeight;
+                    
+                    if (message.success) {
+                        setTimeout(() => {
+                            window.location.href = `/ark-evolved/serverfiles?success=Telepítés+sikeres`;
+                        }, 2000);
+                    } else {
+                        installBtn.disabled = false;
+                        installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+                        document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+                    }
+                } else if (message.type === 'error') {
+                    const line = document.createElement('div');
+                    line.style.color = '#f48771';
+                    line.textContent = `Hiba: ${message.message}`;
+                    terminal.appendChild(line);
+                    terminal.scrollTop = terminal.scrollHeight;
+                    
+                    installBtn.disabled = false;
+                    installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+                    document.getElementById('closeTerminalBtn').style.display = 'inline-block';
+                }
+            };
+            
+            websocket.onerror = function(error) {
+                terminal.innerHTML += '<div style="color: #f48771;">WebSocket hiba történt</div>';
+                installBtn.disabled = false;
+                installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+            };
+            
+            websocket.onclose = function() {
+                console.log('WebSocket kapcsolat bezárva');
+            };
+        } else {
+            alert('Hiba: ' + (data.detail || 'Ismeretlen hiba'));
+            installBtn.disabled = false;
+            installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+        }
+    } catch (error) {
+        console.error('Hiba:', error);
+        alert('Hiba történt a telepítés indításakor.');
+        installBtn.disabled = false;
+        installBtn.innerHTML = '<i class="fas fa-download"></i> Telepítés Indítása';
+    }
+});
+
+document.getElementById('closeTerminalBtn').addEventListener('click', function() {
+    if (websocket) {
+        websocket.close();
+    }
+    document.getElementById('terminalCard').style.display = 'none';
+});
+</script>
+{% endblock %}
+{% endblock %}
