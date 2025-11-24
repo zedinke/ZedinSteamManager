@@ -535,6 +535,21 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 "MAX_PLAYERS": server.max_players or 70,
             }
         
+        # FONTOS: Ha a config_values-ban nincs ServerAdminPassword, de a server.config-ban van, akkor használjuk azt
+        # Ez biztosítja, hogy mindig legyen érték, ha a szerver config-ban van
+        if not config_values.get("ServerAdminPassword") and server.config:
+            server_admin_from_config = server.config.get("ServerAdminPassword", "")
+            if server_admin_from_config:
+                config_values["ServerAdminPassword"] = server_admin_from_config
+                logger.info(f"DEBUG: ServerAdminPassword beállítva server.config-ból: {server_admin_from_config[:3]}...")
+        
+        # Ha még mindig nincs érték, akkor próbáljuk meg közvetlenül a server.config-ból
+        if not config_values.get("ServerAdminPassword") and server.config:
+            direct_admin_password = server.config.get("ServerAdminPassword")
+            if direct_admin_password:
+                config_values["ServerAdminPassword"] = direct_admin_password
+                logger.info(f"DEBUG: ServerAdminPassword beállítva közvetlenül server.config-ból: {direct_admin_password[:3]}...")
+        
         # Portok
         port = server.port or settings.ark_default_port
         query_port = server.query_port or (port + 2)
@@ -586,11 +601,17 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             }
         }
         
-        # Server Admin Password
-        if config_values.get("ServerAdminPassword"):
+        # Server Admin Password - mindig bekerül, ha van értéke
+        server_admin_password_value = config_values.get("ServerAdminPassword", "")
+        if server_admin_password_value:
             compose_data['services']['asaserver']['environment'].append(
-                f'SERVER_ADMIN_PASSWORD={config_values.get("ServerAdminPassword")}'
+                f'SERVER_ADMIN_PASSWORD={server_admin_password_value}'
             )
+            logger.info(f"DEBUG: SERVER_ADMIN_PASSWORD hozzáadva a Docker Compose-hoz: {server_admin_password_value[:3]}... (hossz: {len(server_admin_password_value)})")
+        else:
+            logger.warning(f"DEBUG: SERVER_ADMIN_PASSWORD NEM került hozzáadásra! config_values.get('ServerAdminPassword'): '{server_admin_password_value}'")
+            logger.warning(f"DEBUG: config_values keys: {list(config_values.keys())}")
+            logger.warning(f"DEBUG: server.config: {server.config}")
         
         # Server Password
         if config_values.get("ServerPassword"):
@@ -1416,6 +1437,11 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         mod_ids = env_dict.get('MOD_IDS', '')
         custom_server_args = env_dict.get('CUSTOM_SERVER_ARGS', '')
         
+        # Debug: logoljuk az értékeket
+        logger.info(f"DEBUG: Indítási parancs generálás - server_admin_password: '{server_admin_password}' (type: {type(server_admin_password)}, len: {len(server_admin_password) if server_admin_password else 0})")
+        logger.info(f"DEBUG: env_dict keys: {list(env_dict.keys())}")
+        logger.info(f"DEBUG: SERVER_ADMIN_PASSWORD in env_dict: {'SERVER_ADMIN_PASSWORD' in env_dict}")
+        
         # Cluster ID lekérése
         cluster_id = ''
         if server.cluster:
@@ -1434,8 +1460,11 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
             query_params.append(f'RCONPort={rcon_port}')
         
         # ServerAdminPassword mindig szerepeljen, ha van értéke (függetlenül az RCON állapotától)
-        if server_admin_password:
+        if server_admin_password and server_admin_password.strip():
             query_params.append(f'ServerAdminPassword={server_admin_password}')
+            logger.info(f"DEBUG: ServerAdminPassword hozzáadva a query_params-hoz: {server_admin_password}")
+        else:
+            logger.warning(f"DEBUG: ServerAdminPassword NEM került hozzáadásra! Érték: '{server_admin_password}' (üres: {not server_admin_password or not server_admin_password.strip()})")
         
         if server_password:
             query_params.append(f'ServerPassword={server_password}')
@@ -1539,11 +1568,28 @@ def get_start_command_string(server: ServerInstance, db: Session) -> Optional[st
                 with open(compose_file, 'r', encoding='utf-8') as f:
                     compose_data = yaml.safe_load(f)
                 
+                # FONTOS: Ha a Docker Compose fájlban nincs SERVER_ADMIN_PASSWORD, de a server.config-ban van,
+                # akkor hozzáadjuk a compose_data-hoz, hogy az indítási parancs generálásnál használható legyen
+                if compose_data and 'services' in compose_data and 'asaserver' in compose_data['services']:
+                    env_list = compose_data['services']['asaserver'].get('environment', [])
+                    has_admin_password = any('SERVER_ADMIN_PASSWORD=' in str(env) for env in env_list)
+                    
+                    if not has_admin_password and server.config:
+                        admin_password = server.config.get("ServerAdminPassword", "")
+                        if admin_password:
+                            if isinstance(env_list, list):
+                                env_list.append(f'SERVER_ADMIN_PASSWORD={admin_password}')
+                                logger.info(f"DEBUG: SERVER_ADMIN_PASSWORD hozzáadva a compose_data-hoz server.config-ból: {admin_password[:3]}...")
+                            else:
+                                logger.warning(f"DEBUG: env_list nem lista típusú: {type(env_list)}")
+                
                 # Frissítsük az indítási parancs fájlt
                 if compose_data:
                     update_start_command_file(server, compose_file, compose_data)
             except Exception as e:
                 logger.warning(f"Hiba az indítási parancs fájl frissítésekor: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Most olvassuk be a fájlt (frissített vagy meglévő)
         if command_file.exists():
