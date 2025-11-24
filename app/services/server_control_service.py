@@ -1140,38 +1140,57 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         )
         
         # Státusz frissítése - újrapróbálás kapcsolat hiba esetén
-        max_retries = 3
+        max_retries = 5
         retry_count = 0
         status_updated = False
         server_id = server.id  # Mentsük el az ID-t, mert a server objektum változhat
         
+        # Zárjuk be az eredeti session-t, hogy ne legyen problémás kapcsolat
+        try:
+            db.close()
+        except:
+            pass
+        
         while retry_count < max_retries and not status_updated:
             try:
-                if retry_count > 0:
-                    # Új session létrehozása retry esetén
-                    try:
-                        db.rollback()
-                    except:
-                        pass
-                    from app.database import SessionLocal
-                    db = SessionLocal()
-                    server = db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
-                    if not server:
-                        break
+                # Mindig új session-t hozunk létre, hogy biztosan működjön
+                try:
+                    if retry_count > 0:
+                        # Várakozás retry esetén
+                        time.sleep(0.5 * retry_count)  # Exponenciális backoff
+                except:
+                    pass
                 
-                server.status = ServerStatus.STOPPED
-                server.started_at = None
-                db.commit()
-                status_updated = True
-                logger.info(f"Szerver {server_id} státusza frissítve (próbálkozás: {retry_count + 1})")
+                from app.database import SessionLocal
+                new_db = SessionLocal()
+                try:
+                    # Új session-ben lekérjük a szervert
+                    server = new_db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+                    if not server:
+                        logger.warning(f"Szerver {server_id} nem található az adatbázisban")
+                        new_db.close()
+                        break
+                    
+                    server.status = ServerStatus.STOPPED
+                    server.started_at = None
+                    new_db.commit()
+                    status_updated = True
+                    logger.info(f"Szerver {server_id} státusza frissítve (próbálkozás: {retry_count + 1})")
+                    new_db.close()
+                except Exception as inner_error:
+                    new_db.rollback()
+                    new_db.close()
+                    raise inner_error
+                    
             except Exception as db_error:
                 retry_count += 1
                 error_msg = str(db_error)
-                if "MySQL server has gone away" in error_msg or "2006" in error_msg or "Connection reset" in error_msg:
+                if "MySQL server has gone away" in error_msg or "2006" in error_msg or "Connection reset" in error_msg or "Lost connection" in error_msg:
                     logger.warning(f"Adatbázis kapcsolat hiba a szerver leállításakor (próbálkozás {retry_count}/{max_retries}): {db_error}")
                     if retry_count < max_retries:
-                        time.sleep(0.5 * retry_count)  # Exponenciális backoff
                         continue
+                    else:
+                        logger.error(f"Adatbázis frissítés sikertelen {max_retries} próbálkozás után is")
                 else:
                     # Más típusú hiba, nem próbáljuk újra
                     logger.error(f"Adatbázis hiba (nem kapcsolati): {db_error}")
