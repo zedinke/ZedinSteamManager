@@ -228,8 +228,27 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         # Ellenőrizzük a real_server_path szülő mappáit (user_* mappa)
         # FONTOS: Lépésenként hozzuk létre, hogy minden lépés után beállíthassuk a jogosultságokat!
         if not real_server_path.exists():
+            # FONTOS: Először ellenőrizzük és javítjuk a base mappát (ServerFiles)!
+            # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
+            if base_path.exists():
+                try:
+                    stat_info = base_path.stat()
+                    if stat_info.st_uid == 0 and current_uid != 0:
+                        logger.warning(f"Root jogosultságokkal létező base mappa észlelve: {base_path}")
+                        try:
+                            os.chmod(base_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                            os.chown(base_path, current_uid, current_gid)
+                            logger.info(f"✓ Base mappa jogosultságok javítva: {base_path}")
+                        except (PermissionError, OSError) as e:
+                            logger.error(f"⚠️ Nem sikerült javítani a base mappa jogosultságait {base_path}: {e}")
+                except (PermissionError, OSError):
+                    pass
+            
             # Először a user_* mappát (parent)
             if not real_server_path.parent.exists():
+                # FONTOS: Mielőtt létrehoznánk, biztosítjuk, hogy a base mappa megfelelő jogosultságokkal létezik!
+                if base_path.exists():
+                    ensure_permissions(base_path)
                 real_server_path.parent.mkdir(parents=True, exist_ok=True)
                 # AZONNAL beállítjuk a jogosultságokat!
                 ensure_permissions(real_server_path.parent)
@@ -238,6 +257,9 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 ensure_permissions(real_server_path.parent)
             
             # Most a tényleges mappát (latest vagy verzió)
+            # FONTOS: Mielőtt létrehoznánk, biztosítjuk, hogy a user_* mappa megfelelő jogosultságokkal létezik!
+            if real_server_path.parent.exists():
+                ensure_permissions(real_server_path.parent)
             real_server_path.mkdir(parents=True, exist_ok=True)
             # AZONNAL beállítjuk a jogosultságokat!
             ensure_permissions(real_server_path)
@@ -247,6 +269,9 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
             # Ellenőrizzük a szülő mappát is
             if real_server_path.parent.exists():
                 ensure_permissions(real_server_path.parent)
+            # Ellenőrizzük a base mappát is
+            if base_path.exists():
+                ensure_permissions(base_path)
         
         # Ellenőrizzük a saved_path szülő mappáit is
         if saved_path.exists() or not saved_path.exists():

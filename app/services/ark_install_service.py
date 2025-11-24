@@ -145,6 +145,23 @@ async def install_ark_server_files(
         
         # Lépésenként hozzuk létre/javítjuk a mappákat
         for path in parts:
+            # FONTOS: Mielőtt létrehoznánk egy mappát, ellenőrizzük és javítjuk a szülő mappát is!
+            # Mert ha a szülő mappa root jogosultságokkal létezik, akkor az új mappa is root jogosultságokkal jön létre
+            if path.parent.exists():
+                try:
+                    if os.name != 'nt':
+                        parent_stat = os.stat(path.parent)
+                        if parent_stat.st_uid == 0 and target_uid != 0:
+                            await log(f"⚠️ Szülő mappa root jogosultságokkal: {path.parent}, javítás...")
+                            try:
+                                os.chmod(path.parent, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                                os.chown(path.parent, target_uid, target_gid)
+                                await log(f"✓ Szülő mappa jogosultságok javítva: {path.parent}")
+                            except (PermissionError, OSError) as e:
+                                await log(f"⚠️ Szülő mappa jogosultságok javítása sikertelen: {e}")
+                except (PermissionError, OSError):
+                    pass
+            
             if path.exists():
                 # Ha a mappa létezik, ellenőrizzük a tulajdonjogot
                 try:
@@ -175,6 +192,22 @@ async def install_ark_server_files(
             
             # Ha nem létezik (vagy töröltük), létrehozzuk
             if not path.exists():
+                # FONTOS: Mielőtt létrehoznánk, biztosítjuk, hogy a szülő mappa megfelelő jogosultságokkal létezik!
+                if path.parent.exists():
+                    try:
+                        if os.name != 'nt':
+                            parent_stat = os.stat(path.parent)
+                            if parent_stat.st_uid == 0 and target_uid != 0:
+                                await log(f"⚠️ Szülő mappa root jogosultságokkal: {path.parent}, javítás...")
+                                try:
+                                    os.chmod(path.parent, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                                    os.chown(path.parent, target_uid, target_gid)
+                                    await log(f"✓ Szülő mappa jogosultságok javítva: {path.parent}")
+                                except (PermissionError, OSError) as e:
+                                    await log(f"⚠️ Szülő mappa jogosultságok javítása sikertelen: {e}")
+                    except (PermissionError, OSError):
+                        pass
+                
                 path.mkdir(exist_ok=True)
                 # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
                 try:
