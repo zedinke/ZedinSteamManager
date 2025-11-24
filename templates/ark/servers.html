@@ -2,6 +2,84 @@
 
 {% block title %}Ark Szerverek - ZedinArkManager{% endblock %}
 
+{% block extra_head %}
+<script>
+// FONTOS: A függvényeket AZONNAL definiáljuk, hogy biztosan elérhetők legyenek
+// Még mielőtt a HTML betöltődne, már elérhetők legyenek a függvények
+
+// Operation Status Notification - GLOBÁLIS FÜGGVÉNYEK
+window.showOperationStatus = function(title, message, type = 'info') {
+    const statusDiv = document.getElementById('operationStatus');
+    const titleDiv = document.getElementById('operationTitle');
+    const messageDiv = document.getElementById('operationMessage');
+    
+    if (!statusDiv || !titleDiv || !messageDiv) {
+        console.warn('Operation status elemek nem találhatók');
+        return;
+    }
+    
+    const colors = {
+        'success': '#28a745',
+        'warning': '#ffc107',
+        'info': '#17a2b8',
+        'danger': '#dc3545'
+    };
+    
+    const color = colors[type] || colors['info'];
+    statusDiv.style.borderLeftColor = color;
+    const spinner = statusDiv.querySelector('.spinner');
+    if (spinner) {
+        spinner.style.borderTopColor = color;
+    }
+    
+    titleDiv.textContent = title;
+    messageDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        if (statusDiv.style.display === 'block') {
+            window.hideOperationStatus();
+        }
+    }, 30000);
+};
+
+window.hideOperationStatus = function() {
+    const statusDiv = document.getElementById('operationStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+    }
+};
+
+window.updateOperationStatus = function(message) {
+    const messageDiv = document.getElementById('operationMessage');
+    if (messageDiv) {
+        messageDiv.textContent = message;
+    }
+};
+
+// Logs és Shutdown függvények placeholder-ek (később definiáljuk)
+window.showServerLogs = function(serverId) {
+    console.log('showServerLogs placeholder called, serverId:', serverId);
+    // A teljes implementáció a script blokkban lesz
+    if (window._showServerLogsImpl) {
+        window._showServerLogsImpl(serverId);
+    } else {
+        console.warn('showServerLogs implementation not loaded yet');
+    }
+};
+
+window.showShutdownModal = function(serverId) {
+    console.log('showShutdownModal placeholder called, serverId:', serverId);
+    // A teljes implementáció a script blokkban lesz
+    if (window._showShutdownModalImpl) {
+        window._showShutdownModalImpl(serverId);
+    } else {
+        console.warn('showShutdownModal implementation not loaded yet');
+    }
+};
+</script>
+{% endblock %}
+
 {% block content %}
 <!-- Operation Status Notification -->
 <div id="operationStatus" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 2000; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: 300px; border-left: 4px solid #007bff;">
@@ -527,7 +605,8 @@ function refreshLogs() {
 }
 
 // Globális függvény, hogy elérhető legyen az onclick eseményhez
-window.showServerLogs = async function(serverId, scrollToBottom = true) {
+// A placeholder-t felülírjuk a teljes implementációval
+window._showServerLogsImpl = async function(serverId, scrollToBottom = true) {
     console.log('showServerLogs called with serverId:', serverId);
     
     // Inicializáljuk a modal elemeket
@@ -562,6 +641,9 @@ window.showServerLogs = async function(serverId, scrollToBottom = true) {
     
     await loadLogs(serverId, scrollToBottom);
 };
+
+// A placeholder-t felülírjuk
+window.showServerLogs = window._showServerLogsImpl;
 
 async function loadLogs(serverId, scrollToBottom = false) {
     try {
@@ -668,7 +750,8 @@ if (document.readyState === 'loading') {
 }
 
 // Globális függvény, hogy elérhető legyen az onclick eseményhez
-window.showShutdownModal = function(serverId) {
+// A placeholder-t felülírjuk a teljes implementációval
+window._showShutdownModalImpl = function(serverId) {
     console.log('showShutdownModal called with serverId:', serverId);
     
     // Inicializáljuk a modal elemeket
