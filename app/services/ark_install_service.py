@@ -667,10 +667,9 @@ async def install_ark_server_files(
             await log(f"⚠️ SteamCMD exit code 8 (gyakori, nem feltétlenül hiba)")
             await log("Ellenőrizzük, hogy a telepítés sikeres volt-e...")
             
-            # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
-            # Csak a linux64/ mappát ellenőrizzük (a ShooterGame/Binaries/Linux nem létezik)
+            # Ellenőrizzük, hogy a bináris létezik-e
+            # Csak a linux64/ mappát ellenőrizzük
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
-            win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
             # Várunk, amíg a bináris létrejön (max 60 másodperc, de csak akkor várunk, ha még nincs)
             max_wait_time = 60  # Maximum 60 másodperc
@@ -685,11 +684,6 @@ async def install_ark_server_files(
                 if linux_binary:
                     await log(f"✓ Linux bináris megtalálva: {linux_binary}")
                     await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
-                    return True, '\n'.join(log_lines)
-                elif win64_binary.exists():
-                    await log(f"✓ Windows bináris megtalálva: {win64_binary}")
-                    await log("✓ Telepítés sikeres (exit code 8, de bináris létezik)!")
-                    await log("ℹ️ Windows binárist használunk Wine-nal")
                     return True, '\n'.join(log_lines)
                 
                 # Ha még nincs, várunk és újra ellenőrizzük
@@ -719,7 +713,6 @@ async def install_ark_server_files(
             # Mégis ellenőrizzük, hogy esetleg a bináris létezik-e
             await asyncio.sleep(2)
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
-            win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
             # Csak a linux64/ mappát ellenőrizzük
             linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
@@ -727,11 +720,6 @@ async def install_ark_server_files(
             if linux_binary:
                 await log("⚠️ Linux bináris mégis létezik, telepítés valószínűleg sikeres volt!")
                 await log(f"✓ Linux bináris: {linux_binary}")
-                return True, '\n'.join(log_lines)
-            elif win64_binary.exists():
-                await log("⚠️ Windows bináris mégis létezik, telepítés valószínűleg sikeres volt!")
-                await log(f"✓ Windows bináris: {win64_binary}")
-                await log("ℹ️ Windows binárist használunk Wine-nal")
                 return True, '\n'.join(log_lines)
             
             return False, '\n'.join(log_lines)
