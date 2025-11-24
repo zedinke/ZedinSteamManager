@@ -1530,8 +1530,22 @@ def get_start_command_string(server: ServerInstance, db: Session) -> Optional[st
     try:
         instance_dir = get_instance_dir(server)
         command_file = instance_dir / "start_command.txt"
+        compose_file = get_docker_compose_file(server)
         
-        # Ha létezik a fájl, olvassuk be a teljes tartalmat
+        # Ha létezik a compose fájl, mindig frissítsük az indítási parancs fájlt
+        if compose_file.exists():
+            try:
+                # Docker Compose fájl beolvasása
+                with open(compose_file, 'r', encoding='utf-8') as f:
+                    compose_data = yaml.safe_load(f)
+                
+                # Frissítsük az indítási parancs fájlt
+                if compose_data:
+                    update_start_command_file(server, compose_file, compose_data)
+            except Exception as e:
+                logger.warning(f"Hiba az indítási parancs fájl frissítésekor: {e}")
+        
+        # Most olvassuk be a fájlt (frissített vagy meglévő)
         if command_file.exists():
             with open(command_file, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
@@ -1543,7 +1557,6 @@ def get_start_command_string(server: ServerInstance, db: Session) -> Optional[st
         if not docker_compose_cmd:
             return None
         
-        compose_file = get_docker_compose_file(server)
         if not compose_file.exists():
             return None
         
@@ -1552,4 +1565,6 @@ def get_start_command_string(server: ServerInstance, db: Session) -> Optional[st
         return cmd
     except Exception as e:
         logger.error(f"Hiba a parancs generálásakor: {e}")
+        import traceback
+        traceback.print_exc()
         return None
