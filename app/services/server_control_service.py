@@ -660,19 +660,27 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         container_work_dir = '/home/ai_developer/arkserver'
         container_saved_path = '/home/ai_developer/arkserver/ShooterGame/Saved'
         
-        # Container név: egyedi kell legyen, szerver ID alapján
-        # Prefix: 'zedin_asa_' hogy ne ütközzön más rendszerekkel
-        # Ark Survival Evolved esetén 'zedin_ase_', egyébként 'zedin_asa_'
-        container_name = f'zedin_asa_{server.id}'
+        # Játék típus meghatározása (Ark Survival Evolved vagy Ark Survival Ascended)
+        is_evolved = False
+        ark_app_id = "2430930"  # Ark Survival Ascended alapértelmezett
         if db:
             try:
                 from app.database import Game
                 game = db.query(Game).filter(Game.id == server.game_id).first()
                 if game and game.name == "Ark Survival Evolved":
-                    container_name = f'zedin_ase_{server.id}'
+                    is_evolved = True
+                    ark_app_id = "346110"  # Ark Survival Evolved App ID
             except Exception:
-                # Ha hiba van, az eredeti container nevet használjuk
+                # Ha hiba van, az eredeti értékeket használjuk
                 pass
+        
+        # Container név: egyedi kell legyen, szerver ID alapján
+        # Prefix: 'zedin_asa_' hogy ne ütközzön más rendszerekkel
+        # Ark Survival Evolved esetén 'zedin_ase_', egyébként 'zedin_asa_'
+        if is_evolved:
+            container_name = f'zedin_ase_{server.id}'
+        else:
+            container_name = f'zedin_asa_{server.id}'
         
         # Docker Compose YAML összeállítása
         compose_data = {
@@ -707,6 +715,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         f'API={"True" if config_values.get("API", False) else "False"}',
                         f'ARK_SERVER_DIR={container_work_dir}',  # A mountolt mappa, ahol a ServerFiles található
                         f'UPDATE_SERVER=False',  # Ne telepítsen újra, ha a fájlok már a hoston vannak
+                        f'ARK_APP_ID={ark_app_id}',  # Steam App ID (2430930 = Ascended, 346110 = Evolved)
                     ],
                 }
             }
