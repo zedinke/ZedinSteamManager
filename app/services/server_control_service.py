@@ -8,6 +8,8 @@ import signal
 import psutil
 import shutil
 import time
+import socket
+import struct
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict
@@ -20,6 +22,79 @@ import logging
 import yaml
 
 logger = logging.getLogger(__name__)
+
+def send_rcon_command(host: str, port: int, password: str, command: str, timeout: int = 5) -> Optional[str]:
+    """
+    RCON parancs küldése ARK szervernek (Source RCON protokoll)
+    
+    Args:
+        host: Szerver host (általában localhost)
+        port: RCON port
+        password: RCON jelszó
+        command: Parancs (pl. "saveworld")
+        timeout: Timeout másodpercben
+    
+    Returns:
+        Válasz a szervertől vagy None hiba esetén
+    """
+    try:
+        # Socket létrehozása
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        
+        # Kapcsolódás
+        sock.connect((host, port))
+        
+        # RCON autentikáció
+        # SERVERDATA_AUTH packet
+        auth_packet = struct.pack('<III', 0, 3, len(password)) + password.encode('utf-8') + b'\x00\x00'
+        auth_packet = struct.pack('<I', len(auth_packet)) + auth_packet
+        sock.send(auth_packet)
+        
+        # Válasz olvasása (2 packet: SERVERDATA_AUTH_RESPONSE és SERVERDATA_RESPONSE_VALUE)
+        try:
+            response = sock.recv(4096)
+            if len(response) < 4:
+                logger.warning("RCON autentikáció válasz túl rövid")
+                sock.close()
+                return None
+            
+            # Ellenőrizzük, hogy az autentikáció sikeres volt-e
+            # Ha a válasz ID -1, akkor sikertelen volt
+            response_id = struct.unpack('<I', response[4:8])[0]
+            if response_id == 0xFFFFFFFF:
+                logger.warning("RCON autentikáció sikertelen")
+                sock.close()
+                return None
+        except socket.timeout:
+            logger.warning("RCON autentikáció timeout")
+            sock.close()
+            return None
+        
+        # Parancs küldése
+        # SERVERDATA_EXECCOMMAND packet
+        command_packet = struct.pack('<III', 0, 2, len(command)) + command.encode('utf-8') + b'\x00\x00'
+        command_packet = struct.pack('<I', len(command_packet)) + command_packet
+        sock.send(command_packet)
+        
+        # Válasz olvasása
+        try:
+            response = sock.recv(4096)
+            if len(response) >= 4:
+                response_length = struct.unpack('<I', response[0:4])[0]
+                if len(response) >= response_length + 4:
+                    response_body = response[12:12+response_length-10].decode('utf-8', errors='ignore')
+                    sock.close()
+                    return response_body
+        except socket.timeout:
+            logger.warning("RCON parancs válasz timeout")
+        
+        sock.close()
+        return None
+        
+    except Exception as e:
+        logger.error(f"RCON parancs hiba: {e}")
+        return None
 
 def check_docker_available() -> bool:
     """
@@ -1020,6 +1095,39 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 "success": True,
                 "message": "A szerver nem futott"
             }
+        
+        # Ellenőrizzük, hogy a konténer fut-e
+        container_name = f"zedin_asa_{server.id}"
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            container_running = result.returncode == 0 and result.stdout.strip()
+        except Exception as e:
+            logger.warning(f"Konténer ellenőrzés hiba: {e}")
+            container_running = False
+        
+        # Ha a konténer fut, küldjük a saveworld parancsot RCON-on keresztül
+        if container_running:
+            try:
+                # RCON beállítások lekérése
+                config = server.config or {}
+                rcon_enabled = config.get("RCON_ENABLED", True)
+                rcon_port = server.rcon_port or 27020
+                server_admin_password = config.get("SERVER_ADMIN_PASSWORD", "")
+                
+                if rcon_enabled and server_admin_password:
+                    logger.info(f"Saveworld parancs küldése RCON-on keresztül (port: {rcon_port})...")
+                    send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld")
+                    logger.info("Saveworld parancs elküldve, várakozás 10 másodpercet...")
+                    time.sleep(10)
+                else:
+                    logger.info("RCON nincs engedélyezve vagy nincs admin jelszó, saveworld parancs kihagyva")
+            except Exception as rcon_error:
+                logger.warning(f"RCON saveworld parancs hiba (folytatjuk a leállítással): {rcon_error}")
         
         # Docker Compose leállítás
         compose_cmd = docker_compose_cmd.split() + ["-f", str(compose_file), "down"]

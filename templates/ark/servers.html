@@ -325,13 +325,32 @@ function showRamPurchaseModal(serverId, currentPurchased) {
 
 <script>
 let currentServerId = null;
-let logsModal = document.getElementById('logsModal');
-let logsContent = document.getElementById('logsContent');
+let logsModal = null;
+let logsContent = null;
 let liveLogsInterval = null;
 let currentLogType = 'docker';
 
+// Inicializáljuk a DOM elemeket, amikor a script betöltődik
+function initLogsModal() {
+    if (!logsModal) {
+        logsModal = document.getElementById('logsModal');
+    }
+    if (!logsContent) {
+        logsContent = document.getElementById('logsContent');
+    }
+}
+
+// DOM betöltése után inicializálás
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLogsModal);
+} else {
+    initLogsModal();
+}
+
 function closeLogsModal() {
-    logsModal.style.display = 'none';
+    if (logsModal) {
+        logsModal.style.display = 'none';
+    }
     currentServerId = null;
     stopLiveLogs();
 }
@@ -376,6 +395,12 @@ function refreshLogs() {
 }
 
 async function showServerLogs(serverId, scrollToBottom = true) {
+    initLogsModal(); // Biztosítjuk, hogy a modal elemek inicializálva legyenek
+    if (!logsModal || !logsContent) {
+        console.error('Logs modal elemek nem találhatók');
+        alert('Hiba: A logok modal nem található. Kérlek, frissítsd az oldalt.');
+        return;
+    }
     currentServerId = serverId;
     logsModal.style.display = 'flex';
     logsContent.innerHTML = '<p>Logok betöltése...</p>';
@@ -458,11 +483,13 @@ function copyLogs() {
 }
 
 // Modal bezárása kattintásra a háttérre
-logsModal.addEventListener('click', function(e) {
-    if (e.target === logsModal) {
-        closeLogsModal();
-    }
-});
+if (logsModal) {
+    logsModal.addEventListener('click', function(e) {
+        if (e.target === logsModal) {
+            closeLogsModal();
+        }
+    });
+}
 </script>
 {% endblock %}
 
