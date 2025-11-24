@@ -276,12 +276,50 @@ if [ "${USE_WINE}" = "true" ]; then
     LOGS_DIR="${SAVED_DIR}/Logs"
     mkdir -p "${LOGS_DIR}" || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Logs mappát"
     
+    # Jogosultságok beállítása a Saved mappára (ha szükséges)
+    # A Saved mappa volume mount, lehet, hogy a host-on más jogosultságokkal van
+    # Próbáljuk meg javítani a jogosultságokat, ha nem tudunk írni
+    if [ ! -w "${LOGS_DIR}" ]; then
+        echo "FIGYELMEZTETÉS: Logs mappa nem írható, jogosultságok javítása..."
+        chmod -R u+w "${SAVED_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült javítani a jogosultságokat"
+    fi
+    
+    # Log fájl útvonal (ha nem tudunk írni a Saved mappába, használjuk a /tmp-t)
+    if [ -w "${LOGS_DIR}" ]; then
+        LOG_FILE="${LOGS_DIR}/server.log"
+    else
+        LOG_FILE="/tmp/ark_server.log"
+        echo "FIGYELMEZTETÉS: Log fájl a /tmp/ark_server.log-ba íródik (Saved mappa nem írható)"
+    fi
+    
+    # Wine prefix inicializálása (ha még nem teljes)
+    # A Wine automatikusan inicializálja, de ellenőrizzük, hogy a kernel32.dll létezik-e
+    if [ ! -f "${WINEPREFIX}/drive_c/windows/system32/kernel32.dll" ]; then
+        echo "Wine prefix inicializálása (kernel32.dll hiányzik)..."
+        # Próbáljuk meg inicializálni a Wine prefix-et
+        WINEDLLOVERRIDES="mscoree,mshtml=" wineboot --init 2>&1 | head -10 || echo "FIGYELMEZTETÉS: Wine prefix inicializálás figyelmeztetéseket adott"
+        sleep 2
+    fi
+    
     # Szerver indítása Wine-nal
     echo "Szerver indítása Wine-nal..."
     echo "Bináris: ${SERVER_BINARY}"
     echo "Parancs: wine ${SERVER_BINARY} ${SERVER_ARGS}"
-    echo "Log fájl: ${LOGS_DIR}/server.log"
-    exec wine "${SERVER_BINARY}" ${SERVER_ARGS} 2>&1 | tee -a "${LOGS_DIR}/server.log"
+    echo "Log fájl: ${LOG_FILE}"
+    echo ""
+    echo "=========================================="
+    echo "Wine inicializálja a prefix-et az első futtatáskor..."
+    echo "Ez 30-60 másodpercet vehet igénybe..."
+    echo "=========================================="
+    echo ""
+    # A Wine inicializálása az első futtatáskor időbe telhet
+    # A szerver kimenetét mind a stdout-ra, mind a log fájlba írjuk (ha lehet)
+    if [ -w "${LOG_FILE}" ] || [ "${LOG_FILE}" = "/tmp/ark_server.log" ]; then
+        exec wine "${SERVER_BINARY}" ${SERVER_ARGS} 2>&1 | tee -a "${LOG_FILE}"
+    else
+        # Ha nem tudunk írni a log fájlba, csak stdout-ra
+        exec wine "${SERVER_BINARY}" ${SERVER_ARGS}
+    fi
 else
     # Natív Linux bináris
     # Saved mappa és Logs mappa létrehozása (ha szükséges)
