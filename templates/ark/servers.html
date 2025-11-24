@@ -391,6 +391,60 @@ function showRamPurchaseModal(serverId, currentPurchased) {
 </div>
 
 <script>
+// FONTOS: A függvényeket előre definiáljuk, hogy biztosan elérhetők legyenek
+// Operation Status Notification - GLOBÁLIS FÜGGVÉNYEK (előre definiálva)
+window.showOperationStatus = function(title, message, type = 'info') {
+    const statusDiv = document.getElementById('operationStatus');
+    const titleDiv = document.getElementById('operationTitle');
+    const messageDiv = document.getElementById('operationMessage');
+    
+    if (!statusDiv || !titleDiv || !messageDiv) {
+        console.warn('Operation status elemek nem találhatók');
+        return;
+    }
+    
+    // Színek típus szerint
+    const colors = {
+        'success': '#28a745',
+        'warning': '#ffc107',
+        'info': '#17a2b8',
+        'danger': '#dc3545'
+    };
+    
+    const color = colors[type] || colors['info'];
+    statusDiv.style.borderLeftColor = color;
+    const spinner = statusDiv.querySelector('.spinner');
+    if (spinner) {
+        spinner.style.borderTopColor = color;
+    }
+    
+    titleDiv.textContent = title;
+    messageDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    // Automatikus elrejtés 30 másodperc után (ha még nem törölték)
+    setTimeout(() => {
+        if (statusDiv.style.display === 'block') {
+            window.hideOperationStatus();
+        }
+    }, 30000);
+};
+
+window.hideOperationStatus = function() {
+    const statusDiv = document.getElementById('operationStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+    }
+};
+
+window.updateOperationStatus = function(message) {
+    const messageDiv = document.getElementById('operationMessage');
+    if (messageDiv) {
+        messageDiv.textContent = message;
+    }
+};
+
+// Logs modal változók
 let currentServerId = null;
 let logsModal = null;
 let logsContent = null;
@@ -808,13 +862,14 @@ if (shutdownModal) {
     });
 }
 
-// Operation Status Notification
-function showOperationStatus(title, message, type = 'info') {
+// Operation Status Notification - GLOBÁLIS FÜGGVÉNYEK (előre definiálva, hogy elérhetők legyenek)
+window.showOperationStatus = function(title, message, type = 'info') {
     const statusDiv = document.getElementById('operationStatus');
     const titleDiv = document.getElementById('operationTitle');
     const messageDiv = document.getElementById('operationMessage');
     
     if (!statusDiv || !titleDiv || !messageDiv) {
+        console.warn('Operation status elemek nem találhatók');
         return;
     }
     
@@ -828,7 +883,10 @@ function showOperationStatus(title, message, type = 'info') {
     
     const color = colors[type] || colors['info'];
     statusDiv.style.borderLeftColor = color;
-    statusDiv.querySelector('.spinner').style.borderTopColor = color;
+    const spinner = statusDiv.querySelector('.spinner');
+    if (spinner) {
+        spinner.style.borderTopColor = color;
+    }
     
     titleDiv.textContent = title;
     messageDiv.textContent = message;
@@ -837,24 +895,24 @@ function showOperationStatus(title, message, type = 'info') {
     // Automatikus elrejtés 30 másodperc után (ha még nem törölték)
     setTimeout(() => {
         if (statusDiv.style.display === 'block') {
-            hideOperationStatus();
+            window.hideOperationStatus();
         }
     }, 30000);
-}
+};
 
-function hideOperationStatus() {
+window.hideOperationStatus = function() {
     const statusDiv = document.getElementById('operationStatus');
     if (statusDiv) {
         statusDiv.style.display = 'none';
     }
-}
+};
 
-function updateOperationStatus(message) {
+window.updateOperationStatus = function(message) {
     const messageDiv = document.getElementById('operationMessage');
     if (messageDiv) {
         messageDiv.textContent = message;
     }
-}
+};
 
 // Form submit után figyeljük a válaszokat
 document.addEventListener('DOMContentLoaded', function() {
