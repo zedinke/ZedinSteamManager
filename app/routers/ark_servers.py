@@ -40,8 +40,53 @@ async def get_server_logs(
     # Docker konténer logok lekérése
     if log_type == "docker":
         import subprocess
+        from app.services.symlink_service import get_server_dedicated_saved_path, get_server_path
+        
         container_name = f"zedin_asa_{server.id}"
         
+        # Próbáljuk meg először a Saved/Logs mappában lévő log fájlt olvasni
+        # Ez csak a szerver kimenetét tartalmazza, nem az entrypoint.sh üzeneteket
+        server_path = get_server_path(server.id)
+        saved_path = get_server_dedicated_saved_path(server_path)
+        server_log_file = saved_path / "Logs" / "server.log"
+        
+        # Ha van szerver log fájl, olvassuk be azt (ez csak a szerver kimenetét tartalmazza)
+        if server_log_file.exists():
+            try:
+                with open(server_log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    # Utolsó 500 sort olvassuk be
+                    lines = f.readlines()
+                    last_lines = lines[-500:] if len(lines) > 500 else lines
+                    server_log_content = ''.join(last_lines)
+                
+                # Ellenőrizzük a konténer státuszát is
+                try:
+                    check_result = subprocess.run(
+                        ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    container_status = "running" if check_result.stdout.strip() else "stopped"
+                except:
+                    container_status = "unknown"
+                
+                return JSONResponse({
+                    "success": True,
+                    "log_type": "docker",
+                    "log_source": "server_log_file",
+                    "container_name": container_name,
+                    "container_status": container_status,
+                    "log_file": str(server_log_file),
+                    "log_content": server_log_content,
+                    "log_lines": len(server_log_content.splitlines()),
+                    "total_lines": len(lines)
+                })
+            except Exception as e:
+                # Ha nem sikerül olvasni a log fájlt, folytatjuk a Docker logs-al
+                pass
+        
+        # Ha nincs szerver log fájl, vagy nem sikerült olvasni, használjuk a Docker logs-ot
         try:
             # Ellenőrizzük, hogy a konténer fut-e
             check_result = subprocess.run(
@@ -67,28 +112,57 @@ async def get_server_logs(
                     })
                 else:
                     # Konténer létezik, de nem fut
+                    # Több sort kérünk, hogy lássuk a szerver logokat is
                     log_result = subprocess.run(
-                        ["docker", "logs", "--tail", "200", container_name],
+                        ["docker", "logs", "--tail", "1000", container_name],
                         capture_output=True,
                         text=True,
-                        timeout=10
+                        timeout=15
                     )
+                    
+                    # Szűrjük a logokat: csak a szerver kimenetét mutatjuk (Commandline sor után)
+                    log_lines = log_result.stdout.splitlines()
+                    filtered_lines = []
+                    found_commandline = False
+                    
+                    for line in log_lines:
+                        # Ha megtaláltuk a Commandline sort, onnantól kezdve minden sor a szerver kimenete
+                        if "Commandline:" in line or "[202" in line:
+                            found_commandline = True
+                            filtered_lines.append(line)
+                        elif found_commandline:
+                            # Commandline után minden sor a szerver kimenete
+                            filtered_lines.append(line)
+                        elif not found_commandline and any(marker in line for marker in ["[202", "Log file open", "ARK Version", "LogMemory"]):
+                            # Ha még nem találtuk meg a Commandline sort, de látunk ARK szerver log sort, akkor is hozzáadjuk
+                            found_commandline = True
+                            filtered_lines.append(line)
+                    
+                    # Ha nem találtunk Commandline sort, de van log, akkor az utolsó 500 sort mutatjuk
+                    if not filtered_lines and log_lines:
+                        filtered_lines = log_lines[-500:]
+                    
+                    filtered_content = '\n'.join(filtered_lines) if filtered_lines else log_result.stdout
                     
                     return JSONResponse({
                         "success": True,
                         "log_type": "docker",
+                        "log_source": "docker_logs",
                         "container_name": container_name,
                         "container_status": "stopped",
-                        "log_content": log_result.stdout,
-                        "log_lines": len(log_result.stdout.splitlines())
+                        "log_content": filtered_content,
+                        "log_lines": len(filtered_lines),
+                        "original_lines": len(log_lines),
+                        "filtered": len(filtered_lines) < len(log_lines)
                     })
             
             # Konténer fut, logok lekérése
+            # Több sort kérünk, hogy lássuk a szerver logokat is (az entrypoint.sh üzenetek után)
             log_result = subprocess.run(
-                ["docker", "logs", "--tail", "200", container_name],
+                ["docker", "logs", "--tail", "1000", container_name],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=15
             )
             
             if log_result.returncode != 0:
@@ -97,13 +171,40 @@ async def get_server_logs(
                     "message": f"Docker logok lekérése sikertelen: {log_result.stderr}"
                 })
             
+            # Szűrjük a logokat: csak a szerver kimenetét mutatjuk (Commandline sor után)
+            log_lines = log_result.stdout.splitlines()
+            filtered_lines = []
+            found_commandline = False
+            
+            for line in log_lines:
+                # Ha megtaláltuk a Commandline sort, onnantól kezdve minden sor a szerver kimenete
+                if "Commandline:" in line or "[202" in line:
+                    found_commandline = True
+                    filtered_lines.append(line)
+                elif found_commandline:
+                    # Commandline után minden sor a szerver kimenete
+                    filtered_lines.append(line)
+                elif not found_commandline and any(marker in line for marker in ["[202", "Log file open", "ARK Version", "LogMemory"]):
+                    # Ha még nem találtuk meg a Commandline sort, de látunk ARK szerver log sort, akkor is hozzáadjuk
+                    found_commandline = True
+                    filtered_lines.append(line)
+            
+            # Ha nem találtunk Commandline sort, de van log, akkor az utolsó 500 sort mutatjuk
+            if not filtered_lines and log_lines:
+                filtered_lines = log_lines[-500:]
+            
+            filtered_content = '\n'.join(filtered_lines) if filtered_lines else log_result.stdout
+            
             return JSONResponse({
                 "success": True,
                 "log_type": "docker",
+                "log_source": "docker_logs",
                 "container_name": container_name,
                 "container_status": "running",
-                "log_content": log_result.stdout,
-                "log_lines": len(log_result.stdout.splitlines())
+                "log_content": filtered_content,
+                "log_lines": len(filtered_lines),
+                "original_lines": len(log_lines),
+                "filtered": len(filtered_lines) < len(log_lines)
             })
             
         except subprocess.TimeoutExpired:
