@@ -106,11 +106,28 @@ async def start_install(
     
     # Ark Survival Evolved játék lekérése az adatbázisból
     ark_game = db.query(Game).filter(Game.name == "Ark Survival Evolved").first()
+    if not ark_game:
+        # Ha nincs találat, próbáljuk meg case-insensitive kereséssel
+        ark_game = db.query(Game).filter(Game.name.ilike("%ark%evolved%")).first()
+    
     game_id = ark_game.id if ark_game else None
+    
+    # Debug log
+    import logging
+    logger = logging.getLogger(__name__)
+    if ark_game:
+        logger.info(f"start_install: Found Ark Survival Evolved game: id={ark_game.id}, name={ark_game.name}, is_active={ark_game.is_active}")
+    else:
+        logger.warning(f"start_install: Ark Survival Evolved game NOT FOUND in database!")
+        # Listázuk az összes Ark játékot debug céljából
+        all_ark_games = db.query(Game).filter(Game.name.ilike("%ark%")).all()
+        logger.warning(f"start_install: All Ark games in database: {[(g.id, g.name, g.is_active) for g in all_ark_games]}")
     
     # Telepítési útvonal (játék-specifikus)
     user_serverfiles = get_user_serverfiles_path(current_user.id, game_id=game_id, db=db)
     install_path = user_serverfiles / version
+    
+    logger.info(f"start_install: Calculated install_path: {install_path}")
     
     # Ellenőrizzük, hogy van-e már telepítés folyamatban
     existing_pending = db.query(UserServerFiles).filter(
