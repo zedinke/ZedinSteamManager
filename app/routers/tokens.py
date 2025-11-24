@@ -292,24 +292,34 @@ async def process_token_request(
         role_changed = False
         
         # Ellenőrizzük, hogy user token típusú-e
-        # A token_type enumként van tárolva, de ellenőrizzük mindkét módon
-        token_type_enum = token_request.token_type
-        if isinstance(token_type_enum, str):
-            # Ha string, konvertáljuk enum-ra
-            token_type_enum = TokenType(token_type_enum)
+        # A token_type enumként van tárolva az adatbázisban
+        token_type_value = None
+        if hasattr(token_request.token_type, 'value'):
+            token_type_value = token_request.token_type.value
+        else:
+            token_type_value = str(token_request.token_type)
         
-        is_user_token = (token_type_enum == TokenType.USER or 
-                        (hasattr(token_type_enum, 'value') and token_type_enum.value == "user"))
+        # Debug: kiírjuk a token_type értékét
+        print(f"DEBUG: token_request.token_type = {token_request.token_type}, value = {token_type_value}")
+        print(f"DEBUG: user.role = {user.role}, user.role.value = {user.role.value if hasattr(user.role, 'value') else user.role}")
+        
+        # Ellenőrizzük, hogy user token típusú-e
+        is_user_token = (token_type_value == "user" or 
+                        token_request.token_type == TokenType.USER)
+        
+        print(f"DEBUG: is_user_token = {is_user_token}")
         
         # Csak akkor frissítjük, ha user token ÉS még user rangú
         if is_user_token:
             # Ellenőrizzük a jelenlegi rangot
-            current_role = user.role
-            if isinstance(current_role, str):
-                current_role = UserRole(current_role)
+            current_role_value = user.role.value if hasattr(user.role, 'value') else str(user.role)
+            is_user_role = (current_role_value == "user" or user.role == UserRole.USER)
+            
+            print(f"DEBUG: current_role_value = {current_role_value}, is_user_role = {is_user_role}")
             
             # Csak akkor frissítjük, ha user rangú
-            if current_role == UserRole.USER:
+            if is_user_role:
+                print(f"DEBUG: Frissítjük a rangot user-ról server_admin-ra")
                 # Rang frissítése
                 user.role = UserRole.SERVER_ADMIN
                 role_changed = True
@@ -321,11 +331,17 @@ async def process_token_request(
                 db.refresh(user)
                 
                 # Ellenőrizzük, hogy tényleg változott-e
-                if user.role != UserRole.SERVER_ADMIN:
+                final_role_value = user.role.value if hasattr(user.role, 'value') else str(user.role)
+                print(f"DEBUG: Frissítés után user.role = {user.role}, value = {final_role_value}")
+                
+                if final_role_value != "server_admin":
                     # Ha még mindig nem változott, próbáljuk meg újra
+                    print(f"DEBUG: Rang még mindig nem server_admin, újrapróbálás")
                     user.role = UserRole.SERVER_ADMIN
                     db.commit()
                     db.refresh(user)
+                    final_role_value_after_retry = user.role.value if hasattr(user.role, 'value') else str(user.role)
+                    print(f"DEBUG: Újrapróbálás után user.role = {user.role}, value = {final_role_value_after_retry}")
         
         # Token igénylés státusz frissítése
         token_request.status = "approved"
