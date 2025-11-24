@@ -1084,7 +1084,7 @@ async def list_servers(
     servers = db.query(ServerInstance).join(Game).filter(
         and_(
             ServerInstance.server_admin_id == current_user.id,
-            Game.name == "Ark Survival Evolved"
+            Game.name.ilike("%ark%evolved%")
         )
     ).order_by(desc(ServerInstance.created_at)).all()
     
