@@ -96,6 +96,75 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
         logger.error(f"RCON parancs hiba: {e}")
         return None
 
+def check_process_running_in_container(container_name: str, process_pattern: str = "ArkAscendedServer.exe") -> bool:
+    """
+    Ellenőrzi, hogy egy folyamat fut-e a Docker konténerben
+    
+    Args:
+        container_name: Docker konténer neve
+        process_pattern: Folyamat keresési minta (pl. "ArkAscendedServer.exe")
+    
+    Returns:
+        True ha a folyamat fut, False egyébként
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "exec", container_name, "pgrep", "-f", process_pattern],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        return result.returncode == 0 and result.stdout.strip() != ""
+    except Exception as e:
+        logger.warning(f"Folyamat ellenőrzés hiba a konténerben: {e}")
+        return False
+
+def wait_for_process_shutdown(container_name: str, process_pattern: str = "ArkAscendedServer.exe", max_wait_seconds: int = 180) -> bool:
+    """
+    Várja, hogy a folyamat leálljon a Docker konténerben
+    
+    Args:
+        container_name: Docker konténer neve
+        process_pattern: Folyamat keresési minta (pl. "ArkAscendedServer.exe")
+        max_wait_seconds: Maximum várakozási idő másodpercben (alapértelmezett: 180 = 3 perc)
+    
+    Returns:
+        True ha a folyamat leállt, False ha timeout
+    """
+    check_interval = 5  # 5 másodpercenként ellenőrzünk
+    elapsed = 0
+    
+    logger.info(f"Várakozás, hogy a folyamat leálljon a konténerben (max {max_wait_seconds} másodperc)...")
+    
+    while elapsed < max_wait_seconds:
+        # Ellenőrizzük, hogy a konténer még fut-e
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if not result.stdout.strip():
+                logger.info("Konténer már leállt")
+                return True
+        except Exception as e:
+            logger.warning(f"Konténer ellenőrzés hiba: {e}")
+            return True  # Ha nem tudjuk ellenőrizni, feltételezzük, hogy leállt
+        
+        # Ellenőrizzük, hogy a folyamat még fut-e
+        if not check_process_running_in_container(container_name, process_pattern):
+            logger.info("Folyamat leállt")
+            return True
+        
+        time.sleep(check_interval)
+        elapsed += check_interval
+        if elapsed % 30 == 0:  # Minden 30 másodpercben logolunk
+            logger.info(f"Várakozás... ({elapsed}/{max_wait_seconds} másodperc)")
+    
+    logger.warning(f"Timeout: a folyamat nem állt le {max_wait_seconds} másodperc alatt")
+    return False
+
 def check_docker_available() -> bool:
     """
     Ellenőrzi, hogy Docker elérhető-e
