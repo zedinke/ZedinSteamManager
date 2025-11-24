@@ -62,7 +62,8 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
         # Teljes packet: [4 byte length][header + body]
         auth_packet = struct.pack('<I', packet_length) + full_packet
         
-        logger.info(f"RCON autentikáció küldés: host={host}, port={port}, jelszó hossza={len(password_bytes)}, jelszó előnézet={password[:3] + '...' if len(password) > 3 else password}, jelszó teljes={password if len(password) <= 20 else password[:20] + '...'}, packet hossza={len(auth_packet)}")
+        password_display = password if len(password) <= 30 else password[:30] + '...'
+        logger.info(f"RCON autentikáció küldés: host={host}, port={port}, jelszó hossza={len(password_bytes)}, jelszó={password_display}, packet hossza={len(auth_packet)}")
         logger.debug(f"RCON autentikáció packet hex: {auth_packet.hex()[:100]}...")
         
         # Ellenőrizzük, hogy a jelszó nem üres

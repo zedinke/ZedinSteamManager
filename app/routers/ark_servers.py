@@ -972,7 +972,18 @@ async def get_rcon_status(
             logger.warning(f"RCON jelszó Docker Compose fájlból való beolvasása sikertelen: {e}")
     
     # Debug: logoljuk a config tartalmát
-    logger.info(f"RCON beállítások: server_id={server_id}, rcon_enabled={rcon_enabled}, rcon_port={rcon_port}, password_present={bool(server_admin_password)}, password_len={len(server_admin_password) if server_admin_password else 0}, password_preview={server_admin_password[:3] + '...' if server_admin_password and len(server_admin_password) > 3 else '(üres)'}, config_keys={list(config.keys())}")
+    password_preview = server_admin_password[:10] + '...' if server_admin_password and len(server_admin_password) > 10 else (server_admin_password if server_admin_password else '(üres)')
+    logger.info(f"RCON beállítások: server_id={server_id}, rcon_enabled={rcon_enabled}, rcon_port={rcon_port}, password_present={bool(server_admin_password)}, password_len={len(server_admin_password) if server_admin_password else 0}, password_preview={password_preview}, config_keys={list(config.keys())}")
+    
+    # Ha a config-ban van ServerAdminPassword, de nem SERVER_ADMIN_PASSWORD formátumban, próbáljuk meg azt is
+    if not server_admin_password and config:
+        # Próbáljuk meg minden lehetséges kulcsot
+        possible_keys = ["ServerAdminPassword", "server_admin_password", "SERVER_ADMIN_PASSWORD", "admin_password", "ADMIN_PASSWORD"]
+        for key in possible_keys:
+            if key in config and config[key]:
+                server_admin_password = config[key]
+                logger.info(f"RCON jelszó megtalálva '{key}' kulccsal: {server_admin_password[:10] + '...' if len(server_admin_password) > 10 else server_admin_password}")
+                break
     
     if not rcon_enabled:
         return JSONResponse({
