@@ -174,7 +174,7 @@
                                         <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary" title="Szerver szerkesztése">
                                             <i class="fas fa-edit"></i> Szerkesztés
                                         </a>
-                                        <button type="button" class="btn btn-sm btn-info" onclick="showServerLogs({{ server.id }})" title="Indítási logok megtekintése">
+                                        <button type="button" class="btn btn-sm btn-info" onclick="showServerLogs({{ server.id }}); return false;" title="Indítási logok megtekintése">
                                             <i class="fas fa-file-alt"></i> Logok
                                         </button>
                                         <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
@@ -408,10 +408,21 @@ function initLogsModal() {
 }
 
 // DOM betöltése után inicializálás
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initLogsModal);
-} else {
+function initializeLogsSystem() {
     initLogsModal();
+    // Ellenőrizzük, hogy a modal elemek léteznek-e
+    if (!logsModal) {
+        console.warn('logsModal nem található inicializáláskor');
+    }
+    if (!logsContent) {
+        console.warn('logsContent nem található inicializáláskor');
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeLogsSystem);
+} else {
+    initializeLogsSystem();
 }
 
 function closeLogsModal() {
@@ -461,13 +472,30 @@ function refreshLogs() {
     }
 }
 
-async function showServerLogs(serverId, scrollToBottom = true) {
-    initLogsModal(); // Biztosítjuk, hogy a modal elemek inicializálva legyenek
+// Globális függvény, hogy elérhető legyen az onclick eseményhez
+window.showServerLogs = async function(serverId, scrollToBottom = true) {
+    console.log('showServerLogs called with serverId:', serverId);
+    
+    // Inicializáljuk a modal elemeket
+    initLogsModal();
+    
+    // Ha még mindig nincs modal, próbáljuk meg újra
+    if (!logsModal) {
+        logsModal = document.getElementById('logsModal');
+    }
+    if (!logsContent) {
+        logsContent = document.getElementById('logsContent');
+    }
+    
     if (!logsModal || !logsContent) {
         console.error('Logs modal elemek nem találhatók');
+        console.error('logsModal:', logsModal);
+        console.error('logsContent:', logsContent);
         alert('Hiba: A logok modal nem található. Kérlek, frissítsd az oldalt.');
         return;
     }
+    
+    console.log('Modal elemek megtalálva, megnyitás...');
     currentServerId = serverId;
     logsModal.style.display = 'flex';
     logsContent.innerHTML = '<p>Logok betöltése...</p>';
@@ -479,7 +507,7 @@ async function showServerLogs(serverId, scrollToBottom = true) {
     }
     
     await loadLogs(serverId, scrollToBottom);
-}
+};
 
 async function loadLogs(serverId, scrollToBottom = false) {
     try {
