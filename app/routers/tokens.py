@@ -288,15 +288,17 @@ async def process_token_request(
             token.activated_at = datetime.now()
         
         # Ha user token típusú, akkor automatikusan server_admin rangot adunk
-        if token_request.token_type == TokenType.USER and user.role == UserRole.USER:
-            user.role = UserRole.SERVER_ADMIN
-            # Session frissítése, ha a felhasználó be van jelentkezve
-            # Ez egy middleware-ben vagy külön endpoint-ban történhet, de itt is frissíthetjük
-            # ha a felhasználó éppen be van jelentkezve (session-ben van user_id)
-            # Megjegyzés: A session frissítéshez szükség van a request objektumra,
-            # de itt csak a DB-t frissítjük, a session-t a következő oldal betöltésénél frissíti a rendszer
+        # (csak akkor, ha még nem server_admin vagy manager_admin)
+        role_changed = False
+        if token_request.token_type == TokenType.USER:
+            if user.role == UserRole.USER:
+                user.role = UserRole.SERVER_ADMIN
+                role_changed = True
         
         db.commit()
+        
+        # Frissítjük a user objektumot, hogy megkapjuk a frissített rangot
+        db.refresh(user)
         
         # Token igénylés státusz frissítése
         token_request.status = "approved"
@@ -306,7 +308,7 @@ async def process_token_request(
         
         # Értesítés küldése
         role_message = ""
-        if token_request.token_type == TokenType.USER and user.role == UserRole.SERVER_ADMIN:
+        if token_request.token_type == TokenType.USER and role_changed:
             role_message = " A rangod automatikusan frissült Server Admin-re."
         
         create_notification(
