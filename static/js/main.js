@@ -67,12 +67,63 @@ function initMobileMenu() {
     }
 }
 
+// Session role ellenőrzés - periodikusan ellenőrzi, hogy változott-e a felhasználó rangja
+function initSessionRoleCheck() {
+    // Csak akkor ellenőrizzük, ha van bejelentkezve (van user_id a session-ben)
+    // Ez a template-ben van ellenőrizve, de biztosítjuk, hogy ne fusson feleslegesen
+    if (document.body.getAttribute('data-user-id')) {
+        let lastCheckedRole = null;
+        
+        // Először ellenőrizzük azonnal
+        checkSessionRole();
+        
+        // Aztán periodikusan (5 másodpercenként)
+        setInterval(checkSessionRole, 5000);
+        
+        function checkSessionRole() {
+            fetch('/api/session/check-role')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Ha változott a rang, frissítjük az oldalt
+                        if (data.role_changed) {
+                            // Rangspecifikus értesítés
+                            const roleNames = {
+                                'user': 'Felhasználó',
+                                'admin': 'Admin',
+                                'server_admin': 'Szerver Admin',
+                                'manager_admin': 'Manager Admin'
+                            };
+                            const roleName = roleNames[data.role] || data.role;
+                            
+                            // Értesítés megjelenítése
+                            if (confirm(`A rangod frissült: ${roleName}\n\nAz oldal frissítése szükséges az új jogosultságokhoz.`)) {
+                                location.reload();
+                            } else {
+                                // Ha nem akarja frissíteni, akkor is frissítjük (később)
+                                setTimeout(() => location.reload(), 2000);
+                            }
+                        }
+                        lastCheckedRole = data.role;
+                    }
+                })
+                .catch(error => {
+                    // Csendes hiba - ne zavarjuk a felhasználót
+                    console.debug('Session role check error:', error);
+                });
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize theme
     initTheme();
     
     // Initialize mobile menu
     initMobileMenu();
+    
+    // Initialize session role check
+    initSessionRoleCheck();
     
     // Auto-hide alerts disabled - alerts will remain visible until manually closed
     // (Commented out to keep alert messages visible)

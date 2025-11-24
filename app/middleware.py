@@ -46,3 +46,36 @@ async def catch_exceptions_middleware(request: Request, call_next):
                 }
             )
 
+async def session_role_refresh_middleware(request: Request, call_next):
+    """Session role refresh middleware - frissíti a session-t, ha a felhasználó rangja változott"""
+    # Csak akkor ellenőrizzük, ha van session-ben user_id
+    user_id = request.session.get("user_id")
+    if user_id:
+        try:
+            # Csak akkor csinálunk adatbázis lekérdezést, ha van session-ben user_id
+            # és nem API endpoint vagy statikus fájl (hogy ne lassítsuk az API-t)
+            if (not request.url.path.startswith("/api/") and 
+                not request.url.path.startswith("/static/") and
+                not request.url.path.startswith("/_") and
+                request.method == "GET"):  # Csak GET request-eknél, hogy ne lassítsuk a POST-okat
+                from app.database import SessionLocal, User
+                
+                # Adatbázis session létrehozása
+                db = SessionLocal()
+                try:
+                    current_user = db.query(User).filter(User.id == user_id).first()
+                    if current_user:
+                        # Ellenőrizzük, hogy változott-e a rang
+                        current_role = request.session.get("user_role")
+                        if current_role != current_user.role.value:
+                            # Frissítjük a session-t
+                            request.session["user_role"] = current_user.role.value
+                finally:
+                    db.close()
+        except Exception:
+            # Ha hiba történik, ne akadályozza a request feldolgozását
+            pass
+    
+    response = await call_next(request)
+    return response
+

@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pathlib import Path
 from app.config import settings
-from app.middleware import catch_exceptions_middleware
+from app.middleware import catch_exceptions_middleware, session_role_refresh_middleware
 import asyncio
 import logging
 
@@ -28,6 +28,9 @@ app = FastAPI(
 
 # Exception handler middleware (legelső)
 app.middleware("http")(catch_exceptions_middleware)
+
+# Session role refresh middleware (session ellenőrzés után)
+app.middleware("http")(session_role_refresh_middleware)
 
 # Session middleware
 app.add_middleware(
