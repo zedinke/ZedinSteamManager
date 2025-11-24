@@ -63,12 +63,20 @@ window.updateOperationStatus = function(message) {
 window.showServerLogs = function(serverId) {
     console.log('showServerLogs called, serverId:', serverId);
     // Várunk, amíg a DOM betöltődik, ha még nem
-    function doShowLogs() {
+    function doShowLogs(retryCount = 0) {
         const logsModal = document.getElementById('logsModal');
         const logsContent = document.getElementById('logsContent');
         
         if (!logsModal || !logsContent) {
-            console.error('Logs modal elemek nem találhatók');
+            // Ha még nincs modal, próbáljuk meg újra (max 10x, 100ms-ig várva)
+            if (retryCount < 10) {
+                console.log('Logs modal elemek még nem találhatók, újrapróbálás...', retryCount + 1);
+                setTimeout(function() {
+                    doShowLogs(retryCount + 1);
+                }, 100);
+                return;
+            }
+            console.error('Logs modal elemek nem találhatók 10 próbálkozás után');
             alert('Hiba: A logok modal nem található. Kérlek, frissítsd az oldalt.');
             return;
         }
@@ -107,25 +115,29 @@ window.showServerLogs = function(serverId) {
             });
     }
     
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', doShowLogs);
-    } else {
-        doShowLogs();
-    }
-};
+        console.log('Logs modal megtalálva, megnyitás...');
 
 window.showShutdownModal = function(serverId) {
     console.log('showShutdownModal called, serverId:', serverId);
     // Várunk, amíg a DOM betöltődik, ha még nem
-    function doShowShutdown() {
+    function doShowShutdown(retryCount = 0) {
         const shutdownModal = document.getElementById('shutdownModal');
         
         if (!shutdownModal) {
-            console.error('Shutdown modal nem található');
+            // Ha még nincs modal, próbáljuk meg újra (max 10x, 100ms-ig várva)
+            if (retryCount < 10) {
+                console.log('Shutdown modal még nem található, újrapróbálás...', retryCount + 1);
+                setTimeout(function() {
+                    doShowShutdown(retryCount + 1);
+                }, 100);
+                return;
+            }
+            console.error('Shutdown modal nem található 10 próbálkozás után');
             alert('Hiba: A shutdown modal nem található. Kérlek, frissítsd az oldalt.');
             return;
         }
         
+        console.log('Shutdown modal megtalálva, megnyitás...');
         // Megnyitjuk a modalt
         shutdownModal.style.display = 'flex';
         window.shutdownServerId = serverId;
@@ -143,10 +155,14 @@ window.showShutdownModal = function(serverId) {
         }
     }
     
+    // Várunk, amíg a DOM teljesen betöltődik
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', doShowShutdown);
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(doShowShutdown, 100); // Extra 100ms késleltetés, hogy biztosan betöltődjenek az elemek
+        });
     } else {
-        doShowShutdown();
+        // Ha már betöltődött, várunk egy kicsit, hogy biztosan létezzenek az elemek
+        setTimeout(doShowShutdown, 100);
     }
 };
 
@@ -469,29 +485,6 @@ function showRamPurchaseModal(serverId, currentPurchased) {
     }
 }
 {% endif %}
-
-<!-- Shutdown Modal -->
-<div id="shutdownModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; position: relative;">
-        <button onclick="closeShutdownModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">
-            <i class="fas fa-times"></i>
-        </button>
-        <h3 style="margin-top: 0;"><i class="fas fa-clock"></i> Késleltetett Leállítás</h3>
-        <div style="margin-bottom: 15px;">
-            <label for="shutdownMinutes" style="display: block; margin-bottom: 5px; font-weight: bold;">Leállítás késleltetése (perc):</label>
-            <input type="number" id="shutdownMinutes" min="1" max="60" value="5" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
-            <small style="color: #666;">1-60 perc között</small>
-        </div>
-        <div id="shutdownCountdown" style="display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center;">
-            <strong style="font-size: 18px; color: #dc3545;">Leállítás: <span id="countdownTime">--:--</span></strong>
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-            <button onclick="closeShutdownModal()" class="btn btn-secondary" id="shutdownCancelBtn">Mégse</button>
-            <button onclick="confirmShutdown()" class="btn btn-warning" id="shutdownConfirmBtn">Leállítás Beállítása</button>
-            <button onclick="cancelScheduledShutdown()" class="btn btn-danger" id="shutdownCancelScheduledBtn" style="display: none;">Mégse</button>
-        </div>
-    </div>
-</div>
 
 <!-- Shutdown Modal -->
 <div id="shutdownModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
