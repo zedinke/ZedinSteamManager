@@ -734,7 +734,10 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             log_f.write(f"Szerver ID: {server.id}\n")
             log_f.write(f"Container name: zedin_asa_{server.id}\n")
             log_f.write(f"Compose file: {compose_file}\n")
-            log_f.write(f"ServerFiles: {serverfiles_link}\n")
+            # Real server path (symlink célja)
+            real_server_path = serverfiles_link.resolve() if serverfiles_link.is_symlink() else serverfiles_link
+            log_f.write(f"ServerFiles (symlink): {serverfiles_link}\n")
+            log_f.write(f"ServerFiles (tényleges): {real_server_path}\n")
             log_f.write(f"Saved path: {saved_path}\n")
             log_f.write("\n")
             
