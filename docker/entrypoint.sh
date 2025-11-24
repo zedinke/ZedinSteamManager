@@ -233,16 +233,62 @@ fi
 echo "Szerver indítása..."
 if [ "${USE_WINE}" = "true" ]; then
     echo "Wine használata Windows bináris futtatásához..."
-    # Wine konfiguráció (ha szükséges)
+    # Wine konfiguráció
     export WINEPREFIX="${ARK_SERVER_DIR}/.wine"
     export DISPLAY=:99
+    export WINEDEBUG=-all  # Wine debug üzenetek kikapcsolása (csak hibák)
+    
+    # Wine prefix inicializálása (ha még nem létezik)
+    if [ ! -d "${WINEPREFIX}" ]; then
+        echo "Wine prefix inicializálása: ${WINEPREFIX}"
+        # Wine prefix inicializálása nem interaktív módon
+        WINEDLLOVERRIDES="mscoree,mshtml=" wineboot --init 2>&1 | head -20 || echo "Wine prefix inicializálás figyelmeztetések (normális lehet)"
+        # Várunk egy kicsit, hogy a Wine prefix inicializálódjon
+        sleep 2
+    else
+        echo "Wine prefix már létezik: ${WINEPREFIX}"
+    fi
+    
     # Xvfb indítása háttérben (ha szükséges)
+    echo "Xvfb indítása..."
     Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-    # Wine-nal futtatjuk a szervert
-    exec wine "${SERVER_BINARY}" ${SERVER_ARGS}
+    XVFB_PID=$!
+    sleep 2  # Várunk, hogy az Xvfb elinduljon
+    
+    # Ellenőrizzük, hogy az Xvfb fut-e
+    if ! kill -0 $XVFB_PID 2>/dev/null; then
+        echo "FIGYELMEZTETÉS: Xvfb nem indult el, de folytatjuk..."
+    else
+        echo "✓ Xvfb elindult (PID: $XVFB_PID)"
+    fi
+    
+    # Wine verzió ellenőrzése
+    echo "Wine verzió:"
+    wine --version || echo "FIGYELMEZTETÉS: Wine verzió ellenőrzés sikertelen"
+    
+    # Saved mappa és Logs mappa létrehozása (ha szükséges)
+    SAVED_DIR="${ARK_SERVER_DIR}/ShooterGame/Saved"
+    LOGS_DIR="${SAVED_DIR}/Logs"
+    mkdir -p "${LOGS_DIR}" || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Logs mappát"
+    
+    # Szerver indítása Wine-nal
+    echo "Szerver indítása Wine-nal..."
+    echo "Bináris: ${SERVER_BINARY}"
+    echo "Parancs: wine ${SERVER_BINARY} ${SERVER_ARGS}"
+    echo "Log fájl: ${LOGS_DIR}/server.log"
+    exec wine "${SERVER_BINARY}" ${SERVER_ARGS} 2>&1 | tee -a "${LOGS_DIR}/server.log"
 else
     # Natív Linux bináris
-    exec "${SERVER_BINARY}" ${SERVER_ARGS}
+    # Saved mappa és Logs mappa létrehozása (ha szükséges)
+    SAVED_DIR="${ARK_SERVER_DIR}/ShooterGame/Saved"
+    LOGS_DIR="${SAVED_DIR}/Logs"
+    mkdir -p "${LOGS_DIR}" || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Logs mappát"
+    
+    echo "Szerver indítása natív Linux binárissal..."
+    echo "Bináris: ${SERVER_BINARY}"
+    echo "Parancs: ${SERVER_BINARY} ${SERVER_ARGS}"
+    echo "Log fájl: ${LOGS_DIR}/server.log"
+    exec "${SERVER_BINARY}" ${SERVER_ARGS} 2>&1 | tee -a "${LOGS_DIR}/server.log"
 fi
 
 # Ha ide jutunk, akkor a szerver leállt
