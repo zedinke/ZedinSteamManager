@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import (
     get_db, User, ServerAdminAdmin, Server, AdminServer,
-    UserRole, Token, CartItem
+    UserRole, Token, CartItem, ServerInstance, Cluster,
+    Notification, Ticket, TicketMessage, TicketRating,
+    ChatMessage, RamPurchase, TokenRequest, TokenExtensionRequest
 )
 from app.services.auth_service import create_user
 from app.services.email_service import send_verification_email
@@ -358,22 +360,88 @@ async def delete_user(
     if user.role == UserRole.MANAGER_ADMIN:
         raise HTTPException(status_code=403, detail="Manager Admin felhasználó nem törölhető")
     
-    # Kapcsolódó adatok törlése
-    # ServerAdminAdmin kapcsolatok
-    db.query(ServerAdminAdmin).filter(
-        (ServerAdminAdmin.server_admin_id == user_id) | (ServerAdminAdmin.admin_id == user_id)
-    ).delete()
-    
-    # Tokenek törlése
-    db.query(Token).filter(Token.user_id == user_id).delete()
-    
-    # CartItem-ek törlése
-    db.query(CartItem).filter(CartItem.user_id == user_id).delete()
-    
-    # Felhasználó törlése
-    db.delete(user)
-    db.commit()
-    
-    request.session["success"] = f"{user.username} felhasználó sikeresen törölve!"
-    return RedirectResponse(url="/admin/users", status_code=302)
+    try:
+        # Kapcsolódó adatok törlése (sorrend fontos!)
+        # 1. ServerInstance-ek (ha server_admin)
+        server_instances = db.query(ServerInstance).filter(ServerInstance.server_admin_id == user_id).all()
+        if server_instances:
+            # Ha van szerver, akkor nem törölhető (vagy először törölni kell a szervereket)
+            raise HTTPException(
+                status_code=400, 
+                detail=f"A felhasználónak {len(server_instances)} szervere van. Először töröld a szervereket!"
+            )
+        
+        # 2. Server-ek (ha server_admin)
+        servers = db.query(Server).filter(Server.server_admin_id == user_id).all()
+        if servers:
+            raise HTTPException(
+                status_code=400,
+                detail=f"A felhasználónak {len(servers)} szervere van. Először töröld a szervereket!"
+            )
+        
+        # 3. Cluster-ek (ha server_admin)
+        clusters = db.query(Cluster).filter(Cluster.server_admin_id == user_id).all()
+        if clusters:
+            db.query(Cluster).filter(Cluster.server_admin_id == user_id).delete()
+        
+        # 4. Tokenek (user_id és generated_by_id alapján)
+        db.query(Token).filter(
+            (Token.user_id == user_id) | (Token.generated_by_id == user_id)
+        ).delete()
+        
+        # 5. ServerAdminAdmin kapcsolatok
+        db.query(ServerAdminAdmin).filter(
+            (ServerAdminAdmin.server_admin_id == user_id) | (ServerAdminAdmin.admin_id == user_id)
+        ).delete()
+        
+        # 6. AdminServer kapcsolatok
+        db.query(AdminServer).filter(AdminServer.admin_id == user_id).delete()
+        
+        # 7. CartItem-ek
+        db.query(CartItem).filter(CartItem.user_id == user_id).delete()
+        
+        # 8. TokenRequest-ek
+        db.query(TokenRequest).filter(TokenRequest.user_id == user_id).delete()
+        
+        # 9. TokenExtensionRequest-ek
+        db.query(TokenExtensionRequest).filter(TokenExtensionRequest.user_id == user_id).delete()
+        
+        # 10. Notification-ök (CASCADE, de biztosítjuk)
+        db.query(Notification).filter(Notification.user_id == user_id).delete()
+        
+        # 11. Ticket-ek és kapcsolódó adatok
+        tickets = db.query(Ticket).filter(Ticket.user_id == user_id).all()
+        for ticket in tickets:
+            # Ticket üzenetek
+            db.query(TicketMessage).filter(TicketMessage.ticket_id == ticket.id).delete()
+            # Ticket rating
+            db.query(TicketRating).filter(TicketRating.ticket_id == ticket.id).delete()
+        # Ticket-ek
+        db.query(Ticket).filter(Ticket.user_id == user_id).delete()
+        
+        # 12. Chat üzenetek
+        db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete()
+        
+        # 13. RamPurchase-ek
+        db.query(RamPurchase).filter(RamPurchase.user_id == user_id).delete()
+        
+        # 14. Felhasználó törlése
+        db.delete(user)
+        db.commit()
+        
+        request.session["success"] = f"{user.username} felhasználó sikeresen törölve!"
+        return RedirectResponse(url="/admin/users", status_code=302)
+        
+    except HTTPException:
+        # HTTPException-t tovább dobjuk
+        raise
+    except Exception as e:
+        db.rollback()
+        error_msg = str(e)
+        # Részletesebb hibaüzenet
+        if "foreign key constraint" in error_msg.lower() or "cannot delete" in error_msg.lower():
+            error_msg = f"Törlési hiba: A felhasználóhoz még kapcsolódó adatok vannak. Részletek: {error_msg}"
+        else:
+            error_msg = f"Törlési hiba: {error_msg}"
+        raise HTTPException(status_code=500, detail=error_msg)
 

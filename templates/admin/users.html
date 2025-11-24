@@ -223,22 +223,36 @@ document.querySelectorAll('.delete-user-btn').forEach(btn => {
             const response = await fetch(`/admin/users/delete`, {
                 method: 'POST',
                 body: formData,
-                redirect: 'follow'
+                redirect: 'manual'  // Ne kövesse automatikusan a redirect-et
             });
             
             if (response.ok || response.status === 302) {
                 alert('Felhasználó sikeresen törölve!');
                 location.reload();
             } else {
+                // Próbáljuk meg JSON-ként olvasni a választ
+                let errorMessage = 'Ismeretlen hiba';
                 try {
-                    const error = await response.json();
-                    alert('Hiba: ' + (error.detail || 'Ismeretlen hiba'));
-                } catch {
-                    alert('Hiba történt a törlés során.');
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const error = await response.json();
+                        errorMessage = error.detail || error.message || 'Ismeretlen hiba';
+                    } else {
+                        // Ha nem JSON, próbáljuk meg szövegként
+                        const text = await response.text();
+                        if (text) {
+                            errorMessage = text;
+                        } else {
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        }
+                    }
+                } catch (parseError) {
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
                 }
+                alert('Hiba: ' + errorMessage);
             }
         } catch (error) {
-            alert('Hiba: ' + error.message);
+            alert('Hiba: ' + (error.message || 'Ismeretlen hiba történt'));
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
