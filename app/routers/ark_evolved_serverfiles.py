@@ -264,6 +264,13 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
             steam_app_id = "376030"
             await progress_callback(f"Játék: Ark Survival Evolved (alapértelmezett Steam App ID: {steam_app_id})")
         
+        # FONTOS: Ellenőrizzük, hogy a steam_app_id valóban 376030 (Ark Survival Evolved)
+        # Ha nem, akkor kényszerítjük a helyes értéket
+        if steam_app_id != "376030":
+            await progress_callback(f"⚠️ FIGYELMEZTETÉS: A játék Steam App ID-ja ({steam_app_id}) nem 376030!")
+            await progress_callback(f"✓ Javítás: Steam App ID beállítása 376030-ra (Ark Survival Evolved)")
+            steam_app_id = "376030"
+        
         # Telepítés vagy frissítés
         success, log = await install_ark_server_files(
             str(user.id),  # user_id stringként
