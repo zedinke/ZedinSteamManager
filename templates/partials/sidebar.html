@@ -140,7 +140,8 @@
                     <i class="fas fa-chevron-down nav-category-icon"></i>
                 </div>
                 <div class="nav-category-content">
-                    {% if "Ascended" in game.name or game.name == "Ark Survival Ascended" or game.name == "Ark: Survival Ascended" %}
+                    {% set game_name_lower = game.name|lower %}
+                    {% if "ascended" in game_name_lower %}
                     <a href="/ark/clusters" class="nav-item nav-sub-item">
                         <i class="fas fa-network-wired"></i> Cluster-ek
                     </a>
@@ -153,7 +154,7 @@
                     <a href="/mods" class="nav-item nav-sub-item">
                         <i class="fas fa-box"></i> Mod Tároló
                     </a>
-                    {% elif "Evolved" in game.name or game.name == "Ark Survival Evolved" or game.name == "Ark: Survival Evolved" %}
+                    {% elif "evolved" in game_name_lower %}
                     <a href="/ark-evolved/clusters" class="nav-item nav-sub-item">
                         <i class="fas fa-network-wired"></i> Cluster-ek
                     </a>
@@ -164,6 +165,20 @@
                         <i class="fas fa-folder-open"></i> Szerverfájlok
                     </a>
                     <a href="/mods?game_id={{ game.id }}" class="nav-item nav-sub-item">
+                        <i class="fas fa-box"></i> Mod Tároló
+                    </a>
+                    {% else %}
+                    {# Fallback: ha nem egyezik, akkor is mutassunk valamit #}
+                    <a href="/ark/clusters" class="nav-item nav-sub-item">
+                        <i class="fas fa-network-wired"></i> Cluster-ek
+                    </a>
+                    <a href="/ark/servers" class="nav-item nav-sub-item">
+                        <i class="fas fa-server"></i> Ark Szerverek
+                    </a>
+                    <a href="/ark/serverfiles" class="nav-item nav-sub-item">
+                        <i class="fas fa-folder-open"></i> Szerverfájlok
+                    </a>
+                    <a href="/mods" class="nav-item nav-sub-item">
                         <i class="fas fa-box"></i> Mod Tároló
                     </a>
                     {% endif %}
