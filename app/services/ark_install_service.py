@@ -35,7 +35,8 @@ async def install_ark_server_files(
     cluster_id: str,
     version: str,
     install_path: Path,
-    progress_callback: Optional[Union[Callable[[str], None], Callable[[str], Awaitable[None]]]] = None
+    progress_callback: Optional[Union[Callable[[str], None], Callable[[str], Awaitable[None]]]] = None,
+    steam_app_id: Optional[str] = None
 ) -> tuple[bool, str]:
     """
     Ark szerverfájlok telepítése SteamCMD-vel
@@ -45,6 +46,7 @@ async def install_ark_server_files(
         version: Verzió (opcionális, ha None, akkor legújabb)
         install_path: Telepítési útvonal
         progress_callback: Callback függvény a progress üzenetekhez
+        steam_app_id: Steam App ID (opcionális, ha None, akkor Ark Survival Ascended: 2430930)
     
     Returns:
         (success: bool, log: str)
@@ -386,7 +388,14 @@ async def install_ark_server_files(
     
     # SteamCMD parancs összeállítása
     # Ark Survival Ascended App ID: 2430930
-    app_id = "2430930"
+    # Ark Survival Evolved App ID: 346110
+    if steam_app_id:
+        app_id = steam_app_id
+        await log(f"Steam App ID: {app_id} (megadott)")
+    else:
+        # Alapértelmezett: Ark Survival Ascended
+        app_id = "2430930"
+        await log(f"Steam App ID: {app_id} (alapértelmezett - Ark Survival Ascended)")
     
     # SteamCMD parancsok argumentumként
     # ARK Survival Ascended szerverfájlok telepítése
@@ -761,7 +770,8 @@ def delete_ark_server_files(install_path: Path) -> bool:
 
 async def check_for_updates(
     install_path: Path,
-    progress_callback: Optional[Union[Callable[[str], None], Callable[[str], Awaitable[None]]]] = None
+    progress_callback: Optional[Union[Callable[[str], None], Callable[[str], Awaitable[None]]]] = None,
+    steam_app_id: Optional[str] = None
 ) -> tuple[bool, str]:
     """
     Ellenőrzi, hogy van-e frissítés a szerverfájlokhoz
@@ -770,6 +780,7 @@ async def check_for_updates(
     Args:
         install_path: Telepítési útvonal
         progress_callback: Callback függvény a progress üzenetekhez (opcionális)
+        steam_app_id: Steam App ID (opcionális, ha None, akkor Ark Survival Ascended: 2430930)
     
     Returns:
         (has_update: bool, current_version: str)
@@ -782,7 +793,12 @@ async def check_for_updates(
     if not install_path.exists():
         return True, ""  # Van "frissítés" (nincs telepítve)
     
-    app_id = "2430930"
+    # Steam App ID meghatározása
+    if steam_app_id:
+        app_id = steam_app_id
+    else:
+        # Alapértelmezett: Ark Survival Ascended
+        app_id = "2430930"
     
     try:
         # SteamCMD futtatása app_update-dal, de csak ellenőrzés céljából

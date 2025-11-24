@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, Form, HTTPException, Depends, WebSocket,
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
-from app.database import get_db, User, UserServerFiles, SessionLocal
+from app.database import get_db, User, UserServerFiles, SessionLocal, Game
 from app.services.ark_install_service import install_ark_server_files, delete_ark_server_files, check_for_updates
 from app.services.symlink_service import get_user_serverfiles_path
 from fastapi.templating import Jinja2Templates
@@ -228,12 +228,24 @@ async def install_stream(websocket: WebSocket, serverfiles_id: int):
             "message": "Telepítés elindítva..."
         })
         
+        # Ark játék lekérése az adatbázisból (Ark Survival Ascended vagy Ark Survival Evolved)
+        ark_game = db.query(Game).filter(Game.name.ilike("%ark%")).first()
+        steam_app_id = None
+        if ark_game and ark_game.steam_app_id:
+            steam_app_id = ark_game.steam_app_id
+            await progress_callback(f"Játék: {ark_game.name} (Steam App ID: {steam_app_id})")
+        else:
+            # Alapértelmezett: Ark Survival Ascended
+            steam_app_id = "2430930"
+            await progress_callback(f"Játék: Ark Survival Ascended (alapértelmezett Steam App ID: {steam_app_id})")
+        
         # Telepítés vagy frissítés
         success, log = await install_ark_server_files(
             str(user.id),  # user_id stringként
             serverfiles.version,
             install_path,
-            progress_callback
+            progress_callback,
+            steam_app_id=steam_app_id
         )
         
         # Státusz és log frissítése - új session használata a hosszú folyamat után
@@ -452,7 +464,13 @@ async def check_updates_api(
     
     # Frissítés ellenőrzése (hosszú művelet, de külön endpoint)
     try:
-        has_update, _ = await check_for_updates(install_path)
+        # Ark játék lekérése az adatbázisból
+        ark_game = db.query(Game).filter(Game.name.ilike("%ark%")).first()
+        steam_app_id = None
+        if ark_game and ark_game.steam_app_id:
+            steam_app_id = ark_game.steam_app_id
+        
+        has_update, _ = await check_for_updates(install_path, steam_app_id=steam_app_id)
         return JSONResponse({
             "has_update": has_update,
             "message": "Frissítés elérhető" if has_update else "Nincs frissítés"
