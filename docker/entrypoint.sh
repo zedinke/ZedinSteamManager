@@ -72,6 +72,11 @@ if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
             echo "HIBA: Nem lehet létrehozni az ARK szerver mappát!"
             exit 1
         }
+        # FONTOS: Jogosultságok beállítása (ne root jogosultságokkal jöjjön létre!)
+        # A konténer ai_developer felhasználóként fut (UID 1000), de a host oldalon
+        # a mappát a manager hozza létre megfelelő jogosultságokkal
+        # Itt csak biztosítjuk, hogy a konténerben is megfelelő jogosultságok legyenek
+        chmod 755 "${ARK_SERVER_DIR}" || true
     fi
     
     # Ellenőrizzük, hogy az ARK_SERVER_DIR írható-e

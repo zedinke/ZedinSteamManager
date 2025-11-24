@@ -200,6 +200,40 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         from app.services.symlink_service import ensure_permissions
         ensure_permissions(instance_dir)
         
+        # FONTOS: Ellenőrizzük és javítjuk a volume mount útvonalak szülő mappáit is!
+        # Mert ha a Docker volume mount-nál a mappa nem létezik, root jogosultságokkal hozhatja létre
+        import os
+        import stat
+        current_uid = os.getuid()
+        current_gid = os.getgid()
+        
+        # Ellenőrizzük a real_server_path szülő mappáit (user_* mappa)
+        if real_server_path.exists() or not real_server_path.exists():
+            # Ha nem létezik, létrehozzuk megfelelő jogosultságokkal
+            if not real_server_path.exists():
+                real_server_path.parent.mkdir(parents=True, exist_ok=True)
+                ensure_permissions(real_server_path.parent)
+                real_server_path.mkdir(parents=True, exist_ok=True)
+                ensure_permissions(real_server_path)
+            else:
+                # Ha létezik, ellenőrizzük a jogosultságokat
+                ensure_permissions(real_server_path)
+                # Ellenőrizzük a szülő mappát is
+                if real_server_path.parent.exists():
+                    ensure_permissions(real_server_path.parent)
+        
+        # Ellenőrizzük a saved_path szülő mappáit is
+        if saved_path.exists() or not saved_path.exists():
+            if not saved_path.exists():
+                saved_path.mkdir(parents=True, exist_ok=True)
+                ensure_permissions(saved_path)
+            else:
+                ensure_permissions(saved_path)
+                # Ellenőrizzük a szülő mappákat is
+                for parent in [saved_path.parent, saved_path.parent.parent]:
+                    if parent.exists():
+                        ensure_permissions(parent)
+        
         # Ha a saved_path egy symlink, követjük
         if saved_path.is_symlink():
             try:

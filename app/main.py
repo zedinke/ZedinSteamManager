@@ -130,6 +130,22 @@ async def startup_event():
             except (PermissionError, OSError):
                 pass
         
+        # FONTOS: Ellenőrizzük és javítjuk a base mappát is!
+        # Ha a base mappa root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
+        if base_path.exists():
+            try:
+                stat_info = base_path.stat()
+                if stat_info.st_uid == 0 and current_uid != 0:
+                    logging.warning(f"Root jogosultságokkal létező base mappa észlelve: {base_path}")
+                    try:
+                        os.chmod(base_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        os.chown(base_path, current_uid, current_gid)
+                        logging.info(f"✓ Base mappa jogosultságok javítva: {base_path}")
+                    except (PermissionError, OSError) as e:
+                        logging.error(f"⚠️ Nem sikerült javítani a base mappa jogosultságait {base_path}: {e}")
+            except (PermissionError, OSError):
+                pass
+        
         # FONTOS: NE hozzuk létre a base mappát, csak ellenőrizzük, ha már létezik!
         # Ha a base mappa nem létezik, NE hozzuk létre automatikusan!
         # Csak akkor ellenőrizzük, ha már létezik
@@ -189,6 +205,32 @@ async def startup_event():
                         pass
     except Exception as e:
         logging.warning(f"Startup ellenőrzés során hiba: {e}")
+    
+    # FONTOS: Ellenőrizzük, hogy nincs-e automatikusan elindított steamcmd folyamat
+    # Ha van pending vagy installing státuszú telepítés, akkor NEM indítjuk újra automatikusan
+    try:
+        from app.database import SessionLocal, UserServerFiles
+        db = SessionLocal()
+        try:
+            pending_installations = db.query(UserServerFiles).filter(
+                UserServerFiles.installation_status.in_(["pending", "installing"])
+            ).all()
+            if pending_installations:
+                logging.warning(f"⚠️ {len(pending_installations)} pending/installing telepítés található az adatbázisban")
+                logging.warning("⚠️ Ezek a telepítések NEM indítódnak újra automatikusan startup-nál")
+                # Átállítjuk failed-re, hogy ne maradjon pending állapotban
+                for installation in pending_installations:
+                    installation.installation_status = "failed"
+                    installation.installation_log = (installation.installation_log or "") + "\n[SYSTEM] Telepítés megszakadt a manager újraindításakor"
+                db.commit()
+                logging.info(f"✓ {len(pending_installations)} telepítés átállítva failed státuszra")
+        except Exception as e:
+            logging.warning(f"Pending telepítések ellenőrzése során hiba: {e}")
+            db.rollback()
+        finally:
+            db.close()
+    except Exception as e:
+        logging.warning(f"Pending telepítések ellenőrzése során hiba: {e}")
     
     from app.tasks.token_expiry_task import token_expiry_worker
     asyncio.create_task(token_expiry_worker())

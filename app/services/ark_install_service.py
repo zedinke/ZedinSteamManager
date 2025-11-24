@@ -83,6 +83,25 @@ async def install_ark_server_files(
         target_uid = current_uid
         target_gid = current_gid
         
+        # FONTOS: Először ellenőrizzük és javítjuk a base mappát (ServerFiles) is!
+        # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
+        from app.services.symlink_service import get_user_serverfiles_path
+        from app.config import settings
+        base_path = Path(settings.ark_serverfiles_base)
+        if base_path.exists():
+            try:
+                stat_info = base_path.stat()
+                if stat_info.st_uid == 0 and target_uid != 0:
+                    await log(f"⚠️ {base_path} root jogosultságokkal létezik, javítás...")
+                    try:
+                        os.chmod(base_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        os.chown(base_path, target_uid, target_gid)
+                        await log(f"✓ {base_path} jogosultságok javítva")
+                    except (PermissionError, OSError) as e:
+                        await log(f"⚠️ Nem sikerült javítani {base_path}: {e}")
+            except (PermissionError, OSError):
+                pass
+        
         # FONTOS: Először ellenőrizzük és javítjuk a user_serverfiles_path mappát is!
         # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
         user_serverfiles_path = install_path.parent
