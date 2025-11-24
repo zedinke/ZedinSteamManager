@@ -557,6 +557,25 @@ if [ ! -x "${SERVER_BINARY}" ]; then
     }
 fi
 
+# Library függőségek ellenőrzése (csak Linux binárisoknál)
+if [ "${USE_WINE}" = "false" ] && command -v ldd >/dev/null 2>&1; then
+    echo "Library függőségek ellenőrzése..."
+    MISSING_LIBS=$(ldd "${SERVER_BINARY}" 2>/dev/null | grep "not found" || true)
+    if [ -n "${MISSING_LIBS}" ]; then
+        echo "⚠️  FIGYELMEZTETÉS: Hiányzó library-k észlelve:"
+        echo "${MISSING_LIBS}"
+        echo "Ez problémát okozhat a szerver indításakor!"
+    else
+        echo "✓ Minden szükséges library elérhető"
+    fi
+fi
+
+# Bináris fájltípus ellenőrzése
+if command -v file >/dev/null 2>&1; then
+    echo "Bináris fájltípus:"
+    file "${SERVER_BINARY}" || true
+fi
+
 # Szerver indítása
 echo "Szerver indítása..."
 if [ "${USE_WINE}" = "true" ]; then
