@@ -486,7 +486,22 @@ if [ -f "${STEAM_APPID_FILE}" ]; then
     CURRENT_APPID=$(cat "${STEAM_APPID_FILE}" 2>/dev/null | tr -d '\n\r ')
     if [ "${CURRENT_APPID}" != "${ARK_APP_ID}" ]; then
         echo "steam_appid.txt javítása: ${CURRENT_APPID} -> ${ARK_APP_ID}"
-        echo "${ARK_APP_ID}" > "${STEAM_APPID_FILE}"
+        # Jogosultságok javítása, ha szükséges
+        chmod 644 "${STEAM_APPID_FILE}" 2>/dev/null || true
+        # Próbáljuk meg írni a fájlt
+        if echo "${ARK_APP_ID}" > "${STEAM_APPID_FILE}" 2>/dev/null; then
+            echo "✓ steam_appid.txt sikeresen javítva"
+        else
+            echo "⚠️  Nem sikerült írni a steam_appid.txt fájlt, de folytatjuk..."
+            # Próbáljuk meg a fájl könyvtárának jogosultságait javítani
+            chmod -R u+w "$(dirname "${STEAM_APPID_FILE}")" 2>/dev/null || true
+            # Újrapróbálás
+            if echo "${ARK_APP_ID}" > "${STEAM_APPID_FILE}" 2>/dev/null; then
+                echo "✓ steam_appid.txt sikeresen javítva (második próbálkozás)"
+            else
+                echo "⚠️  Figyelmeztetés: steam_appid.txt nem sikerült javítani, de folytatjuk a szerver indítását"
+            fi
+        fi
     else
         echo "steam_appid.txt helyes: ${ARK_APP_ID}"
     fi
@@ -494,7 +509,14 @@ else
     # Ha nincs, létrehozzuk
     echo "steam_appid.txt létrehozása: ${ARK_APP_ID}"
     mkdir -p "$(dirname "${STEAM_APPID_FILE}")"
-    echo "${ARK_APP_ID}" > "${STEAM_APPID_FILE}"
+    # Jogosultságok beállítása a könyvtárra
+    chmod -R u+w "$(dirname "${STEAM_APPID_FILE}")" 2>/dev/null || true
+    if echo "${ARK_APP_ID}" > "${STEAM_APPID_FILE}" 2>/dev/null; then
+        echo "✓ steam_appid.txt sikeresen létrehozva"
+        chmod 644 "${STEAM_APPID_FILE}" 2>/dev/null || true
+    else
+        echo "⚠️  Figyelmeztetés: steam_appid.txt nem sikerült létrehozni, de folytatjuk a szerver indítását"
+    fi
 fi
 
 # Szerver indítása
