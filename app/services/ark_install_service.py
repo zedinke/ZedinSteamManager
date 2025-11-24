@@ -81,9 +81,15 @@ async def install_ark_server_files(
         
         # FONTOS: Először ellenőrizzük és javítjuk a base mappát (ServerFiles) is!
         # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
-        from app.services.symlink_service import get_user_serverfiles_path
+        # Base path meghatározása az install_path alapján (Ark Evolved vagy Ascended)
         from app.config import settings
-        base_path = Path(settings.ark_serverfiles_base)
+        # Az install_path alapján határozzuk meg, hogy melyik base path-et használjuk
+        install_path_str = str(install_path)
+        if "ArkEvolved" in install_path_str or "ark_evolved" in install_path_str.lower():
+            base_path = Path(settings.ark_evolved_serverfiles_base)
+        else:
+            base_path = Path(settings.ark_serverfiles_base)
+        
         if base_path.exists():
             try:
                 stat_info = base_path.stat()
