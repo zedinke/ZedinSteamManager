@@ -204,23 +204,49 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         # Mert ha a Docker volume mount-nál a mappa nem létezik, root jogosultságokkal hozhatja létre
         import os
         import stat
+        from app.config import settings
         current_uid = os.getuid()
         current_gid = os.getgid()
         
+        # FONTOS: Először ellenőrizzük és javítjuk a base mappát (ServerFiles)!
+        # Mert ha az root jogosultságokkal létezik, akkor az új mappák is root jogosultságokkal jönnek létre
+        base_path = Path(settings.ark_serverfiles_base)
+        if base_path.exists():
+            try:
+                stat_info = base_path.stat()
+                if stat_info.st_uid == 0 and current_uid != 0:
+                    logger.warning(f"Root jogosultságokkal létező base mappa észlelve: {base_path}")
+                    try:
+                        os.chmod(base_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        os.chown(base_path, current_uid, current_gid)
+                        logger.info(f"✓ Base mappa jogosultságok javítva: {base_path}")
+                    except (PermissionError, OSError) as e:
+                        logger.error(f"⚠️ Nem sikerült javítani a base mappa jogosultságait {base_path}: {e}")
+            except (PermissionError, OSError):
+                pass
+        
         # Ellenőrizzük a real_server_path szülő mappáit (user_* mappa)
-        if real_server_path.exists() or not real_server_path.exists():
-            # Ha nem létezik, létrehozzuk megfelelő jogosultságokkal
-            if not real_server_path.exists():
+        # FONTOS: Lépésenként hozzuk létre, hogy minden lépés után beállíthassuk a jogosultságokat!
+        if not real_server_path.exists():
+            # Először a user_* mappát (parent)
+            if not real_server_path.parent.exists():
                 real_server_path.parent.mkdir(parents=True, exist_ok=True)
+                # AZONNAL beállítjuk a jogosultságokat!
                 ensure_permissions(real_server_path.parent)
-                real_server_path.mkdir(parents=True, exist_ok=True)
-                ensure_permissions(real_server_path)
             else:
                 # Ha létezik, ellenőrizzük a jogosultságokat
-                ensure_permissions(real_server_path)
-                # Ellenőrizzük a szülő mappát is
-                if real_server_path.parent.exists():
-                    ensure_permissions(real_server_path.parent)
+                ensure_permissions(real_server_path.parent)
+            
+            # Most a tényleges mappát (latest vagy verzió)
+            real_server_path.mkdir(parents=True, exist_ok=True)
+            # AZONNAL beállítjuk a jogosultságokat!
+            ensure_permissions(real_server_path)
+        else:
+            # Ha létezik, ellenőrizzük a jogosultságokat
+            ensure_permissions(real_server_path)
+            # Ellenőrizzük a szülő mappát is
+            if real_server_path.parent.exists():
+                ensure_permissions(real_server_path.parent)
         
         # Ellenőrizzük a saved_path szülő mappáit is
         if saved_path.exists() or not saved_path.exists():
@@ -560,6 +586,53 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 "success": False,
                 "message": f"Saved mappa nem található: {saved_path}"
             }
+        
+        # FONTOS: Docker indítás előtt biztosítjuk, hogy a volume mount útvonalak létezzenek megfelelő jogosultságokkal!
+        # Mert ha a Docker volume mount-nál a mappa nem létezik, root jogosultságokkal hozhatja létre
+        from app.services.symlink_service import ensure_permissions
+        import os
+        import stat
+        from app.config import settings
+        
+        # Ellenőrizzük a real_server_path-et (ServerFiles symlink célja)
+        real_server_path = serverfiles_link.resolve() if serverfiles_link.is_symlink() else serverfiles_link
+        
+        # FONTOS: Először ellenőrizzük és javítjuk a base mappát (ServerFiles)!
+        base_path = Path(settings.ark_serverfiles_base)
+        if base_path.exists():
+            try:
+                stat_info = base_path.stat()
+                current_uid = os.getuid()
+                if stat_info.st_uid == 0 and current_uid != 0:
+                    logger.warning(f"Root jogosultságokkal létező base mappa észlelve: {base_path}")
+                    try:
+                        os.chmod(base_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        os.chown(base_path, current_uid, os.getgid())
+                        logger.info(f"✓ Base mappa jogosultságok javítva: {base_path}")
+                    except (PermissionError, OSError) as e:
+                        logger.error(f"⚠️ Nem sikerült javítani a base mappa jogosultságait {base_path}: {e}")
+            except (PermissionError, OSError):
+                pass
+        
+        # Ellenőrizzük, hogy a real_server_path létezik-e és megfelelő jogosultságokkal
+        if not real_server_path.exists():
+            # Létrehozzuk lépésenként
+            if not real_server_path.parent.exists():
+                real_server_path.parent.mkdir(parents=True, exist_ok=True)
+                ensure_permissions(real_server_path.parent)
+            real_server_path.mkdir(parents=True, exist_ok=True)
+            ensure_permissions(real_server_path)
+        else:
+            ensure_permissions(real_server_path)
+            if real_server_path.parent.exists():
+                ensure_permissions(real_server_path.parent)
+        
+        # Ellenőrizzük a saved_path-et is
+        if not saved_path.exists():
+            saved_path.mkdir(parents=True, exist_ok=True)
+            ensure_permissions(saved_path)
+        else:
+            ensure_permissions(saved_path)
         
         # Docker Compose fájl létrehozása/frissítése
         # Mindig frissítjük, hogy a konfigurációk szinkronban legyenek
