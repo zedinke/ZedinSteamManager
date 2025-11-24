@@ -467,8 +467,8 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 else:
                     # Ellenőrizzük a Linux binárist (csak linux64/ mappa létezik, ShooterGame/Binaries/Linux nem)
                     linux_binary_linux64 = real_server_path / "linux64" / "ShooterGameServer"
-                    # Ellenőrizzük a Windows binárist is
-                    win64_binary = binaries_path / "Win64" / "ShooterGameServer.exe"
+                    # Ellenőrizzük a Windows binárist is (ArkAscendedServer.exe, nem ShooterGameServer.exe)
+                    win64_binary = binaries_path / "Win64" / "ArkAscendedServer.exe"
                     
                     # Csak a linux64/ mappát ellenőrizzük
                     linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
@@ -480,10 +480,11 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                     if linux_binary:
                         logger.info(f"Linux ShooterGameServer bináris megtalálva: {linux_binary}")
                     elif win64_binary.exists():
-                        logger.info(f"Windows ShooterGameServer.exe bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
+                        logger.info(f"Windows ArkAscendedServer.exe bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
                     else:
-                        logger.warning(f"ShooterGameServer bináris nem található (sem Linux, sem Windows):")
-                        logger.warning(f"  - Linux (linux64/): {linux_binary_linux64}")
+                        logger.warning(f"Bináris nem található:")
+                        logger.warning(f"  - Linux (linux64/ShooterGameServer): {linux_binary_linux64}")
+                        logger.warning(f"  - Windows (ShooterGame/Binaries/Win64/ArkAscendedServer.exe): {win64_binary}")
                         logger.warning(f"  - Windows: {win64_binary}")
                         logger.warning(f"  - Binaries mappa tartalma: {binaries_contents}")
                         if binaries_path.exists():

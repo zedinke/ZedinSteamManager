@@ -36,8 +36,8 @@ if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
 elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer" ]; then
     SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
     USE_WINE=false
-elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ShooterGameServer.exe" ]; then
-    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ShooterGameServer.exe"
+elif [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe" ]; then
+    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
     USE_WINE=true
 else
     # Alapértelmezett: próbáljuk meg a linux64/ mappát
