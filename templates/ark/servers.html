@@ -138,6 +138,9 @@
                                                     <i class="fas fa-stop"></i> Leállítás
                                                 </button>
                                             </form>
+                                            <button type="button" class="btn btn-sm btn-warning" onclick="showShutdownModal({{ server.id }})" title="Késleltetett leállítás">
+                                                <i class="fas fa-clock"></i> Shutdown
+                                            </button>
                                             <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;">
                                                 <button type="submit" class="btn btn-sm btn-info" title="Szerver újraindítása">
                                                     <i class="fas fa-redo"></i> Újraindítás
@@ -291,6 +294,52 @@ function showRamPurchaseModal(serverId, currentPurchased) {
     }
 }
 {% endif %}
+
+<!-- Shutdown Modal -->
+<div id="shutdownModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; position: relative;">
+        <button onclick="closeShutdownModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 style="margin-top: 0;"><i class="fas fa-clock"></i> Késleltetett Leállítás</h3>
+        <div style="margin-bottom: 15px;">
+            <label for="shutdownMinutes" style="display: block; margin-bottom: 5px; font-weight: bold;">Leállítás késleltetése (perc):</label>
+            <input type="number" id="shutdownMinutes" min="1" max="60" value="5" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
+            <small style="color: #666;">1-60 perc között</small>
+        </div>
+        <div id="shutdownCountdown" style="display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center;">
+            <strong style="font-size: 18px; color: #dc3545;">Leállítás: <span id="countdownTime">--:--</span></strong>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button onclick="closeShutdownModal()" class="btn btn-secondary" id="shutdownCancelBtn">Mégse</button>
+            <button onclick="confirmShutdown()" class="btn btn-warning" id="shutdownConfirmBtn">Leállítás Beállítása</button>
+            <button onclick="cancelScheduledShutdown()" class="btn btn-danger" id="shutdownCancelScheduledBtn" style="display: none;">Mégse</button>
+        </div>
+    </div>
+</div>
+
+<!-- Shutdown Modal -->
+<div id="shutdownModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; position: relative;">
+        <button onclick="closeShutdownModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer;">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 style="margin-top: 0;"><i class="fas fa-clock"></i> Késleltetett Leállítás</h3>
+        <div style="margin-bottom: 15px;">
+            <label for="shutdownMinutes" style="display: block; margin-bottom: 5px; font-weight: bold;">Leállítás késleltetése (perc):</label>
+            <input type="number" id="shutdownMinutes" min="1" max="60" value="5" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px;">
+            <small style="color: #666;">1-60 perc között</small>
+        </div>
+        <div id="shutdownCountdown" style="display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center;">
+            <strong style="font-size: 18px; color: #dc3545;">Leállítás: <span id="countdownTime">--:--</span></strong>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button onclick="closeShutdownModal()" class="btn btn-secondary" id="shutdownCancelBtn">Mégse</button>
+            <button onclick="confirmShutdown()" class="btn btn-warning" id="shutdownConfirmBtn">Leállítás Beállítása</button>
+            <button onclick="cancelScheduledShutdown()" class="btn btn-danger" id="shutdownCancelScheduledBtn" style="display: none;">Mégse</button>
+        </div>
+    </div>
+</div>
 
 <!-- Logok Modal -->
 <div id="logsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
@@ -487,6 +536,180 @@ if (logsModal) {
     logsModal.addEventListener('click', function(e) {
         if (e.target === logsModal) {
             closeLogsModal();
+        }
+    });
+}
+
+// Shutdown Modal kezelés
+let shutdownModal = null;
+let shutdownServerId = null;
+let shutdownCountdownInterval = null;
+let shutdownScheduledTime = null;
+
+function initShutdownModal() {
+    if (!shutdownModal) {
+        shutdownModal = document.getElementById('shutdownModal');
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initShutdownModal);
+} else {
+    initShutdownModal();
+}
+
+function showShutdownModal(serverId) {
+    initShutdownModal();
+    if (!shutdownModal) {
+        console.error('Shutdown modal nem található');
+        return;
+    }
+    shutdownServerId = serverId;
+    shutdownModal.style.display = 'flex';
+    document.getElementById('shutdownMinutes').value = 5;
+    document.getElementById('shutdownCountdown').style.display = 'none';
+    document.getElementById('shutdownConfirmBtn').style.display = 'inline-block';
+    document.getElementById('shutdownCancelScheduledBtn').style.display = 'none';
+    document.getElementById('shutdownCancelBtn').style.display = 'inline-block';
+    // Ellenőrizzük, hogy van-e már ütemezett leállítás
+    checkScheduledShutdown(serverId);
+}
+
+function closeShutdownModal() {
+    if (shutdownModal) {
+        shutdownModal.style.display = 'none';
+    }
+    shutdownServerId = null;
+    if (shutdownCountdownInterval) {
+        clearInterval(shutdownCountdownInterval);
+        shutdownCountdownInterval = null;
+    }
+}
+
+async function confirmShutdown() {
+    const minutes = parseInt(document.getElementById('shutdownMinutes').value);
+    if (isNaN(minutes) || minutes < 1 || minutes > 60) {
+        alert('Kérlek, adj meg egy érvényes számot 1-60 perc között!');
+        return;
+    }
+    
+    if (!shutdownServerId) {
+        alert('Hiba: Szerver ID nem található');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/ark/servers/${shutdownServerId}/shutdown`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ minutes: minutes })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Countdown indítása
+            shutdownScheduledTime = new Date(data.shutdown_time);
+            startShutdownCountdown();
+            document.getElementById('shutdownConfirmBtn').style.display = 'none';
+            document.getElementById('shutdownCancelScheduledBtn').style.display = 'inline-block';
+            document.getElementById('shutdownCountdown').style.display = 'block';
+        } else {
+            alert('Hiba: ' + (data.message || 'Nem sikerült beállítani a leállítást'));
+        }
+    } catch (error) {
+        alert('Hiba a leállítás beállításakor: ' + error.message);
+    }
+}
+
+async function cancelScheduledShutdown() {
+    if (!shutdownServerId) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/ark/servers/${shutdownServerId}/shutdown/cancel`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            if (shutdownCountdownInterval) {
+                clearInterval(shutdownCountdownInterval);
+                shutdownCountdownInterval = null;
+            }
+            document.getElementById('shutdownCountdown').style.display = 'none';
+            document.getElementById('shutdownConfirmBtn').style.display = 'inline-block';
+            document.getElementById('shutdownCancelScheduledBtn').style.display = 'none';
+            shutdownScheduledTime = null;
+        } else {
+            alert('Hiba: ' + (data.message || 'Nem sikerült törölni a leállítást'));
+        }
+    } catch (error) {
+        alert('Hiba a leállítás törlésekor: ' + error.message);
+    }
+}
+
+async function checkScheduledShutdown(serverId) {
+    try {
+        const response = await fetch(`/ark/servers/${serverId}/shutdown/status`);
+        const data = await response.json();
+        
+        if (data.success && data.scheduled) {
+            shutdownScheduledTime = new Date(data.shutdown_time);
+            startShutdownCountdown();
+            document.getElementById('shutdownConfirmBtn').style.display = 'none';
+            document.getElementById('shutdownCancelScheduledBtn').style.display = 'inline-block';
+            document.getElementById('shutdownCountdown').style.display = 'block';
+        }
+    } catch (error) {
+        // Csendben hibázunk, ha nincs ütemezett leállítás
+    }
+}
+
+function startShutdownCountdown() {
+    if (shutdownCountdownInterval) {
+        clearInterval(shutdownCountdownInterval);
+    }
+    
+    function updateCountdown() {
+        if (!shutdownScheduledTime) {
+            return;
+        }
+        
+        const now = new Date();
+        const diff = shutdownScheduledTime - now;
+        
+        if (diff <= 0) {
+            // Lejárt az idő, leállítjuk a szervert
+            clearInterval(shutdownCountdownInterval);
+            shutdownCountdownInterval = null;
+            document.getElementById('countdownTime').textContent = 'Leállítás...';
+            // Automatikus oldal frissítés, hogy lássuk a leállított státuszt
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+            return;
+        }
+        
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        document.getElementById('countdownTime').textContent = 
+            String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    }
+    
+    updateCountdown();
+    shutdownCountdownInterval = setInterval(updateCountdown, 1000);
+}
+
+// Shutdown modal bezárása kattintásra a háttérre
+if (shutdownModal) {
+    shutdownModal.addEventListener('click', function(e) {
+        if (e.target === shutdownModal) {
+            closeShutdownModal();
         }
     });
 }

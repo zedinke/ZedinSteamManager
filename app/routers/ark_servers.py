@@ -14,8 +14,48 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from datetime import datetime, timedelta
 import json
+import threading
+import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ark", tags=["ark_servers"])
+
+# Scheduled shutdown tárolás: {server_id: shutdown_datetime}
+scheduled_shutdowns = {}
+shutdown_lock = threading.Lock()
+
+def schedule_server_shutdown(server_id: int, minutes: int, db: Session):
+    """Háttérfolyamat, ami késleltetve leállítja a szervert"""
+    def shutdown_task():
+        time.sleep(minutes * 60)  # Várakozás percekben
+        
+        # Ellenőrizzük, hogy még mindig ütemezve van-e
+        with shutdown_lock:
+            if server_id in scheduled_shutdowns:
+                shutdown_time = scheduled_shutdowns[server_id]
+                if datetime.now() >= shutdown_time:
+                    # Leállítjuk a szervert
+                    from app.database import SessionLocal
+                    shutdown_db = SessionLocal()
+                    try:
+                        server = shutdown_db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+                        if server and server.status == ServerStatus.RUNNING:
+                            from app.services.server_control_service import stop_server
+                            result = stop_server(server, shutdown_db)
+                            logger.info(f"Scheduled shutdown executed for server {server_id}: {result}")
+                        # Töröljük az ütemezett leállítást
+                        if server_id in scheduled_shutdowns:
+                            del scheduled_shutdowns[server_id]
+                    except Exception as e:
+                        logger.error(f"Error executing scheduled shutdown for server {server_id}: {e}")
+                    finally:
+                        shutdown_db.close()
+    
+    thread = threading.Thread(target=shutdown_task, daemon=True)
+    thread.start()
+    return thread
 
 @router.get("/servers/{server_id}/logs")
 async def get_server_logs(
@@ -1296,6 +1336,138 @@ async def restart_server_endpoint(
             url=f"/ark/servers?error={result['message']}",
             status_code=302
         )
+
+@router.post("/servers/{server_id}/shutdown")
+async def schedule_shutdown(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Késleltetett leállítás beállítása"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    if server.status != ServerStatus.RUNNING:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "A szerver nem fut"}
+        )
+    
+    # JSON body olvasása
+    try:
+        body = await request.json()
+        minutes = int(body.get("minutes", 5))
+    except:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Érvénytelen kérés"}
+        )
+    
+    if minutes < 1 or minutes > 60:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "A perc értéknek 1-60 között kell lennie"}
+        )
+    
+    # Ütemezett leállítás beállítása
+    shutdown_time = datetime.now() + timedelta(minutes=minutes)
+    
+    with shutdown_lock:
+        # Ha már van ütemezett leállítás, töröljük
+        if server_id in scheduled_shutdowns:
+            # Megjegyzés: a régi thread továbbra is futhat, de az ellenőrzi a scheduled_shutdowns dict-et
+            pass
+        scheduled_shutdowns[server_id] = shutdown_time
+    
+    # Háttérfolyamat indítása
+    schedule_server_shutdown(server_id, minutes, db)
+    
+    logger.info(f"Scheduled shutdown for server {server_id} in {minutes} minutes")
+    
+    return JSONResponse(
+        content={
+            "success": True,
+            "message": f"Leállítás ütemezve {minutes} percre",
+            "shutdown_time": shutdown_time.isoformat()
+        }
+    )
+
+@router.post("/servers/{server_id}/shutdown/cancel")
+async def cancel_shutdown(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Ütemezett leállítás törlése"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    with shutdown_lock:
+        if server_id in scheduled_shutdowns:
+            del scheduled_shutdowns[server_id]
+            logger.info(f"Cancelled scheduled shutdown for server {server_id}")
+            return JSONResponse(
+                content={"success": True, "message": "Ütemezett leállítás törölve"}
+            )
+        else:
+            return JSONResponse(
+                content={"success": False, "message": "Nincs ütemezett leállítás"}
+            )
+
+@router.get("/servers/{server_id}/shutdown/status")
+async def get_shutdown_status(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: Ütemezett leállítás státusza"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    with shutdown_lock:
+        if server_id in scheduled_shutdowns:
+            shutdown_time = scheduled_shutdowns[server_id]
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "scheduled": True,
+                    "shutdown_time": shutdown_time.isoformat()
+                }
+            )
+        else:
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "scheduled": False
+                }
+            )
 
 @router.post("/servers/{server_id}/ram-limit")
 async def set_ram_limit(
