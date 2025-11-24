@@ -74,9 +74,12 @@ async def add_mod(
     ).first()
     
     if existing:
-        raise HTTPException(
+        return JSONResponse(
             status_code=400,
-            detail="Ez a mod már hozzá van adva a tárolódhoz"
+            content={
+                "success": False,
+                "detail": "Ez a mod már hozzá van adva a tárolódhoz"
+            }
         )
     
     # Új mod létrehozása
