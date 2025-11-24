@@ -52,10 +52,21 @@ async def activate_token(db: Session, token_string: str, user_id: int) -> dict:
     token.activated_at = datetime.utcnow()
     
     # Ha user token, akkor server_admin jogosultságot ad
+    # (csak akkor, ha még user rangú)
     if token.token_type == TokenType.USER:
         user = db.query(User).filter(User.id == user_id).first()
         if user:
-            user.role = UserRole.SERVER_ADMIN
+            # Ellenőrizzük a jelenlegi rangot
+            current_role_value = user.role.value if hasattr(user.role, 'value') else str(user.role)
+            if current_role_value == "user" or user.role == UserRole.USER:
+                user.role = UserRole.SERVER_ADMIN
+                db.commit()
+                db.refresh(user)
+                # Ellenőrizzük, hogy tényleg változott-e
+                if user.role != UserRole.SERVER_ADMIN:
+                    user.role = UserRole.SERVER_ADMIN
+                    db.commit()
+                    db.refresh(user)
     
     db.commit()
     

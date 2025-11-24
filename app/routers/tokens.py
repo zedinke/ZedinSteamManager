@@ -77,6 +77,29 @@ async def generate(
         )
         generated_tokens.append(token)
     
+    # Ha user token típusú, akkor automatikusan aktiváljuk és server_admin rangot adunk
+    if token_type_enum == TokenType.USER:
+        # Felhasználó lekérése
+        target_user = db.query(User).filter(User.id == user_id).first()
+        if target_user:
+            # Ellenőrizzük a jelenlegi rangot
+            current_role_value = target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role)
+            if current_role_value == "user" or target_user.role == UserRole.USER:
+                # Rang frissítése
+                target_user.role = UserRole.SERVER_ADMIN
+                # Tokenek automatikus aktiválása
+                for token in generated_tokens:
+                    token.user_id = user_id
+                    token.is_active = True
+                    token.activated_at = datetime.now()
+                db.commit()
+                db.refresh(target_user)
+                # Ellenőrizzük, hogy tényleg változott-e
+                if target_user.role != UserRole.SERVER_ADMIN:
+                    target_user.role = UserRole.SERVER_ADMIN
+                    db.commit()
+                    db.refresh(target_user)
+    
     # Tokenek küldése (csak az elsőt küldjük email-ben, a többit csak értesítésben)
     email_sent = False
     if generated_tokens:
@@ -288,7 +311,7 @@ async def process_token_request(
             token.activated_at = datetime.now()
         
         # Ha user token típusú, akkor automatikusan server_admin rangot adunk
-        # (csak akkor, ha még nem server_admin vagy manager_admin)
+        # (csak akkor, ha még user rangú)
         role_changed = False
         
         # Ellenőrizzük, hogy user token típusú-e
@@ -299,15 +322,9 @@ async def process_token_request(
         else:
             token_type_value = str(token_request.token_type)
         
-        # Debug: kiírjuk a token_type értékét
-        print(f"DEBUG: token_request.token_type = {token_request.token_type}, value = {token_type_value}")
-        print(f"DEBUG: user.role = {user.role}, user.role.value = {user.role.value if hasattr(user.role, 'value') else user.role}")
-        
         # Ellenőrizzük, hogy user token típusú-e
         is_user_token = (token_type_value == "user" or 
                         token_request.token_type == TokenType.USER)
-        
-        print(f"DEBUG: is_user_token = {is_user_token}")
         
         # Csak akkor frissítjük, ha user token ÉS még user rangú
         if is_user_token:
@@ -315,11 +332,8 @@ async def process_token_request(
             current_role_value = user.role.value if hasattr(user.role, 'value') else str(user.role)
             is_user_role = (current_role_value == "user" or user.role == UserRole.USER)
             
-            print(f"DEBUG: current_role_value = {current_role_value}, is_user_role = {is_user_role}")
-            
             # Csak akkor frissítjük, ha user rangú
             if is_user_role:
-                print(f"DEBUG: Frissítjük a rangot user-ról server_admin-ra")
                 # Rang frissítése
                 user.role = UserRole.SERVER_ADMIN
                 role_changed = True
@@ -332,16 +346,11 @@ async def process_token_request(
                 
                 # Ellenőrizzük, hogy tényleg változott-e
                 final_role_value = user.role.value if hasattr(user.role, 'value') else str(user.role)
-                print(f"DEBUG: Frissítés után user.role = {user.role}, value = {final_role_value}")
-                
                 if final_role_value != "server_admin":
                     # Ha még mindig nem változott, próbáljuk meg újra
-                    print(f"DEBUG: Rang még mindig nem server_admin, újrapróbálás")
                     user.role = UserRole.SERVER_ADMIN
                     db.commit()
                     db.refresh(user)
-                    final_role_value_after_retry = user.role.value if hasattr(user.role, 'value') else str(user.role)
-                    print(f"DEBUG: Újrapróbálás után user.role = {user.role}, value = {final_role_value_after_retry}")
         
         # Token igénylés státusz frissítése
         token_request.status = "approved"
