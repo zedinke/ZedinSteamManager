@@ -2,7 +2,7 @@
 Ark Server router - Server Admin Ark szerver kezelés
 """
 
-from fastapi import APIRouter, Request, Form, HTTPException, Depends
+from fastapi import APIRouter, Request, Form, HTTPException, Depends, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, asc
@@ -21,9 +21,10 @@ router = APIRouter(prefix="/ark", tags=["ark_servers"])
 async def get_server_logs(
     request: Request,
     server_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    log_type: str = Query("startup", description="Log típus: 'startup' vagy 'docker'")
 ):
-    """Server Admin: Szerver indítási logok megtekintése"""
+    """Server Admin: Szerver logok megtekintése (indítási vagy Docker konténer logok)"""
     current_user = require_server_admin(request, db)
     
     server = db.query(ServerInstance).filter(
@@ -36,6 +37,87 @@ async def get_server_logs(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
+    # Docker konténer logok lekérése
+    if log_type == "docker":
+        import subprocess
+        container_name = f"zedin_asa_{server.id}"
+        
+        try:
+            # Ellenőrizzük, hogy a konténer fut-e
+            check_result = subprocess.run(
+                ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if not check_result.stdout.strip():
+                # Ha nem fut, ellenőrizzük, hogy létezik-e
+                exists_result = subprocess.run(
+                    ["docker", "ps", "-a", "-q", "-f", f"name=^{container_name}$"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                
+                if not exists_result.stdout.strip():
+                    return JSONResponse({
+                        "success": False,
+                        "message": f"Konténer {container_name} nem található"
+                    })
+                else:
+                    # Konténer létezik, de nem fut
+                    log_result = subprocess.run(
+                        ["docker", "logs", "--tail", "200", container_name],
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+                    
+                    return JSONResponse({
+                        "success": True,
+                        "log_type": "docker",
+                        "container_name": container_name,
+                        "container_status": "stopped",
+                        "log_content": log_result.stdout,
+                        "log_lines": len(log_result.stdout.splitlines())
+                    })
+            
+            # Konténer fut, logok lekérése
+            log_result = subprocess.run(
+                ["docker", "logs", "--tail", "200", container_name],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if log_result.returncode != 0:
+                return JSONResponse({
+                    "success": False,
+                    "message": f"Docker logok lekérése sikertelen: {log_result.stderr}"
+                })
+            
+            return JSONResponse({
+                "success": True,
+                "log_type": "docker",
+                "container_name": container_name,
+                "container_status": "running",
+                "log_content": log_result.stdout,
+                "log_lines": len(log_result.stdout.splitlines())
+            })
+            
+        except subprocess.TimeoutExpired:
+            return JSONResponse({
+                "success": False,
+                "message": "Docker logok lekérése túllépte az időkorlátot"
+            })
+        except Exception as e:
+            return JSONResponse({
+                "success": False,
+                "message": f"Docker logok lekérése sikertelen: {str(e)}"
+            })
+    
+    # Indítási logok (alapértelmezett)
     from app.services.symlink_service import get_server_path
     server_path = get_server_path(server.id)
     
@@ -45,7 +127,7 @@ async def get_server_logs(
     if not log_files:
         return JSONResponse({
             "success": False,
-            "message": "Nincs log fájl"
+            "message": "Nincs indítási log fájl"
         })
     
     latest_log = log_files[0]
@@ -56,6 +138,7 @@ async def get_server_logs(
         
         return JSONResponse({
             "success": True,
+            "log_type": "startup",
             "log_file": latest_log.name,
             "log_content": log_content,
             "file_size": latest_log.stat().st_size
