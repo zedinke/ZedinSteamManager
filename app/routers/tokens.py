@@ -111,7 +111,6 @@ async def generate(
             from app.services.notification_service import create_notification
             type_text = "Szerver Admin" if token_type_enum == TokenType.SERVER_ADMIN else "Felhasználó"
             from app.config import settings
-            from datetime import datetime
             
             tokens_list = "\n".join([f"- {token.token}" for token in generated_tokens[1:]])
             activation_links = "\n".join([f"- {settings.base_url}/tokens/activate?token={token.token}" for token in generated_tokens[1:]])
