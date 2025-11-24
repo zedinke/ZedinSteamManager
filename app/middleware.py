@@ -48,6 +48,9 @@ async def catch_exceptions_middleware(request: Request, call_next):
 
 async def session_role_refresh_middleware(request: Request, call_next):
     """Session role refresh middleware - frissíti a session-t, ha a felhasználó rangja változott"""
+    # Alapértelmezett: üres lista az Ark játékokhoz
+    request.state.ark_games = []
+    
     # Csak akkor ellenőrizzük, ha van session-ben user_id
     user_id = request.session.get("user_id")
     if user_id:
@@ -81,11 +84,8 @@ async def session_role_refresh_middleware(request: Request, call_next):
                     db.close()
         except Exception:
             # Ha hiba történik, ne akadályozza a request feldolgozását
-            # Üres lista, ha hiba van
-            request.state.ark_games = []
-    else:
-        # Ha nincs bejelentkezve, üres lista
-        request.state.ark_games = []
+            # Üres lista marad (már beállítottuk az elején)
+            pass
     
     response = await call_next(request)
     return response

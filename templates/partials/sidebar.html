@@ -94,7 +94,7 @@
                 </div>
             </div>
             
-            {% set ark_games = request.state.ark_games if hasattr(request.state, 'ark_games') else [] %}
+            {% set ark_games = request.state.ark_games %}
             {% for game in ark_games %}
             <div class="nav-category">
                 <div class="nav-category-header" onclick="toggleCategory(this)">
@@ -132,7 +132,7 @@
                 </div>
             </div>
             
-            {% set ark_games = request.state.ark_games if hasattr(request.state, 'ark_games') else [] %}
+            {% set ark_games = request.state.ark_games %}
             {% for game in ark_games %}
             <div class="nav-category">
                 <div class="nav-category-header" onclick="toggleCategory(this)">
