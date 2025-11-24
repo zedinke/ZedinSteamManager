@@ -47,11 +47,11 @@ RUN wget -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetric
     chmod +x /usr/local/bin/winetricks
 
 # SteamCMD letöltése és telepítése
-# FONTOS: NE hozzuk létre a mappát! A manager már létrehozza megfelelő jogosultságokkal a host-on.
-# A SteamCMD mappa volume mount-tal lesz elérhető a konténeren belül.
-# Ha a mappa nem létezik, a SteamCMD telepítés sikertelen lesz, de ez rendben van,
-# mert a manager felelős a mappák létrehozásáért.
-RUN cd ${STEAMCMD_DIR} && \
+# FONTOS: A build időben létrehozzuk a mappát a konténeren belül (ez NEM érinti a host-ot!)
+# A build a konténeren belül történik, ezért a mappalétrehozás itt nem hoz létre root jogosultságokkal mappát a host-on.
+# A host-on a manager hozza létre a SteamCMD mappát megfelelő jogosultságokkal, és volume mount-tal elérhető lesz.
+RUN mkdir -p ${STEAMCMD_DIR} && \
+    cd ${STEAMCMD_DIR} && \
     curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
     chown -R ai_developer:ai_developer ${STEAMCMD_DIR} && \
     chmod +x ${STEAMCMD_DIR}/steamcmd.sh && \
