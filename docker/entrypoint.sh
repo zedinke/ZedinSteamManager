@@ -66,19 +66,9 @@ if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
         }
     fi
     
-    # FONTOS: NE hozzuk létre a mappát! A manager már létrehozza megfelelő jogosultságokkal.
-    # Ellenőrizzük csak, hogy az ARK_SERVER_DIR létezik-e és írható-e
-    if [ ! -d "${ARK_SERVER_DIR}" ]; then
-        echo "HIBA: ARK szerver mappa nem létezik: ${ARK_SERVER_DIR}"
-        echo "HIBA: A manager-nek kell létrehoznia ezt a mappát megfelelő jogosultságokkal!"
-        exit 1
-    fi
-    
-    # Ellenőrizzük, hogy az ARK_SERVER_DIR írható-e
-    if [ ! -w "${ARK_SERVER_DIR}" ]; then
-        echo "HIBA: Az ARK szerver mappa nem írható: ${ARK_SERVER_DIR}"
-        exit 1
-    fi
+    # FONTOS: NE hozzuk létre és NE ellenőrizzük a mappát!
+    # A manager már létrehozza megfelelő jogosultságokkal.
+    # Csak használjuk, ha létezik.
     
     echo "SteamCMD futtatása..."
     echo "  - Install dir: ${ARK_SERVER_DIR}"
