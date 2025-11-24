@@ -630,8 +630,8 @@ async def install_ark_server_files(
             
             # Részletes ellenőrzés logolása
             await log(f"Bináris ellenőrzés:")
-            await log(f"  - Linux (ShooterGame/Binaries/Linux): {linux_binary_shootergame.exists()}")
             await log(f"  - Linux (linux64/): {linux_binary_linux64.exists()}")
+            await log(f"  - Linux (ShooterGame/Binaries/Linux): {linux_binary_shootergame.exists()}")
             await log(f"  - Windows: {win64_binary.exists()}")
             
             if not linux_binary and not win64_binary.exists():
@@ -679,9 +679,9 @@ async def install_ark_server_files(
             await log("Ellenőrizzük, hogy a telepítés sikeres volt-e...")
             
             # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
-            # Lehet, hogy a linux64/ mappában van közvetlenül (más rendszerekben így van)
-            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
+            # Először a linux64/ mappát, majd a ShooterGame/Binaries/Linux-t ellenőrizzük
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
+            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
             # Várunk, amíg a bináris létrejön (max 60 másodperc, de csak akkor várunk, ha még nincs)
@@ -691,8 +691,8 @@ async def install_ark_server_files(
             
             while waited_time < max_wait_time:
                 # Részletes ellenőrzés
-                # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
-                linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
+                # Először a linux64/ mappát, majd a ShooterGame/Binaries/Linux-t ellenőrizzük
+                linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else (linux_binary_shootergame if linux_binary_shootergame.exists() else None)
                 
                 if linux_binary:
                     await log(f"✓ Linux bináris megtalálva: {linux_binary}")

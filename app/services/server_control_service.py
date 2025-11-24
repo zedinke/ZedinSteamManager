@@ -484,8 +484,8 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         logger.info(f"Windows ShooterGameServer.exe bináris megtalálva: {win64_binary} (Wine-nal fog futni)")
                     else:
                         logger.warning(f"ShooterGameServer bináris nem található (sem Linux, sem Windows):")
-                        logger.warning(f"  - Linux (ShooterGame/Binaries/Linux): {linux_binary_shootergame}")
                         logger.warning(f"  - Linux (linux64/): {linux_binary_linux64}")
+                        logger.warning(f"  - Linux (ShooterGame/Binaries/Linux): {linux_binary_shootergame}")
                         logger.warning(f"  - Windows: {win64_binary}")
                         logger.warning(f"  - Binaries mappa tartalma: {binaries_contents}")
                         if binaries_path.exists():
