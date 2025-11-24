@@ -46,18 +46,6 @@ RUN apt-get install -y --no-install-recommends \
 RUN wget -O /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks && \
     chmod +x /usr/local/bin/winetricks
 
-# SteamCMD letöltése és telepítése
-# FONTOS: A build időben létrehozzuk a mappát a konténeren belül (ez NEM érinti a host-ot!)
-# A build a konténeren belül történik, ezért a mappalétrehozás itt nem hoz létre root jogosultságokkal mappát a host-on.
-# A host-on a manager hozza létre a SteamCMD mappát megfelelő jogosultságokkal, és volume mount-tal elérhető lesz.
-RUN mkdir -p ${STEAMCMD_DIR} && \
-    cd ${STEAMCMD_DIR} && \
-    curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
-    chown -R ai_developer:ai_developer ${STEAMCMD_DIR} && \
-    chmod +x ${STEAMCMD_DIR}/steamcmd.sh && \
-    # Ellenőrizzük, hogy a SteamCMD telepítve van-e
-    test -f ${STEAMCMD_DIR}/steamcmd.sh || (echo "HIBA: SteamCMD telepítése sikertelen!" && exit 1)
-
 # Entrypoint script másolása (root-ként, mert még nem váltottunk felhasználót)
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh && \
@@ -66,8 +54,19 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 # Munkakönyvtár beállítása
 WORKDIR ${ARK_SERVER_DIR}
 
-# Felhasználó váltás
+# Felhasználó váltás (mielőtt a SteamCMD-t telepítenénk)
 USER ai_developer
+
+# SteamCMD letöltése és telepítése (ai_developer felhasználóként)
+# FONTOS: Most már ai_developer felhasználóként futunk, nem root-ként!
+# A build a konténeren belül történik, ezért a mappalétrehozás itt nem hoz létre root jogosultságokkal mappát a host-on.
+# A host-on a manager hozza létre a SteamCMD mappát megfelelő jogosultságokkal, és volume mount-tal elérhető lesz.
+RUN mkdir -p ${STEAMCMD_DIR} && \
+    cd ${STEAMCMD_DIR} && \
+    curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
+    chmod +x ${STEAMCMD_DIR}/steamcmd.sh && \
+    # Ellenőrizzük, hogy a SteamCMD telepítve van-e
+    test -f ${STEAMCMD_DIR}/steamcmd.sh || (echo "HIBA: SteamCMD telepítése sikertelen!" && exit 1)
 
 # Entrypoint beállítása
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
