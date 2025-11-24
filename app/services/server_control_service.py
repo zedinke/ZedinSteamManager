@@ -805,7 +805,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         try:
                             from app.database import Game
                             game = db.query(Game).filter(Game.id == server.game_id).first()
-                            if game and game.name == "Ark Survival Evolved":
+                            if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
                                 is_evolved = True
                         except Exception:
                             pass
@@ -1089,7 +1089,7 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             # Container név meghatározása játék típus alapján
             from app.database import Game
             game = db.query(Game).filter(Game.id == server.game_id).first()
-            if game and game.name == "Ark Survival Evolved":
+            if game and (game.name == "Ark Survival Evolved" or "evolved" in game.name.lower()):
                 container_name_log = f"zedin_ase_{server.id}"
             else:
                 container_name_log = f"zedin_asa_{server.id}"
