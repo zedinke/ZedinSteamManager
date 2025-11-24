@@ -858,39 +858,81 @@ function updateOperationStatus(message) {
 
 // Form submit után figyeljük a válaszokat
 document.addEventListener('DOMContentLoaded', function() {
-    // Logok gombok event listener-ei
-    const logsButtons = document.querySelectorAll('.logs-btn');
-    logsButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
+    console.log('DOMContentLoaded fired');
+    
+    // Event delegation használata - így működik, még ha a gombok később is jönnek létre
+    document.addEventListener('click', function(e) {
+        // Logok gomb
+        if (e.target.closest('.logs-btn')) {
             e.preventDefault();
             e.stopPropagation();
-            const serverId = parseInt(this.getAttribute('data-server-id'));
-            console.log('Logs button clicked, serverId:', serverId);
-            if (serverId && window.showServerLogs) {
-                window.showServerLogs(serverId);
+            const button = e.target.closest('.logs-btn');
+            const serverId = parseInt(button.getAttribute('data-server-id'));
+            console.log('Logs button clicked via delegation, serverId:', serverId);
+            if (serverId) {
+                if (window.showServerLogs) {
+                    window.showServerLogs(serverId);
+                } else {
+                    console.error('window.showServerLogs nem elérhető');
+                    alert('Hiba: A logok függvény nem elérhető. Kérlek, frissítsd az oldalt.');
+                }
             } else {
-                console.error('Logs button: serverId vagy showServerLogs nem elérhető');
-                alert('Hiba: A logok gomb nem működik. Kérlek, frissítsd az oldalt.');
+                console.error('Logs button: serverId nem található');
             }
-        });
+            return;
+        }
+        
+        // Shutdown gomb
+        if (e.target.closest('.shutdown-btn')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const button = e.target.closest('.shutdown-btn');
+            const serverId = parseInt(button.getAttribute('data-server-id'));
+            console.log('Shutdown button clicked via delegation, serverId:', serverId);
+            if (serverId) {
+                if (window.showShutdownModal) {
+                    window.showShutdownModal(serverId);
+                } else {
+                    console.error('window.showShutdownModal nem elérhető');
+                    alert('Hiba: A shutdown függvény nem elérhető. Kérlek, frissítsd az oldalt.');
+                }
+            } else {
+                console.error('Shutdown button: serverId nem található');
+            }
+            return;
+        }
     });
     
-    // Shutdown gombok event listener-ei
-    const shutdownButtons = document.querySelectorAll('.shutdown-btn');
-    shutdownButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const serverId = parseInt(this.getAttribute('data-server-id'));
-            console.log('Shutdown button clicked, serverId:', serverId);
-            if (serverId && window.showShutdownModal) {
-                window.showShutdownModal(serverId);
-            } else {
-                console.error('Shutdown button: serverId vagy showShutdownModal nem elérhető');
-                alert('Hiba: A shutdown gomb nem működik. Kérlek, frissítsd az oldalt.');
-            }
+    // Direkt event listener-ek is (backup)
+    setTimeout(function() {
+        const logsButtons = document.querySelectorAll('.logs-btn');
+        console.log('Found logs buttons:', logsButtons.length);
+        logsButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const serverId = parseInt(this.getAttribute('data-server-id'));
+                console.log('Logs button clicked (direct listener), serverId:', serverId);
+                if (serverId && window.showServerLogs) {
+                    window.showServerLogs(serverId);
+                }
+            });
         });
-    });
+        
+        const shutdownButtons = document.querySelectorAll('.shutdown-btn');
+        console.log('Found shutdown buttons:', shutdownButtons.length);
+        shutdownButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const serverId = parseInt(this.getAttribute('data-server-id'));
+                console.log('Shutdown button clicked (direct listener), serverId:', serverId);
+                if (serverId && window.showShutdownModal) {
+                    window.showShutdownModal(serverId);
+                }
+            });
+        });
+    }, 100);
     
     // Intercept form submissions
     const forms = document.querySelectorAll('form[action*="/ark/servers/"]');
