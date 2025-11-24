@@ -39,9 +39,44 @@ if [ -f "requirements.txt" ]; then
     if [ -d "venv" ]; then
         source venv/bin/activate
         pip install -r requirements.txt --quiet
+        PYTHON_CMD="venv/bin/python3"
     else
         pip3 install -r requirements.txt --quiet
+        PYTHON_CMD="python3"
     fi
+else
+    # Ha nincs requirements.txt, próbáljuk meg megtalálni a Python-t
+    if [ -d "venv" ]; then
+        PYTHON_CMD="venv/bin/python3"
+    else
+        PYTHON_CMD="python3"
+    fi
+fi
+
+# Adatbázis migráció (adatvesztés nélkül)
+echo "[UPDATE] Adatbázis migráció futtatása..."
+if [ -f "app/database_init.py" ]; then
+    if [ -d "venv" ]; then
+        source venv/bin/activate
+    fi
+    $PYTHON_CMD -m app.database_init || {
+        echo "[UPDATE] ⚠️  Figyelmeztetés: Adatbázis migráció során hiba történt, de folytatjuk..."
+    }
+    echo "[UPDATE] ✓ Adatbázis migráció befejezve"
+else
+    echo "[UPDATE] ⚠️  Figyelmeztetés: database_init.py nem található, adatbázis migráció kihagyva"
+fi
+
+# Docker image build
+echo "[UPDATE] Docker image build futtatása..."
+if [ -f "docker/build-image.sh" ]; then
+    chmod +x docker/build-image.sh
+    docker/build-image.sh latest || {
+        echo "[UPDATE] ⚠️  Figyelmeztetés: Docker build során hiba történt, de folytatjuk..."
+    }
+    echo "[UPDATE] ✓ Docker image build befejezve"
+else
+    echo "[UPDATE] ⚠️  Figyelmeztetés: build-image.sh nem található, Docker build kihagyva"
 fi
 
 # Service újraindítása
