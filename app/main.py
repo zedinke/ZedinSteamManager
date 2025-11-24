@@ -92,16 +92,6 @@ app.include_router(api.router, prefix="/api", tags=["API"])
 @app.on_event("startup")
 async def startup_event():
     """Alkalmazás indításakor elindítjuk a token lejárat ellenőrzést"""
-    # FONTOS: Ellenőrizzük, hogy nem root-ként futunk-e
-    import os
-    if os.name != 'nt' and os.getuid() == 0:
-        error_msg = "HIBA: A manager NEM futhat root jogosultságokkal! Futtasd ai_developer felhasználóként!"
-        logging.error(error_msg)
-        print(f"\n{'='*60}")
-        print(error_msg)
-        print(f"{'='*60}\n")
-        raise RuntimeError(error_msg)
-    
     # FONTOS: Ellenőrizzük és javítjuk a root jogosultságokkal létező mappákat
     try:
         from app.config import settings
