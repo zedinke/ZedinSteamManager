@@ -639,25 +639,66 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
             except (PermissionError, OSError):
                 pass
         
-        # Ellenőrizzük, hogy a real_server_path létezik-e és megfelelő jogosultságokkal
+        # FONTOS: Ellenőrizzük, hogy a real_server_path létezik-e és megfelelő jogosultságokkal
+        # Mert ha nem létezik, a Docker volume mount root jogosultságokkal hozhatja létre!
+        logger.info(f"Ellenőrzés: real_server_path = {real_server_path}")
+        logger.info(f"real_server_path.exists() = {real_server_path.exists()}")
+        
         if not real_server_path.exists():
+            logger.warning(f"⚠️ real_server_path nem létezik, létrehozzuk: {real_server_path}")
             # Létrehozzuk lépésenként
             if not real_server_path.parent.exists():
+                logger.info(f"Szülő mappa létrehozása: {real_server_path.parent}")
                 real_server_path.parent.mkdir(parents=True, exist_ok=True)
                 ensure_permissions(real_server_path.parent)
+                logger.info(f"✓ Szülő mappa létrehozva és jogosultságok beállítva: {real_server_path.parent}")
             real_server_path.mkdir(parents=True, exist_ok=True)
             ensure_permissions(real_server_path)
+            logger.info(f"✓ real_server_path létrehozva és jogosultságok beállítva: {real_server_path}")
+            
+            # Ellenőrizzük, hogy tényleg létrejött-e és megfelelő jogosultságokkal
+            if real_server_path.exists():
+                try:
+                    stat_info = real_server_path.stat()
+                    current_uid = os.getuid()
+                    if stat_info.st_uid == 0 and current_uid != 0:
+                        logger.error(f"❌ HIBA: real_server_path root jogosultságokkal jött létre: {real_server_path}")
+                        logger.error(f"   Stat: uid={stat_info.st_uid}, gid={stat_info.st_gid}")
+                    else:
+                        logger.info(f"✓ real_server_path megfelelő jogosultságokkal létezik: uid={stat_info.st_uid}, gid={stat_info.st_gid}")
+                except Exception as e:
+                    logger.error(f"⚠️ Nem sikerült ellenőrizni a real_server_path jogosultságait: {e}")
         else:
             ensure_permissions(real_server_path)
             if real_server_path.parent.exists():
                 ensure_permissions(real_server_path.parent)
+            logger.info(f"✓ real_server_path már létezik, jogosultságok ellenőrizve: {real_server_path}")
         
         # Ellenőrizzük a saved_path-et is
+        logger.info(f"Ellenőrzés: saved_path = {saved_path}")
+        logger.info(f"saved_path.exists() = {saved_path.exists()}")
+        
         if not saved_path.exists():
+            logger.warning(f"⚠️ saved_path nem létezik, létrehozzuk: {saved_path}")
             saved_path.mkdir(parents=True, exist_ok=True)
             ensure_permissions(saved_path)
+            logger.info(f"✓ saved_path létrehozva és jogosultságok beállítva: {saved_path}")
+            
+            # Ellenőrizzük, hogy tényleg létrejött-e és megfelelő jogosultságokkal
+            if saved_path.exists():
+                try:
+                    stat_info = saved_path.stat()
+                    current_uid = os.getuid()
+                    if stat_info.st_uid == 0 and current_uid != 0:
+                        logger.error(f"❌ HIBA: saved_path root jogosultságokkal jött létre: {saved_path}")
+                        logger.error(f"   Stat: uid={stat_info.st_uid}, gid={stat_info.st_gid}")
+                    else:
+                        logger.info(f"✓ saved_path megfelelő jogosultságokkal létezik: uid={stat_info.st_uid}, gid={stat_info.st_gid}")
+                except Exception as e:
+                    logger.error(f"⚠️ Nem sikerült ellenőrizni a saved_path jogosultságait: {e}")
         else:
             ensure_permissions(saved_path)
+            logger.info(f"✓ saved_path már létezik, jogosultságok ellenőrizve: {saved_path}")
         
         # Docker Compose fájl létrehozása/frissítése
         # Mindig frissítjük, hogy a konfigurációk szinkronban legyenek
