@@ -12,7 +12,7 @@ from app.services.ark_config_service import (
     parse_ini_file, save_ini_file, get_setting_description,
     is_boolean_setting, get_server_config_files, get_setting_category
 )
-from app.services.symlink_service import get_user_serverfiles_path
+from app.services.symlink_service import get_servers_base_path
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter(prefix="/ark/servers", tags=["ark_config"])
@@ -40,9 +40,9 @@ def require_server_admin(request: Request, db: Session = Depends(get_db)) -> Use
     return user
 
 def get_server_path_from_instance(server_instance: ServerInstance) -> Path:
-    """Szerver útvonal lekérése a server instance-ból"""
-    user_serverfiles = get_user_serverfiles_path(server_instance.server_admin_id)
-    server_path = user_serverfiles / f"server_{server_instance.id}"
+    """Szerver útvonal lekérése a server instance-ból (új struktúra: Servers/server_{server_id}/)"""
+    servers_base = get_servers_base_path()
+    server_path = servers_base / f"server_{server_instance.id}"
     return server_path
 
 @router.get("/{server_id}/config", response_class=HTMLResponse)
