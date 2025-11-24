@@ -384,35 +384,30 @@ async def server_logs_page(
     from app.services.symlink_service import get_server_path
     server_path = get_server_path(server.id)
     
-    # Log fájlok listázása
+    # Log fájlok listázása - csak ShooterGame.log
     log_files = []
     
-    # Startup logok
-    startup_logs = sorted(server_path.glob("startup_log_*.txt"), key=lambda x: x.stat().st_mtime, reverse=True)
-    for log_file_path in startup_logs:
-        log_files.append({
-            "name": log_file_path.name,
-            "path": str(log_file_path),
-            "size": log_file_path.stat().st_size,
-            "modified": datetime.fromtimestamp(log_file_path.stat().st_mtime),
-            "type": "startup"
-        })
-    
-    # Saved/Logs könyvtár logok
+    # Saved/Logs könyvtárban csak ShooterGame.log
     saved_logs_dir = server_path / "Saved" / "Logs"
     if saved_logs_dir.exists():
-        for log_file_path in saved_logs_dir.glob("*.log"):
+        shooter_game_log = saved_logs_dir / "ShooterGame.log"
+        if shooter_game_log.exists():
             log_files.append({
-                "name": log_file_path.name,
-                "path": str(log_file_path),
-                "size": log_file_path.stat().st_size,
-                "modified": datetime.fromtimestamp(log_file_path.stat().st_mtime),
+                "name": shooter_game_log.name,
+                "path": str(shooter_game_log),
+                "size": shooter_game_log.stat().st_size,
+                "modified": datetime.fromtimestamp(shooter_game_log.stat().st_mtime),
                 "type": "server"
             })
     
-    # Kiválasztott log fájl tartalma
+    # Kiválasztott log fájl tartalma (ha nincs kiválasztva, automatikusan a ShooterGame.log)
     selected_log_content = None
     selected_log_name = None
+    
+    # Ha nincs kiválasztott fájl, automatikusan a ShooterGame.log-t jelenítjük meg
+    if not log_file and log_files:
+        log_file = log_files[0]["name"]
+    
     if log_file:
         # Keresés a log fájlok között
         for log_info in log_files:

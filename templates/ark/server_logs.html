@@ -12,9 +12,10 @@
     </div>
 
     <div style="display: flex; gap: 20px; margin-top: 20px;">
-        <!-- Log fájlok listája -->
+        <!-- Log fájlok listája - csak ShooterGame.log -->
+        {% if log_files %}
         <div style="flex: 0 0 300px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h3 style="margin-top: 0;"><i class="fas fa-list"></i> Log Fájlok</h3>
+            <h3 style="margin-top: 0;"><i class="fas fa-list"></i> Log Fájl</h3>
             
             {% if docker_logs_available %}
             <div style="margin-bottom: 15px;">
@@ -24,32 +25,22 @@
             </div>
             {% endif %}
             
-            {% if log_files %}
-            <div style="max-height: 600px; overflow-y: auto;">
-                {% for log_file in log_files %}
-                <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; {% if selected_log_name == log_file.name %}background: #e3f2fd; border-color: #2196f3;{% endif %}">
-                    <a href="/ark/servers/{{ server.id }}/logs/page?log_file={{ log_file.name }}" 
-                       style="text-decoration: none; color: #333; display: block;">
-                        <div style="font-weight: bold; margin-bottom: 5px;">
-                            <i class="fas fa-file-alt"></i> {{ log_file.name }}
-                        </div>
-                        <div style="font-size: 12px; color: #666;">
-                            <div>Méret: {{ (log_file.size / 1024) | round(2) }} KB</div>
-                            <div>Módosítva: {{ log_file.modified.strftime('%Y-%m-%d %H:%M') }}</div>
-                            <div>
-                                <span class="badge {% if log_file.type == 'startup' %}badge-info{% else %}badge-success{% endif %}">
-                                    {% if log_file.type == 'startup' %}Indítási{% else %}Szerver{% endif %}
-                                </span>
-                            </div>
-                        </div>
-                    </a>
+            {% for log_file in log_files %}
+            <div style="margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background: #e3f2fd; border-color: #2196f3;">
+                <div style="font-weight: bold; margin-bottom: 5px;">
+                    <i class="fas fa-file-alt"></i> {{ log_file.name }}
                 </div>
-                {% endfor %}
+                <div style="font-size: 12px; color: #666;">
+                    <div>Méret: {{ (log_file.size / 1024) | round(2) }} KB</div>
+                    <div>Módosítva: {{ log_file.modified.strftime('%Y-%m-%d %H:%M') }}</div>
+                    <div>
+                        <span class="badge badge-success">Szerver</span>
+                    </div>
+                </div>
             </div>
-            {% else %}
-            <p class="text-muted">Nincsenek log fájlok</p>
-            {% endif %}
+            {% endfor %}
         </div>
+        {% endif %}
 
         <!-- Log tartalom megjelenítése -->
         <div style="flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
