@@ -465,14 +465,14 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                     logger.warning(f"Binaries mappa nem létezik: {binaries_path}")
                     logger.warning(f"  - ShooterGame tartalma: {[item.name for item in shooter_game_path.iterdir()] if shooter_game_path.exists() else 'N/A'}")
                 else:
-                    # Ellenőrizzük a Linux binárist (két helyen is lehet: ShooterGame/Binaries/Linux vagy linux64/)
-                    linux_binary_shootergame = binaries_path / "Linux" / "ShooterGameServer"
+                    # Ellenőrizzük a Linux binárist (két helyen is lehet: linux64/ vagy ShooterGame/Binaries/Linux)
                     linux_binary_linux64 = real_server_path / "linux64" / "ShooterGameServer"
+                    linux_binary_shootergame = binaries_path / "Linux" / "ShooterGameServer"
                     # Ellenőrizzük a Windows binárist is
                     win64_binary = binaries_path / "Win64" / "ShooterGameServer.exe"
                     
-                    # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
-                    linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
+                    # Először a linux64/ mappát, majd a ShooterGame/Binaries/Linux-t ellenőrizzük
+                    linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else (linux_binary_shootergame if linux_binary_shootergame.exists() else None)
                     
                     # Nézzük meg, mi van a Binaries mappában
                     binaries_contents = [item.name for item in binaries_path.iterdir()] if binaries_path.exists() else []
