@@ -400,14 +400,66 @@ async def delete_serverfiles(
             serverfiles.is_active = False
             db.commit()
     
-    # Fájlok törlése
+    # Fájlok törlése (előbb, mielőtt az adatbázis műveletet végeznénk)
     install_path = Path(serverfiles.install_path)
     if install_path.exists():
         delete_ark_server_files(install_path)
     
-    # Rekord törlése
-    db.delete(serverfiles)
-    db.commit()
+    # MySQL kapcsolati hiba kezelése
+    try:
+        # Rekord törlése
+        db.delete(serverfiles)
+        db.commit()
+    except Exception as e:
+        # MySQL kapcsolati hiba esetén újrapróbálkozás új session-nel
+        db.rollback()
+        error_str = str(e)
+        if "2006" in error_str or "MySQL server has gone away" in error_str or "Connection reset" in error_str:
+            # Új session létrehozása
+            from app.database import SessionLocal
+            new_db = SessionLocal()
+            try:
+                # Újra lekérdezzük a rekordot
+                serverfiles = new_db.query(UserServerFiles).filter(
+                    UserServerFiles.id == serverfiles_id
+                ).first()
+                
+                if serverfiles:
+                    # Ha ez az aktív verzió, akkor aktiváljuk a következő legújabb verziót
+                    if serverfiles.is_active:
+                        other_completed = new_db.query(UserServerFiles).filter(
+                            and_(
+                                UserServerFiles.user_id == current_user.id,
+                                UserServerFiles.id != serverfiles_id,
+                                UserServerFiles.installation_status == "completed"
+                            )
+                        ).order_by(UserServerFiles.installed_at.desc()).first()
+                        
+                        if other_completed:
+                            other_completed.is_active = True
+                            serverfiles.is_active = False
+                            new_db.commit()
+                        else:
+                            serverfiles.is_active = False
+                            new_db.commit()
+                    
+                    # Rekord törlése
+                    new_db.delete(serverfiles)
+                    new_db.commit()
+            except Exception as retry_error:
+                new_db.rollback()
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Adatbázis hiba a törlés során: {str(retry_error)}"
+                )
+            finally:
+                new_db.close()
+        else:
+            # Más típusú hiba, továbbdobjuk
+            raise HTTPException(
+                status_code=500,
+                detail=f"Hiba a törlés során: {str(e)}"
+            )
     
     return RedirectResponse(
         url=f"/ark-evolved/serverfiles?success=Szerverfájlok+sikeresen+törölve",
