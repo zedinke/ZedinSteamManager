@@ -1398,6 +1398,12 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         
         # Szerver beállítások kiolvasása
         map_name = env_dict.get('MAP_NAME', 'TheIsland')
+        # Map név _WP utótag hozzáadása, ha nincs
+        if not map_name.endswith('_WP'):
+            map_name_wp = f"{map_name}_WP"
+        else:
+            map_name_wp = map_name
+        
         session_name = env_dict.get('SESSION_NAME', server.name)
         asa_port = env_dict.get('ASA_PORT', str(server.port or 7777))
         query_port = env_dict.get('QUERY_PORT', str(server.query_port or int(asa_port) + 2))
@@ -1415,10 +1421,10 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         if server.cluster:
             cluster_id = server.cluster.cluster_id
         
-        # ARK szerver indítási parancs összeállítása (hasonló a képen láthatóhoz)
-        # Formátum: ArkAscendedServer.exe MapName ?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -mods=... -passivemods=...
+        # ARK szerver indítási parancs összeállítása
+        # Formátum: MapName_WP?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -servergamelog -servergamelogincludetribelogs -ServerRCONOutputTribeLogs -mods=... -NoBattlEye -passivemods=...
         
-        # ?listen?SessionName="..."?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
+        # Query string összeállítása: ?listen?SessionName="..."?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
         query_params = []
         query_params.append('listen')
         query_params.append(f'SessionName="{session_name}"')
@@ -1437,11 +1443,11 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         # Query string összeállítása
         query_string = '?' + '?'.join(query_params)
         
-        # Teljes parancs összeállítása (hosszú sor, mint a képen)
+        # Teljes parancs összeállítása
         command_parts = []
         
-        # Első rész: ArkAscendedServer.exe MapName ?listen?SessionName=...?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
-        first_part = f'ArkAscendedServer.exe {map_name}{query_string}'
+        # Első rész: MapName_WP?listen?SessionName=...?RCONEnabled=...?RCONPort=...?ServerAdminPassword=...
+        first_part = f'{map_name_wp}{query_string}'
         command_parts.append(first_part)
         
         # Második rész: -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=...
@@ -1456,8 +1462,13 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         second_part = ' '.join(second_part_parts)
         command_parts.append(second_part)
         
-        # Harmadik rész: -NoBattlEye -mods=... -passivemods=... custom args
+        # Harmadik rész: -servergamelog -servergamelogincludetribelogs -ServerRCONOutputTribeLogs -NoBattlEye -mods=... -passivemods=... custom args
         third_part_parts = []
+        
+        # Log argumentumok (mindig szerepeljenek)
+        third_part_parts.append('-servergamelog')
+        third_part_parts.append('-servergamelogincludetribelogs')
+        third_part_parts.append('-ServerRCONOutputTribeLogs')
         
         if battleeye == 'True':
             third_part_parts.append('-UseBattlEye')
@@ -1480,7 +1491,8 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
             third_part = ' '.join(third_part_parts)
             command_parts.append(third_part)
         
-        # Teljes parancs összeállítása (egy hosszú sor, mint a képen)
+        # Teljes parancs összeállítása (egy hosszú sor, mint a példában)
+        # Formátum: MapName_WP?listen?SessionName="..."?RCONEnabled=True?RCONPort=...?ServerAdminPassword=... -Port=... -QueryPort=... -WinLiveMaxPlayers=... -clusterid=... -servergamelog -servergamelogincludetribelogs -ServerRCONOutputTribeLogs -mods=... -NoBattlEye -passivemods=...
         full_command = ' '.join(command_parts)
         
         # Parancs fájl írása
