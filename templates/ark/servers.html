@@ -115,7 +115,16 @@ window.showServerLogs = function(serverId) {
             });
     }
     
-        console.log('Logs modal megtalálva, megnyitás...');
+    // Várunk, amíg a DOM teljesen betöltődik
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(doShowLogs, 100); // Extra 100ms késleltetés, hogy biztosan betöltődjenek az elemek
+        });
+    } else {
+        // Ha már betöltődött, várunk egy kicsit, hogy biztosan létezzenek az elemek
+        setTimeout(doShowLogs, 100);
+    }
+};
 
 window.showShutdownModal = function(serverId) {
     console.log('showShutdownModal called, serverId:', serverId);
