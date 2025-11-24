@@ -156,7 +156,7 @@
                                                     <i class="fas fa-stop"></i> Leállítás
                                                 </button>
                                             </form>
-                                            <button type="button" class="btn btn-sm btn-warning shutdown-btn" data-server-id="{{ server.id }}" title="Késleltetett leállítás">
+                                            <button type="button" class="btn btn-sm btn-warning shutdown-btn" data-server-id="{{ server.id }}" onclick="if(window.showShutdownModal){window.showShutdownModal({{ server.id }});}else{alert('Shutdown funkció nem elérhető. Kérlek, frissítsd az oldalt.');} return false;" title="Késleltetett leállítás">
                                                 <i class="fas fa-clock"></i> Shutdown
                                             </button>
                                             <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;" onsubmit="showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info'); return true;">
@@ -174,7 +174,7 @@
                                         <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary" title="Szerver szerkesztése">
                                             <i class="fas fa-edit"></i> Szerkesztés
                                         </a>
-                                        <button type="button" class="btn btn-sm btn-info logs-btn" data-server-id="{{ server.id }}" title="Indítási logok megtekintése">
+                                        <button type="button" class="btn btn-sm btn-info logs-btn" data-server-id="{{ server.id }}" onclick="if(window.showServerLogs){window.showServerLogs({{ server.id }});}else{alert('Logok funkció nem elérhető. Kérlek, frissítsd az oldalt.');} return false;" title="Indítási logok megtekintése">
                                             <i class="fas fa-file-alt"></i> Logok
                                         </button>
                                         <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
