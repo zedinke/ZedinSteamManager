@@ -626,8 +626,8 @@ async def show_create_server(
     """Server Admin: Ark szerver létrehozási form"""
     current_user = require_server_admin(request, db)
     
-    # Ark játék lekérése
-    ark_game = db.query(Game).filter(Game.name == "Ark Survival Evolved").first()
+    # Ark játék lekérése (case-insensitive)
+    ark_game = db.query(Game).filter(Game.name.ilike("%ark%evolved%")).first()
     if not ark_game:
         raise HTTPException(
             status_code=404,
@@ -709,8 +709,8 @@ async def create_server(
     if not cluster:
         raise HTTPException(status_code=404, detail="Cluster nem található")
     
-    # Ark játék lekérése
-    ark_game = db.query(Game).filter(Game.name == "Ark Survival Evolved").first()
+    # Ark játék lekérése (case-insensitive)
+    ark_game = db.query(Game).filter(Game.name.ilike("%ark%evolved%")).first()
     if not ark_game:
         raise HTTPException(status_code=404, detail="Ark Survival Evolved játék nem található")
     
