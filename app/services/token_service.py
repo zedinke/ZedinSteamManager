@@ -51,9 +51,10 @@ async def activate_token(db: Session, token_string: str, user_id: int) -> dict:
     token.is_active = True
     token.activated_at = datetime.utcnow()
     
-    # Ha user token, akkor server_admin jogosultságot ad
+    # Ha server token, akkor server_admin jogosultságot ad
     # (csak akkor, ha még user rangú)
-    if token.token_type == TokenType.USER:
+    # Backward compatibility: USER token is accepted
+    if token.token_type == TokenType.SERVER_TOKEN or token.token_type == TokenType.USER:
         user = db.query(User).filter(User.id == user_id).first()
         if user:
             # Ellenőrizzük a jelenlegi rangot
@@ -89,7 +90,7 @@ async def send_token_to_user(db: Session, token: Token, user_id: int) -> bool:
     
     # Értesítés létrehozása a tokennel (mindig létrejön, még ha az email nem sikerült)
     from app.services.notification_service import create_notification
-    type_text = "Szerver Admin" if token.token_type == TokenType.SERVER_ADMIN else "Felhasználó"
+    type_text = "Server Token"
     activation_link = f"{settings.base_url}/tokens/activate?token={token.token}"
     create_notification(
         db,

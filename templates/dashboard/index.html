@@ -151,7 +151,7 @@
                         {% for token in tokens %}
                             <tr>
                                 <td><code>{{ token.token[:20] }}...</code></td>
-                                <td>{{ "Szerver Admin" if token.token_type.value == "server_admin" else "Felhasználó" }}</td>
+                                <td>Server Token</td>
                                 <td>{{ token.expires_at.strftime("%Y-%m-%d %H:%M") if token.expires_at else "-" }}</td>
                                 <td>
                                     {% if token.is_active %}

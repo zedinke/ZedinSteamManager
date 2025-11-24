@@ -126,7 +126,7 @@ async def add_token_request(
     """User/Server Admin: Token igénylés hozzáadása a kosárhoz"""
     current_user = require_user(request, db)
     
-    if token_type not in ["server_admin", "user"]:
+    if token_type not in ["server_token"]:
         raise HTTPException(status_code=400, detail="Érvénytelen token típus")
     
     if quantity < 1 or quantity > 100:
@@ -137,7 +137,7 @@ async def add_token_request(
     if period_months not in AVAILABLE_PERIODS:
         raise HTTPException(status_code=400, detail="Érvénytelen periódus. Csak 1, 3, 6, vagy 12 hónap választható.")
     
-    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    token_type_enum = TokenType.SERVER_TOKEN
     
     # Kosár elem létrehozása
     cart_item = CartItem(

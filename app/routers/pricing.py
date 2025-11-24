@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/api/pricing/debug-rules")
 async def debug_pricing_rules(
-    token_type: str = "server_admin",
+    token_type: str = "server_token",
     item_type: str = "token_request",
     quantity: int = 1,
     days: Optional[int] = None,
@@ -24,7 +24,7 @@ async def debug_pricing_rules(
     from app.services.pricing_service import get_active_pricing_rules, calculate_price
     from app.database import TokenType
     
-    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    token_type_enum = TokenType.SERVER_TOKEN
     
     rules = get_active_pricing_rules(db, token_type_enum, item_type, quantity, days)
     pricing = calculate_price(db, token_type_enum, item_type, quantity, days)
@@ -174,7 +174,7 @@ async def update_base_price(
     """Alapár frissítése"""
     current_user = require_manager_admin(request, db)
     
-    if token_type not in ["server_admin", "user"]:
+    if token_type not in ["server_token"]:
         raise HTTPException(status_code=400, detail="Érvénytelen token típus")
     
     if item_type not in ["token_request", "token_extension"]:
@@ -183,7 +183,7 @@ async def update_base_price(
     if base_price < 0:
         raise HTTPException(status_code=400, detail="Az ár nem lehet negatív")
     
-    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    token_type_enum = TokenType.SERVER_TOKEN
     
     # Meglévő ár keresése vagy új létrehozása
     base_price_obj = db.query(TokenBasePrice).filter(
@@ -223,7 +223,7 @@ async def update_period_price(
     """Periódus ár frissítése"""
     current_user = require_manager_admin(request, db)
     
-    if token_type not in ["server_admin", "user"]:
+    if token_type not in ["server_token"]:
         raise HTTPException(status_code=400, detail="Érvénytelen token típus")
     
     from app.services.pricing_service import AVAILABLE_PERIODS
@@ -236,7 +236,7 @@ async def update_period_price(
     # EUR-ból centekbe konvertálás
     price_eur_cents = int(price_eur * 100)
     
-    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    token_type_enum = TokenType.SERVER_TOKEN
     
     # Meglévő ár keresése vagy új létrehozása
     period_price_obj = db.query(TokenPeriodPrice).filter(
@@ -323,7 +323,7 @@ async def create_pricing_rule(
     
     token_type_enum = None
     if applies_to_token_type and applies_to_token_type != "":
-        if applies_to_token_type not in ["server_admin", "user"]:
+        if applies_to_token_type not in ["server_token"]:
             raise HTTPException(status_code=400, detail="Érvénytelen token típus")
         token_type_enum = TokenType.SERVER_ADMIN if applies_to_token_type == "server_admin" else TokenType.USER
     

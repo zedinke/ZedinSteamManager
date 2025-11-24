@@ -43,13 +43,13 @@
                             {% else %}{{ period }} hónap{% endif %}
                         </h4>
                         
-                        <!-- Szerver Admin -->
+                        <!-- Server Token -->
                         <form method="POST" action="/admin/pricing/period-price" style="margin-bottom: 15px;">
-                            <input type="hidden" name="token_type" value="server_admin">
+                            <input type="hidden" name="token_type" value="server_token">
                             <input type="hidden" name="period_months" value="{{ period }}">
                             <div style="margin-bottom: 10px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Szerver Admin (EUR):</label>
-                                {% set existing_price = period_prices|selectattr('token_type.value', 'equalto', 'server_admin')|selectattr('period_months', 'equalto', period)|map(attribute='price_eur')|first %}
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Server Token (EUR):</label>
+                                {% set existing_price = period_prices|selectattr('token_type.value', 'in', ['server_token', 'user', 'server_admin'])|selectattr('period_months', 'equalto', period)|map(attribute='price_eur')|first %}
                                 <input type="number" name="price_eur" step="0.01" min="0" 
                                        value="{% if existing_price %}{{ "%.2f"|format(existing_price / 100) }}{% else %}0.00{% endif %}" 
                                        required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
@@ -196,7 +196,7 @@
                                     <br>
                                     <small>
                                         {% if rule.applies_to_token_type %}
-                                            Token: {{ "Szerver Admin" if rule.applies_to_token_type.value == "server_admin" else "Felhasználó" }}
+                                            Token: Server Token
                                         {% else %}
                                             Minden token típus
                                         {% endif %}

@@ -47,7 +47,7 @@
                                 </td>
                                 <td>
                                     {% if item.item_type == "token_request" %}
-                                        <strong>{{ "Szerver Admin" if item.token_type.value == "server_admin" else "Felhasználó" }} token</strong>
+                                        <strong>Server Token</strong>
                                     {% elif item.item_type == "token_extension" %}
                                         {% if item.token %}
                                             <strong>Token:</strong> <code>{{ item.token.token[:20] }}...</code><br>

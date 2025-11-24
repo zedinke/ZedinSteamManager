@@ -50,11 +50,7 @@
                                 <td>
                                     <code>{{ req.token.token[:20] }}...</code><br>
                                     <small>
-                                        {% if req.token.token_type.value == "server_admin" %}
-                                            <span class="badge badge-info">Szerver Admin</span>
-                                        {% else %}
-                                            <span class="badge badge-secondary">Felhasználó</span>
-                                        {% endif %}
+                                        <span class="badge badge-info">Server Token</span>
                                     </small>
                                 </td>
                                 <td>

@@ -40,11 +40,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if token.token_type.value == "server_admin" %}
-                                        <span class="badge badge-info">Szerver Admin</span>
-                                    {% else %}
-                                        <span class="badge badge-secondary">Felhasználó</span>
-                                    {% endif %}
+                                    <span class="badge badge-info">Server Token</span>
                                 </td>
                                 <td>{{ token.created_at.strftime("%Y-%m-%d %H:%M") if token.created_at else "-" }}</td>
                                 <td>{{ token.expires_at.strftime("%Y-%m-%d %H:%M") if token.expires_at else "-" }}</td>

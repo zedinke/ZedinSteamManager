@@ -58,13 +58,13 @@ async def generate(
     """Token generálás"""
     current_user = require_manager_admin(request, db)
     
-    if token_type not in ["server_admin", "user"]:
+    if token_type not in ["server_token"]:
         raise HTTPException(status_code=400, detail="Érvénytelen token típus")
     
     if token_count < 1 or token_count > 100:
         raise HTTPException(status_code=400, detail="A tokenek száma 1 és 100 között lehet")
     
-    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    token_type_enum = TokenType.SERVER_TOKEN
     
     # Több token generálása
     generated_tokens = []
@@ -77,8 +77,8 @@ async def generate(
         )
         generated_tokens.append(token)
     
-    # Ha user token típusú, akkor automatikusan aktiváljuk és server_admin rangot adunk
-    if token_type_enum == TokenType.USER:
+    # Server token automatikusan aktiváljuk és server_admin rangot adunk
+    if token_type_enum == TokenType.SERVER_TOKEN:
         # Felhasználó lekérése
         target_user = db.query(User).filter(User.id == user_id).first()
         if target_user:
@@ -109,7 +109,7 @@ async def generate(
         # További tokenek csak értesítésben
         if len(generated_tokens) > 1:
             from app.services.notification_service import create_notification
-            type_text = "Szerver Admin" if token_type_enum == TokenType.SERVER_ADMIN else "Felhasználó"
+            type_text = "Server Token"
             from app.config import settings
             
             tokens_list = "\n".join([f"- {token.token}" for token in generated_tokens[1:]])
@@ -313,7 +313,7 @@ async def process_token_request(
         # (csak akkor, ha még user rangú)
         role_changed = False
         
-        # Ellenőrizzük, hogy user token típusú-e
+        # Ellenőrizzük, hogy server token típusú-e
         # A token_type enumként van tárolva az adatbázisban
         token_type_value = None
         if hasattr(token_request.token_type, 'value'):
@@ -321,12 +321,14 @@ async def process_token_request(
         else:
             token_type_value = str(token_request.token_type)
         
-        # Ellenőrizzük, hogy user token típusú-e
-        is_user_token = (token_type_value == "user" or 
-                        token_request.token_type == TokenType.USER)
+        # Ellenőrizzük, hogy server token típusú-e
+        is_server_token = (token_type_value == "server_token" or 
+                          token_type_value == "user" or  # Backward compatibility
+                          token_request.token_type == TokenType.SERVER_TOKEN or
+                          token_request.token_type == TokenType.USER)  # Backward compatibility
         
-        # Csak akkor frissítjük, ha user token ÉS még user rangú
-        if is_user_token:
+        # Csak akkor frissítjük, ha server token ÉS még user rangú
+        if is_server_token:
             # Ellenőrizzük a jelenlegi rangot
             current_role_value = user.role.value if hasattr(user.role, 'value') else str(user.role)
             is_user_role = (current_role_value == "user" or user.role == UserRole.USER)
@@ -364,11 +366,13 @@ async def process_token_request(
         if isinstance(token_type_for_notification, str):
             token_type_for_notification = TokenType(token_type_for_notification)
         
-        is_user_token_for_notification = (token_type_for_notification == TokenType.USER or 
-                                         (hasattr(token_type_for_notification, 'value') and 
-                                          token_type_for_notification.value == "user"))
+        is_server_token_for_notification = (token_type_for_notification == TokenType.SERVER_TOKEN or
+                                           token_type_for_notification == TokenType.USER or  # Backward compatibility
+                                           (hasattr(token_type_for_notification, 'value') and 
+                                            (token_type_for_notification.value == "server_token" or
+                                             token_type_for_notification.value == "user")))  # Backward compatibility
         
-        if is_user_token_for_notification and role_changed:
+        if is_server_token_for_notification and role_changed:
             role_message = " A rangod automatikusan frissült Server Admin-re."
         
         create_notification(
@@ -698,7 +702,7 @@ async def request_token(
     if not current_user or current_user.role.value not in ["user", "server_admin"]:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
-    if token_type not in ["server_admin", "user"]:
+    if token_type not in ["server_token"]:
         raise HTTPException(status_code=400, detail="Érvénytelen token típus")
     
     if quantity < 1 or quantity > 100:
@@ -714,7 +718,7 @@ async def request_token(
         if expires_in_days < 1 or expires_in_days > 365:
             raise HTTPException(status_code=400, detail="A lejárat 1 és 365 nap között lehet")
     
-    token_type_enum = TokenType.SERVER_ADMIN if token_type == "server_admin" else TokenType.USER
+    token_type_enum = TokenType.SERVER_TOKEN
     
     if request_type == "cart":
         # Kosárba helyezés

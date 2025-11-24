@@ -71,8 +71,7 @@ class UserRole(str, enum.Enum):
     USER = "user"
 
 class TokenType(str, enum.Enum):
-    SERVER_ADMIN = "server_admin"
-    USER = "user"
+    SERVER_TOKEN = "server_token"  # Ez a token cseréli ki a rangot server_admin-ra
 
 class ServerStatus(str, enum.Enum):
     RUNNING = "running"

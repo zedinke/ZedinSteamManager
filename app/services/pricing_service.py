@@ -67,8 +67,8 @@ def get_base_price(db: Session, token_type: TokenType, item_type: str, days: Opt
         if item_type == "token_request":
             # Régi: 10,000 HUF és 5,000 HUF -> EUR-ban
             default_prices_huf = {
-                TokenType.SERVER_ADMIN: 10000,  # 10,000 HUF
-                TokenType.USER: 5000  # 5,000 HUF
+                TokenType.SERVER_TOKEN: 5000,  # 5,000 HUF (régi USER token ára)
+                TokenType.USER: 5000  # Backward compatibility
             }
             # Konvertálás EUR-ra (centekben)
             huf_price = default_prices_huf.get(token_type, 5000)

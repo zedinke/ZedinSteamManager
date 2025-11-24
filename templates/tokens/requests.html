@@ -47,11 +47,7 @@
                                     <small>{{ req.user.email }}</small>
                                 </td>
                                 <td>
-                                    {% if req.token_type.value == "server_admin" %}
-                                        <span class="badge badge-info">Szerver Admin</span>
-                                    {% else %}
-                                        <span class="badge badge-secondary">Felhasználó</span>
-                                    {% endif %}
+                                    <span class="badge badge-info">Server Token</span>
                                 </td>
                                 <td><strong>{{ req.quantity }}</strong> db</td>
                                 <td>
