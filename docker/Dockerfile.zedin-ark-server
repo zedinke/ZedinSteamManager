@@ -10,8 +10,9 @@ ENV STEAMCMD_DIR=/home/ai_developer/steamcmd
 
 # Felhasználó létrehozása (ai_developer user)
 # UID 1000 használata - ez csak a konténeren belül van, nem ütközik a host felhasználókkal
+# FONTOS: NE hozzuk létre a mappákat itt! A manager már létrehozza megfelelő jogosultságokkal.
+# Csak a felhasználót hozzuk létre, a mappákat a host oldalon a manager hozza létre.
 RUN useradd -m -u 1000 -s /bin/bash ai_developer && \
-    mkdir -p ${ARK_SERVER_DIR} ${STEAMCMD_DIR} && \
     chown -R ai_developer:ai_developer /home/ai_developer
 
 # Wine repository hozzáadása (Debian 12)
