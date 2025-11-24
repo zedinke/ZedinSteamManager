@@ -1459,6 +1459,8 @@ async def edit_server(
         # Új struktúra: server_path most már a Servers/server_{server_id}/ mappa
         # A ServerFiles symlink: server_path / "ServerFiles"
         serverfiles_link = server_path / "ServerFiles"
+        saved_path = server_path / "Saved"
+        
         if serverfiles_link.exists() and serverfiles_link.is_symlink():
             # RCON port beállítása - alapértelmezett 27015 (Ark alapértelmezett RCON port), vagy a szerver rcon_port értéke
             rcon_port_value = server.rcon_port if server.rcon_port else 27015
@@ -1474,6 +1476,17 @@ async def edit_server(
                 motd=motd or server_config.get("MOTD"),
                 motd_duration=motd_duration if motd_duration is not None else server_config.get("MOTD_DURATION")
             )
+            
+            # Docker Compose fájl és indítási parancs fájl frissítése, hogy az új beállítások tükröződjenek
+            if saved_path.exists():
+                try:
+                    from app.services.server_control_service import create_docker_compose_file
+                    create_docker_compose_file(server, serverfiles_link, saved_path, db)
+                    print(f"Docker Compose és indítási parancs fájl frissítve szerver szerkesztésekor: {server.id}")
+                except Exception as e:
+                    print(f"Figyelmeztetés: Docker Compose fájl frissítése sikertelen: {e}")
+                    import traceback
+                    traceback.print_exc()
     
     return RedirectResponse(
         url=f"/ark/servers?success=Szerver+módosítva",
