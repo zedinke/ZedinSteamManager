@@ -45,6 +45,7 @@ else
     USE_WINE=false
 fi
 
+# FONTOS: NE hozzuk létre a mappát itt! A manager már létrehozza megfelelő jogosultságokkal.
 # Ha a szerver nincs telepítve és UPDATE_SERVER=True, akkor telepítjük
 if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
     echo "ARK szerver nincs telepítve. Telepítés indítása SteamCMD-vel..."
@@ -65,18 +66,12 @@ if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
         }
     fi
     
-    # Ellenőrizzük, hogy az ARK_SERVER_DIR létezik-e és írható-e
+    # FONTOS: NE hozzuk létre a mappát! A manager már létrehozza megfelelő jogosultságokkal.
+    # Ellenőrizzük csak, hogy az ARK_SERVER_DIR létezik-e és írható-e
     if [ ! -d "${ARK_SERVER_DIR}" ]; then
-        echo "ARK szerver mappa létrehozása: ${ARK_SERVER_DIR}"
-        mkdir -p "${ARK_SERVER_DIR}" || {
-            echo "HIBA: Nem lehet létrehozni az ARK szerver mappát!"
-            exit 1
-        }
-        # FONTOS: Jogosultságok beállítása (ne root jogosultságokkal jöjjön létre!)
-        # A konténer ai_developer felhasználóként fut (UID 1000), de a host oldalon
-        # a mappát a manager hozza létre megfelelő jogosultságokkal
-        # Itt csak biztosítjuk, hogy a konténerben is megfelelő jogosultságok legyenek
-        chmod 755 "${ARK_SERVER_DIR}" || true
+        echo "HIBA: ARK szerver mappa nem létezik: ${ARK_SERVER_DIR}"
+        echo "HIBA: A manager-nek kell létrehoznia ezt a mappát megfelelő jogosultságokkal!"
+        exit 1
     fi
     
     # Ellenőrizzük, hogy az ARK_SERVER_DIR írható-e
