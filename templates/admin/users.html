@@ -22,6 +22,7 @@
                             <th>Regisztrálva</th>
                             <th>Aktív tokenek</th>
                             <th>Legkésőbbi token lejárat</th>
+                            <th>Műveletek</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -73,6 +74,26 @@
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
+                                <td>
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        <!-- Rang módosítás -->
+                                        <select class="role-select" data-user-id="{{ user.id }}" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px;">
+                                            <option value="user" {% if user.role.value == "user" %}selected{% endif %}>Felhasználó</option>
+                                            <option value="admin" {% if user.role.value == "admin" %}selected{% endif %}>Admin</option>
+                                            <option value="server_admin" {% if user.role.value == "server_admin" %}selected{% endif %}>Szerver Admin</option>
+                                            <option value="manager_admin" {% if user.role.value == "manager_admin" %}selected{% endif %}>Manager Admin</option>
+                                        </select>
+                                        <button class="btn btn-sm btn-primary update-role-btn" data-user-id="{{ user.id }}" title="Rang frissítése">
+                                            <i class="fas fa-save"></i>
+                                        </button>
+                                        <!-- Törlés -->
+                                        {% if user.id != request.session.get("user_id") %}
+                                        <button class="btn btn-sm btn-danger delete-user-btn" data-user-id="{{ user.id }}" data-username="{{ user.username }}" title="Felhasználó törlése">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -119,6 +140,101 @@ document.querySelectorAll('.save-server-admins').forEach(btn => {
                     alert('Hiba: ' + (error.detail || 'Ismeretlen hiba'));
                 } catch {
                     alert('Hiba történt a frissítés során.');
+                }
+            }
+        } catch (error) {
+            alert('Hiba: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+});
+
+// Rang módosítás
+document.querySelectorAll('.update-role-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const userId = parseInt(this.getAttribute('data-user-id'));
+        const roleSelect = document.querySelector(`.role-select[data-user-id="${userId}"]`);
+        const newRole = roleSelect.value;
+        
+        if (!confirm(`Biztosan módosítod a felhasználó rangját "${newRole}"-re?`)) {
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('role', newRole);
+        
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        try {
+            const response = await fetch(`/admin/users/${userId}/role`, {
+                method: 'POST',
+                body: formData,
+                redirect: 'follow'
+            });
+            
+            if (response.ok || response.status === 302) {
+                alert('Rang sikeresen frissítve!');
+                location.reload();
+            } else {
+                try {
+                    const error = await response.json();
+                    alert('Hiba: ' + (error.detail || 'Ismeretlen hiba'));
+                } catch {
+                    alert('Hiba történt a frissítés során.');
+                }
+            }
+        } catch (error) {
+            alert('Hiba: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+});
+
+// Felhasználó törlés
+document.querySelectorAll('.delete-user-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const userId = parseInt(this.getAttribute('data-user-id'));
+        const username = this.getAttribute('data-username');
+        
+        if (!confirm(`Biztosan törölni szeretnéd a felhasználót "${username}"?\n\nFIGYELEM: Ez a művelet nem visszavonható!`)) {
+            return;
+        }
+        
+        if (!confirm(`VÉGLEGESEN törölni szeretnéd "${username}" felhasználót?\n\nEz törli az összes kapcsolódó adatot is!`)) {
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('user_id', userId.toString());
+        
+        const btn = this;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        try {
+            const response = await fetch(`/admin/users/delete`, {
+                method: 'POST',
+                body: formData,
+                redirect: 'follow'
+            });
+            
+            if (response.ok || response.status === 302) {
+                alert('Felhasználó sikeresen törölve!');
+                location.reload();
+            } else {
+                try {
+                    const error = await response.json();
+                    alert('Hiba: ' + (error.detail || 'Ismeretlen hiba'));
+                } catch {
+                    alert('Hiba történt a törlés során.');
                 }
             }
         } catch (error) {

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import (
     get_db, User, ServerAdminAdmin, Server, AdminServer,
-    UserRole, Token
+    UserRole, Token, CartItem
 )
 from app.services.auth_service import create_user
 from app.services.email_service import send_verification_email
@@ -303,5 +303,77 @@ async def update_user_server_admins(
     db.commit()
     
     request.session["success"] = f"{user.username} server admin kapcsolatai sikeresen frissítve!"
+    return RedirectResponse(url="/admin/users", status_code=302)
+
+@router.post("/admin/users/{user_id}/role")
+async def update_user_role(
+    request: Request,
+    user_id: int,
+    role: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Felhasználó rangjának módosítása"""
+    current_user = require_manager_admin(request, db)
+    
+    # Felhasználó lekérése
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Felhasználó nem található")
+    
+    # Nem lehet saját magunkat módosítani
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Nem módosíthatod a saját rangodat")
+    
+    # Érvényes rang ellenőrzése
+    valid_roles = ["user", "admin", "server_admin", "manager_admin"]
+    if role not in valid_roles:
+        raise HTTPException(status_code=400, detail="Érvénytelen rang")
+    
+    # Rang módosítás
+    user.role = UserRole(role)
+    db.commit()
+    
+    request.session["success"] = f"{user.username} rangja sikeresen frissítve {role}-re!"
+    return RedirectResponse(url="/admin/users", status_code=302)
+
+@router.post("/admin/users/delete")
+async def delete_user(
+    request: Request,
+    user_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Felhasználó törlése"""
+    current_user = require_manager_admin(request, db)
+    
+    # Felhasználó lekérése
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Felhasználó nem található")
+    
+    # Nem lehet saját magunkat törölni
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Nem törölheted a saját fiókodat")
+    
+    # Manager admin nem törölhető (biztonsági okokból)
+    if user.role == UserRole.MANAGER_ADMIN:
+        raise HTTPException(status_code=403, detail="Manager Admin felhasználó nem törölhető")
+    
+    # Kapcsolódó adatok törlése
+    # ServerAdminAdmin kapcsolatok
+    db.query(ServerAdminAdmin).filter(
+        (ServerAdminAdmin.server_admin_id == user_id) | (ServerAdminAdmin.admin_id == user_id)
+    ).delete()
+    
+    # Tokenek törlése
+    db.query(Token).filter(Token.user_id == user_id).delete()
+    
+    # CartItem-ek törlése
+    db.query(CartItem).filter(CartItem.user_id == user_id).delete()
+    
+    # Felhasználó törlése
+    db.delete(user)
+    db.commit()
+    
+    request.session["success"] = f"{user.username} felhasználó sikeresen törölve!"
     return RedirectResponse(url="/admin/users", status_code=302)
 

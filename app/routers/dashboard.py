@@ -25,6 +25,11 @@ async def dashboard(
     if not current_user:
         return RedirectResponse(url="/login", status_code=302)
     
+    # Session frissítése, ha a felhasználó rangja változott (pl. token jóváhagyás után)
+    current_role = request.session.get("user_role")
+    if current_role != current_user.role.value:
+        request.session["user_role"] = current_user.role.value
+    
     stats = {}
     
     if current_user.role.value == "manager_admin":

@@ -248,11 +248,25 @@ async def process_token_request(
             )
             generated_tokens.append(token)
         
+        # Felhasználó lekérése
+        user = db.query(User).filter(User.id == token_request.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Felhasználó nem található")
+        
         # Tokenek hozzárendelése a felhasználóhoz
         for token in generated_tokens:
             token.user_id = token_request.user_id
             token.is_active = True
             token.activated_at = datetime.now()
+        
+        # Ha user token típusú, akkor automatikusan server_admin rangot adunk
+        if token_request.token_type == TokenType.USER and user.role == UserRole.USER:
+            user.role = UserRole.SERVER_ADMIN
+            # Session frissítése, ha a felhasználó be van jelentkezve
+            # Ez egy middleware-ben vagy külön endpoint-ban történhet, de itt is frissíthetjük
+            # ha a felhasználó éppen be van jelentkezve (session-ben van user_id)
+            # Megjegyzés: A session frissítéshez szükség van a request objektumra,
+            # de itt csak a DB-t frissítjük, a session-t a következő oldal betöltésénél frissíti a rendszer
         
         db.commit()
         
@@ -263,12 +277,16 @@ async def process_token_request(
         db.commit()
         
         # Értesítés küldése
+        role_message = ""
+        if token_request.token_type == TokenType.USER and user.role == UserRole.SERVER_ADMIN:
+            role_message = " A rangod automatikusan frissült Server Admin-re."
+        
         create_notification(
             db,
             token_request.user_id,
             "token_request_approved",
             f"{token_request.quantity} token generálva",
-            f"A token igénylésed jóváhagyásra került. {token_request.quantity} új token generálva és aktiválva lett számodra."
+            f"A token igénylésed jóváhagyásra került. {token_request.quantity} új token generálva és aktiválva lett számodra.{role_message}"
         )
         
         return RedirectResponse(
