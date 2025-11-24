@@ -204,10 +204,18 @@ def create_server_symlink(server_id: Optional[int], cluster_id: Optional[str] = 
         servers_base = get_servers_base_path()
         server_path = servers_base / f"server_{server_id}"
         
-        # Szülő könyvtárak létrehozása
-        server_path.parent.mkdir(parents=True, exist_ok=True)
-        # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
-        ensure_permissions(server_path.parent)
+        # Szülő könyvtárak létrehozása (Servers mappa)
+        # FONTOS: Lépésenként hozzuk létre, hogy minden lépés után beállíthassuk a jogosultságokat!
+        if not server_path.parent.exists():
+            server_path.parent.mkdir(parents=True, exist_ok=True)
+            # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
+            ensure_permissions(server_path.parent)
+            # Ellenőrizzük a szülő mappákat is (ArkAscended mappa)
+            if server_path.parent.parent.exists():
+                ensure_permissions(server_path.parent.parent)
+        else:
+            # Ha létezik, ellenőrizzük a jogosultságokat
+            ensure_permissions(server_path.parent)
         
         # Ha már létezik, töröljük
         if server_path.exists() or server_path.is_symlink():
