@@ -12,6 +12,72 @@ from sqlalchemy import and_
 from app.config import settings
 from app.database import ArkServerFiles, SessionLocal
 
+def ensure_docker_container_permissions(path: Path, recursive: bool = False) -> bool:
+    """
+    Biztosítja, hogy a mappa/fájl megfelelő jogosultságokkal rendelkezzen a Docker konténer számára.
+    A Docker konténer fix 1000:1000 UID/GID-vel fut (ai_developer user).
+    FONTOS: Ezt a függvényt használjuk a Docker volume mount-okhoz (pl. Saved mappa)!
+    
+    Args:
+        path: A mappa/fájl útvonala
+        recursive: Ha True, akkor rekurzívan beállítja az összes almappára és fájlra
+    
+    Returns:
+        True ha sikeres, False ha hiba történt
+    """
+    try:
+        if not path.exists():
+            return False
+        
+        # Docker konténer UID/GID (fix értékek)
+        DOCKER_UID = 1000
+        DOCKER_GID = 1000
+        
+        # Jogosultságok beállítása
+        if path.is_dir():
+            # Mappa: 755 (rwxr-xr-x)
+            os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        else:
+            # Fájl: 644 (rw-r--r--)
+            os.chmod(path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+        
+        # Tulajdonjog beállítása Docker konténer UID/GID-re (csak Linux-on)
+        if os.name != 'nt':
+            try:
+                os.chown(path, DOCKER_UID, DOCKER_GID)
+            except (PermissionError, OSError) as e:
+                # Ha nincs jogosultság a chown-hoz, próbáljuk meg sudo-val (ha root-ként futunk)
+                if os.getuid() == 0:
+                    # Root-ként futunk, de mégis hiba van - logoljuk
+                    print(f"FIGYELMEZTETÉS: Nem sikerült beállítani a Docker konténer jogosultságokat {path}: {e}")
+                return False
+        
+        # Rekurzív beállítás, ha kérték
+        if recursive and path.is_dir():
+            for root, dirs, files in os.walk(path):
+                for d in dirs:
+                    try:
+                        dir_path = Path(root) / d
+                        os.chmod(dir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                        if os.name != 'nt':
+                            os.chown(dir_path, DOCKER_UID, DOCKER_GID)
+                    except (PermissionError, OSError):
+                        pass
+                
+                for f in files:
+                    try:
+                        file_path = Path(root) / f
+                        os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                        if os.name != 'nt':
+                            os.chown(file_path, DOCKER_UID, DOCKER_GID)
+                    except (PermissionError, OSError):
+                        pass
+        
+        return True
+    except Exception as e:
+        print(f"FIGYELMEZTETÉS: Docker konténer jogosultságok beállítása sikertelen {path}: {e}")
+        return False
+
 def ensure_permissions(path: Path, recursive: bool = False) -> bool:
     """
     Biztosítja, hogy a mappa/fájl megfelelő jogosultságokkal és tulajdonjoggal rendelkezzen.
@@ -444,6 +510,27 @@ def create_dedicated_saved_folder(serverfiles_link: Path) -> bool:
             print(f"Dedikált Saved mappa létrehozva: {dedicated_saved_path}")
         else:
             print(f"Dedikált Saved mappa már létezik, megtartjuk a meglévő adatokat: {dedicated_saved_path}")
+            # FONTOS: Ellenőrizzük és javítjuk a jogosultságokat, ha a mappa már létezik
+            # Mert lehet, hogy root jogosultságokkal jött létre
+            # FONTOS: A Saved mappa Docker volume mount, ezért a Docker konténer UID/GID-jét (1000:1000) kell használni!
+            ensure_docker_container_permissions(dedicated_saved_path, recursive=True)
+            
+            # Alapmappák létrehozása (ha még nem léteznek) és jogosultságok javítása
+            config_dir = dedicated_saved_path / "Config"
+            config_dir.mkdir(exist_ok=True)
+            ensure_docker_container_permissions(config_dir)
+            
+            windows_server_dir = config_dir / "WindowsServer"
+            windows_server_dir.mkdir(exist_ok=True)
+            ensure_docker_container_permissions(windows_server_dir)
+            
+            saved_arks_dir = dedicated_saved_path / "SavedArks"
+            saved_arks_dir.mkdir(exist_ok=True)
+            ensure_docker_container_permissions(saved_arks_dir)
+            
+            logs_dir = dedicated_saved_path / "Logs"
+            logs_dir.mkdir(exist_ok=True)
+            ensure_docker_container_permissions(logs_dir)
         
         # Tényleges szerver Saved mappa útvonala (a ServerFiles symlink mögött)
         real_saved_path = get_server_saved_path(serverfiles_link)

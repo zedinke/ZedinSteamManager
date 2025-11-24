@@ -274,22 +274,47 @@ if [ "${USE_WINE}" = "true" ]; then
     # Saved mappa és Logs mappa létrehozása (ha szükséges)
     SAVED_DIR="${ARK_SERVER_DIR}/ShooterGame/Saved"
     LOGS_DIR="${SAVED_DIR}/Logs"
-    mkdir -p "${LOGS_DIR}" || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Logs mappát"
+    
+    # Ellenőrizzük, hogy a Saved mappa létezik-e és írható-e
+    if [ ! -d "${SAVED_DIR}" ]; then
+        echo "FIGYELMEZTETÉS: Saved mappa nem létezik: ${SAVED_DIR}"
+        echo "FIGYELMEZTETÉS: Próbáljuk létrehozni..."
+        mkdir -p "${SAVED_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Saved mappát"
+    fi
     
     # Jogosultságok beállítása a Saved mappára (ha szükséges)
     # A Saved mappa volume mount, lehet, hogy a host-on más jogosultságokkal van
     # Próbáljuk meg javítani a jogosultságokat, ha nem tudunk írni
-    if [ ! -w "${LOGS_DIR}" ]; then
-        echo "FIGYELMEZTETÉS: Logs mappa nem írható, jogosultságok javítása..."
-        chmod -R u+w "${SAVED_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült javítani a jogosultságokat"
+    if [ -d "${SAVED_DIR}" ] && [ ! -w "${SAVED_DIR}" ]; then
+        echo "FIGYELMEZTETÉS: Saved mappa nem írható, jogosultságok javítása..."
+        # Próbáljuk meg a Saved mappát írhatóvá tenni
+        chmod -R u+w "${SAVED_DIR}" 2>/dev/null || {
+            echo "FIGYELMEZTETÉS: Nem sikerült javítani a Saved mappa jogosultságait"
+            echo "FIGYELMEZTETÉS: Ez normális lehet, ha a mappa a host-on más jogosultságokkal van"
+        }
+    fi
+    
+    # Logs mappa létrehozása
+    if [ -w "${SAVED_DIR}" ]; then
+        mkdir -p "${LOGS_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Logs mappát"
+        
+        # Ellenőrizzük, hogy a Logs mappa írható-e
+        if [ ! -w "${LOGS_DIR}" ]; then
+            echo "FIGYELMEZTETÉS: Logs mappa nem írható, jogosultságok javítása..."
+            chmod -R u+w "${LOGS_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült javítani a Logs mappa jogosultságait"
+        fi
+    else
+        echo "FIGYELMEZTETÉS: Saved mappa nem írható, Logs mappa létrehozása kihagyva"
     fi
     
     # Log fájl útvonal (ha nem tudunk írni a Saved mappába, használjuk a /tmp-t)
-    if [ -w "${LOGS_DIR}" ]; then
+    if [ -w "${LOGS_DIR}" ] 2>/dev/null; then
         LOG_FILE="${LOGS_DIR}/server.log"
+        echo "✓ Log fájl a Saved mappába íródik: ${LOG_FILE}"
     else
         LOG_FILE="/tmp/ark_server.log"
         echo "FIGYELMEZTETÉS: Log fájl a /tmp/ark_server.log-ba íródik (Saved mappa nem írható)"
+        echo "FIGYELMEZTETÉS: A Saved mappa jogosultságait a host-on kell javítani (sudo chown -R $(id -u):$(id -g) ${SAVED_DIR})"
     fi
     
     # Wine prefix inicializálása (ha még nem teljes)

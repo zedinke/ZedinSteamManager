@@ -278,16 +278,20 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 ensure_permissions(base_path)
         
         # Ellenőrizzük a saved_path szülő mappáit is
+        # FONTOS: A Saved mappa Docker volume mount, ezért a Docker konténer UID/GID-jét (1000:1000) kell használni!
+        from app.services.symlink_service import ensure_docker_container_permissions
         if saved_path.exists() or not saved_path.exists():
             if not saved_path.exists():
                 saved_path.mkdir(parents=True, exist_ok=True)
-                ensure_permissions(saved_path)
+                # Docker konténer jogosultságok beállítása (1000:1000)
+                ensure_docker_container_permissions(saved_path, recursive=True)
             else:
-                ensure_permissions(saved_path)
+                # Docker konténer jogosultságok beállítása (1000:1000)
+                ensure_docker_container_permissions(saved_path, recursive=True)
                 # Ellenőrizzük a szülő mappákat is
                 for parent in [saved_path.parent, saved_path.parent.parent]:
                     if parent.exists():
-                        ensure_permissions(parent)
+                        ensure_docker_container_permissions(parent)
         
         # Ha a saved_path egy symlink, követjük
         if saved_path.is_symlink():
