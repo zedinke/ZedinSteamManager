@@ -241,37 +241,15 @@ if [ "${USE_WINE}" = "true" ]; then
     export WINEDEBUG=-all  # Wine debug üzenetek kikapcsolása (csak hibák)
     
     # Wine prefix inicializálása (ha még nem létezik)
+    # FONTOS: A Wine automatikusan inicializálja a prefix-et, amikor először futtatunk egy alkalmazást
+    # Ezért nem kell előre inicializálni, csak biztosítjuk, hogy a mappa létezzen
     if [ ! -d "${WINEPREFIX}" ]; then
-        echo "Wine prefix inicializálása: ${WINEPREFIX}"
-        echo "Wine prefix mappa létrehozása..."
+        echo "Wine prefix mappa létrehozása: ${WINEPREFIX}"
         mkdir -p "${WINEPREFIX}" || {
             echo "HIBA: Nem sikerült létrehozni a Wine prefix mappát: ${WINEPREFIX}"
             exit 1
         }
-        echo "Wine prefix inicializálása (wineboot --init)..."
-        # Wine prefix inicializálása nem interaktív módon
-        # A wineboot --init időbe telhet, ezért timeout-ot használunk
-        # A stderr-t is redirecteljük, hogy ne zavarjon
-        if timeout 60 wineboot --init > /tmp/wine_init.log 2>&1; then
-            echo "✓ Wine prefix inicializálás sikeres"
-        else
-            EXIT_CODE=$?
-            echo "FIGYELMEZTETÉS: Wine prefix inicializálás kilépési kód: $EXIT_CODE"
-            if [ -f /tmp/wine_init.log ]; then
-                echo "Wine inicializálás részletei (utolsó 30 sor):"
-                tail -30 /tmp/wine_init.log || true
-            fi
-            # Mégis folytatjuk, mert a Wine prefix lehet, hogy létrejött
-            if [ -d "${WINEPREFIX}" ]; then
-                echo "✓ Wine prefix mappa létezik, folytatjuk..."
-            else
-                echo "HIBA: Wine prefix mappa nem létezik, kilépés"
-                exit 1
-            fi
-        fi
-        echo "Wine prefix inicializálás befejezve"
-        # Várunk egy kicsit, hogy a Wine prefix stabilizálódjon
-        sleep 1
+        echo "✓ Wine prefix mappa létrehozva (a Wine automatikusan inicializálja az első futtatáskor)"
     else
         echo "Wine prefix már létezik: ${WINEPREFIX}"
     fi
