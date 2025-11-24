@@ -109,15 +109,21 @@ def get_email_template(template_name: str, **kwargs) -> str:
 async def send_verification_email(email: str, username: str, token: str, request: Request = None) -> bool:
     """Email verifikációs email küldése"""
     
-    # Ha a base_url localhost, próbáljuk meg a request-ből meghatározni
-    base_url = settings.base_url
-    if (base_url.startswith("http://localhost") or base_url.startswith("https://localhost")) and request:
-        # Használjuk a request URL-jét
+    # Ha van request, mindig használjuk azt (ez a legmegbízhatóbb)
+    if request:
         base_url = f"{request.url.scheme}://{request.url.hostname}"
         if request.url.port and request.url.port not in [80, 443]:
             base_url += f":{request.url.port}"
+    else:
+        # Ha nincs request, próbáljuk meg a settings.base_url-t használni
+        base_url = settings.base_url
+        # Ha a base_url üres, rossz formátumú, vagy localhost, akkor hiba
+        if not base_url or base_url.startswith("http:///") or base_url.startswith("https:///") or base_url.startswith("http://localhost") or base_url.startswith("https://localhost"):
+            logger.error(f"RCON email: base_url nem érvényes: '{base_url}'. Request szükséges az email link generálásához.")
+            return False
     
     verification_link = f"{base_url}/verify-email?token={token}"
+    logger.info(f"Email verifikációs link generálva: {verification_link}")
     
     # Gamer design template
     body = f"""
