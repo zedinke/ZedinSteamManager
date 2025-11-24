@@ -657,10 +657,7 @@ async def install_ark_server_files(
             if linux_binary:
                 await log(f"✓ Linux ShooterGameServer bináris megtalálva: {linux_binary}")
                 await log("✓ Telepítés teljesen befejeződött!")
-            elif win64_binary.exists():
-                await log(f"✓ Windows ShooterGameServer.exe bináris megtalálva: {win64_binary}")
-                await log("✓ Telepítés teljesen befejeződött! (Windows bináris, Wine-nal fog futni)")
-            return True, '\n'.join(log_lines)
+                return True, '\n'.join(log_lines)
         elif return_code == 8:
             # Exit code 8 gyakran előfordul, de a telepítés mégis sikeres lehet
             # Ellenőrizzük, hogy a bináris létezik-e
