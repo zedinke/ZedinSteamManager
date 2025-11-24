@@ -259,7 +259,6 @@ async def install_ark_server_files(
         import stat
         current_uid = os.getuid()
         current_gid = os.getgid()
-            raise RuntimeError(error_msg)
         
         # Mappa jogosultságok beállítása: 755 (rwxr-xr-x) - csak akkor, ha lehetséges
         try:

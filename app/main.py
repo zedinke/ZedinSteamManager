@@ -94,6 +94,7 @@ async def startup_event():
     """Alkalmazás indításakor elindítjuk a token lejárat ellenőrzést"""
     # FONTOS: Ellenőrizzük és javítjuk a root jogosultságokkal létező mappákat
     try:
+        import os
         from app.config import settings
         from pathlib import Path
         import stat
