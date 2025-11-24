@@ -271,7 +271,7 @@ window.showShutdownModal = function(serverId) {
                                                     <i class="fas fa-stop"></i> Leállítás
                                                 </button>
                                             </form>
-                                            <button type="button" class="btn btn-sm btn-warning shutdown-btn" data-server-id="{{ server.id }}" onclick="if(window.showShutdownModal){window.showShutdownModal({{ server.id }});}else{alert('Shutdown funkció nem elérhető. Kérlek, frissítsd az oldalt.');} return false;" title="Késleltetett leállítás">
+                                            <button type="button" class="btn btn-sm btn-warning shutdown-btn" data-server-id="{{ server.id }}" onclick="console.log('Shutdown gomb kattintás, serverId:', {{ server.id }}); try { if(typeof window.showShutdownModal === 'function') { window.showShutdownModal({{ server.id }}); } else { console.error('showShutdownModal nem függvény:', typeof window.showShutdownModal); alert('Shutdown funkció nem elérhető. Kérlek, frissítsd az oldalt.'); } } catch(e) { console.error('Hiba a showShutdownModal hívásakor:', e); alert('Hiba történt: ' + e.message); } return false;" title="Késleltetett leállítás">
                                                 <i class="fas fa-clock"></i> Shutdown
                                             </button>
                                             <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;" onsubmit="showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info'); return true;">
@@ -289,7 +289,7 @@ window.showShutdownModal = function(serverId) {
                                         <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary" title="Szerver szerkesztése">
                                             <i class="fas fa-edit"></i> Szerkesztés
                                         </a>
-                                        <button type="button" class="btn btn-sm btn-info logs-btn" data-server-id="{{ server.id }}" onclick="if(window.showServerLogs){window.showServerLogs({{ server.id }});}else{alert('Logok funkció nem elérhető. Kérlek, frissítsd az oldalt.');} return false;" title="Indítási logok megtekintése">
+                                        <button type="button" class="btn btn-sm btn-info logs-btn" data-server-id="{{ server.id }}" onclick="console.log('Logok gomb kattintás, serverId:', {{ server.id }}); try { if(typeof window.showServerLogs === 'function') { window.showServerLogs({{ server.id }}); } else { console.error('showServerLogs nem függvény:', typeof window.showServerLogs); alert('Logok funkció nem elérhető. Kérlek, frissítsd az oldalt.'); } } catch(e) { console.error('Hiba a showServerLogs hívásakor:', e); alert('Hiba történt: ' + e.message); } return false;" title="Indítási logok megtekintése">
                                             <i class="fas fa-file-alt"></i> Logok
                                         </button>
                                         <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
