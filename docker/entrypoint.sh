@@ -103,6 +103,54 @@ if [ ! -f "${SERVER_BINARY}" ] && [ "${UPDATE_SERVER}" = "True" ]; then
     echo "ARK szerver telepítve!"
 fi
 
+# Modok letöltése (ha vannak beállítva)
+if [ -n "${MOD_IDS}" ]; then
+    echo "Modok letöltése SteamCMD-vel..."
+    echo "Mod IDs: ${MOD_IDS}"
+    
+    # Ellenőrizzük, hogy a SteamCMD létezik-e
+    if [ ! -f "${STEAMCMD_BIN}" ]; then
+        echo "FIGYELMEZTETÉS: SteamCMD nem található, modok letöltése kihagyva"
+    else
+        # Mods mappa létrehozása (ha még nem létezik)
+        MODS_DIR="${ARK_SERVER_DIR}/ShooterGame/Content/Mods"
+        mkdir -p "${MODS_DIR}" || echo "FIGYELMEZTETÉS: Nem sikerült létrehozni a Mods mappát"
+        
+        # Jogosultságok beállítása
+        if [ -d "${MODS_DIR}" ]; then
+            chmod -R u+w "${MODS_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült beállítani a Mods mappa jogosultságait"
+        fi
+        
+        # Minden mod ID-t letöltünk
+        # A MOD_IDS formátuma: "123456,789012" vagy "123456"
+        IFS=',' read -ra MOD_ARRAY <<< "${MOD_IDS}"
+        for mod_id in "${MOD_ARRAY[@]}"; do
+            mod_id=$(echo "${mod_id}" | xargs)  # Trim whitespace
+            if [ -n "${mod_id}" ]; then
+                echo "Mod letöltése: ${mod_id}..."
+                "${STEAMCMD_BIN}" +force_install_dir "${ARK_SERVER_DIR}" \
+                    +login anonymous \
+                    +workshop_download_item ${ARK_APP_ID} ${mod_id} \
+                    +quit
+                
+                WORKSHOP_EXIT=$?
+                if [ ${WORKSHOP_EXIT} -eq 0 ]; then
+                    echo "✓ Mod ${mod_id} letöltve"
+                else
+                    echo "FIGYELMEZTETÉS: Mod ${mod_id} letöltése sikertelen (exit code: ${WORKSHOP_EXIT})"
+                fi
+            fi
+        done
+        
+        # Jogosultságok újra beállítása a letöltött modokra
+        if [ -d "${MODS_DIR}" ]; then
+            chmod -R u+w "${MODS_DIR}" 2>/dev/null || echo "FIGYELMEZTETÉS: Nem sikerült beállítani a letöltött modok jogosultságait"
+        fi
+        
+        echo "Modok letöltése befejezve"
+    fi
+fi
+
 # Ha a szerverfájlok még mindig nem léteznek, hiba
 if [ ! -f "${SERVER_BINARY}" ]; then
     echo "HIBA: ARK szerver bináris nem található: ${SERVER_BINARY}"
