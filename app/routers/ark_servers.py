@@ -912,6 +912,59 @@ async def create_server(
         status_code=302
     )
 
+@router.get("/servers/{server_id}/rcon/status")
+async def get_rcon_status(
+    request: Request,
+    server_id: int,
+    db: Session = Depends(get_db)
+):
+    """Server Admin: RCON kapcsolat státusza"""
+    current_user = require_server_admin(request, db)
+    
+    server = db.query(ServerInstance).filter(
+        and_(
+            ServerInstance.id == server_id,
+            ServerInstance.server_admin_id == current_user.id
+        )
+    ).first()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Szerver nem található")
+    
+    # RCON beállítások
+    config = server.config or {}
+    rcon_enabled = config.get("RCON_ENABLED", True)
+    rcon_port = server.rcon_port or 27020
+    server_admin_password = config.get("SERVER_ADMIN_PASSWORD", "")
+    
+    if not rcon_enabled:
+        return JSONResponse({
+            "success": True,
+            "rcon_enabled": False,
+            "rcon_working": False,
+            "message": "RCON nincs engedélyezve"
+        })
+    
+    if not server_admin_password:
+        return JSONResponse({
+            "success": True,
+            "rcon_enabled": True,
+            "rcon_working": False,
+            "message": "RCON jelszó nincs beállítva"
+        })
+    
+    # RCON kapcsolat tesztelése
+    from app.services.server_control_service import test_rcon_connection
+    rcon_working = test_rcon_connection("localhost", rcon_port, server_admin_password, timeout=3)
+    
+    return JSONResponse({
+        "success": True,
+        "rcon_enabled": True,
+        "rcon_working": rcon_working,
+        "rcon_port": rcon_port,
+        "message": "RCON működik" if rcon_working else "RCON nem elérhető"
+    })
+
 @router.get("/servers", response_class=HTMLResponse)
 async def list_servers(
     request: Request,

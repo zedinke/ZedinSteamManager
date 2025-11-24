@@ -303,6 +303,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <th>RAM Limit</th>
                             <th>Vásárolt RAM</th>
                             <th>Státusz</th>
+                            <th>RCON Status</th>
                             <th>Token információk</th>
                             <th>Létrehozva</th>
                             <th>Műveletek</th>
@@ -366,6 +367,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     {% elif server.status.value == 'restarting' %}
                                         <span class="badge badge-warning">Újraindítás</span>
                                     {% endif %}
+                                </td>
+                                <td>
+                                    <div id="rconStatus_{{ server.id }}" style="display: inline-block;">
+                                        <span class="badge badge-secondary">
+                                            <i class="fas fa-spinner fa-spin"></i> Ellenőrzés...
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     {% if server.token_used_id %}

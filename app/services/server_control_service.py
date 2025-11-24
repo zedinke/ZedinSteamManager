@@ -96,6 +96,31 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
         logger.error(f"RCON parancs hiba: {e}")
         return None
 
+def test_rcon_connection(host: str, port: int, password: str, timeout: int = 3) -> bool:
+    """
+    RCON kapcsolat tesztelése
+    
+    Args:
+        host: Szerver host (általában localhost)
+        port: RCON port
+        password: RCON jelszó
+        timeout: Timeout másodpercben
+    
+    Returns:
+        True ha az RCON kapcsolat működik, False egyébként
+    """
+    if not password or not password.strip():
+        return False
+    
+    try:
+        # Próbálunk egy egyszerű parancsot küldeni (pl. "listplayers" vagy csak egy üres parancs)
+        result = send_rcon_command(host, port, password, "listplayers", timeout=timeout)
+        # Ha van válasz (akár üres is), akkor működik
+        return result is not None
+    except Exception as e:
+        logger.debug(f"RCON kapcsolat teszt hiba: {e}")
+        return False
+
 def check_process_running_in_container(container_name: str, process_pattern: str = "ArkAscendedServer.exe") -> bool:
     """
     Ellenőrzi, hogy egy folyamat fut-e a Docker konténerben
