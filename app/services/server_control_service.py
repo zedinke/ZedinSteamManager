@@ -497,7 +497,12 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 # Beállítások kiolvasása (a kulcsok lehetnek különböző formátumokban)
                 # MAP_NAME a config-ból vagy alapértelmezett
                 config_values["MAP_NAME"] = server.config.get("MAP_NAME", "TheIsland") if server.config else "TheIsland"
-                config_values["SESSION_NAME"] = session_settings.get("SessionName") or server_settings.get("SessionName") or server.name
+                session_name_from_config = session_settings.get("SessionName") or server_settings.get("SessionName") or server.name
+                # Ha "Server_name" van beállítva (placeholder), akkor használjuk a server.name-t
+                if session_name_from_config == "Server_name" or session_name_from_config == "server_name":
+                    config_values["SESSION_NAME"] = server.name
+                else:
+                    config_values["SESSION_NAME"] = session_name_from_config
                 config_values["ServerAdminPassword"] = server_settings.get("ServerAdminPassword") or server.config.get("ServerAdminPassword", "") if server.config else ""
                 config_values["ServerPassword"] = server_settings.get("ServerPassword") or server.config.get("ServerPassword", "") if server.config else ""
                 
@@ -1426,6 +1431,9 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
             map_name_wp = map_name
         
         session_name = env_dict.get('SESSION_NAME', server.name)
+        # Ha "Server_name" van beállítva (placeholder), akkor használjuk a server.name-t
+        if session_name == "Server_name" or session_name == "server_name":
+            session_name = server.name
         asa_port = env_dict.get('ASA_PORT', str(server.port or 7777))
         query_port = env_dict.get('QUERY_PORT', str(server.query_port or int(asa_port) + 2))
         rcon_port = env_dict.get('RCON_PORT', str(server.rcon_port or 27015))
