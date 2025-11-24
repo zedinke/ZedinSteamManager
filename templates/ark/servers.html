@@ -3,6 +3,24 @@
 {% block title %}Ark Szerverek - ZedinArkManager{% endblock %}
 
 {% block content %}
+<!-- Operation Status Notification -->
+<div id="operationStatus" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 2000; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: 300px; border-left: 4px solid #007bff;">
+    <div style="display: flex; align-items: center; gap: 15px;">
+        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite;"></div>
+        <div style="flex: 1;">
+            <div style="font-weight: bold; color: #333; margin-bottom: 3px;" id="operationTitle">Művelet folyamatban...</div>
+            <div style="font-size: 12px; color: #666;" id="operationMessage">Kérlek várj...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
 <div class="page">
     <div class="page-header">
         <h2><i class="fas fa-server"></i> Ark Szerverek</h2>
@@ -133,7 +151,7 @@
                                 <td>
                                     <div style="display: flex; gap: 5px; flex-wrap: wrap;">
                                         {% if server.status.value == 'running' %}
-                                            <form method="POST" action="/ark/servers/{{ server.id }}/stop" style="display: inline;">
+                                            <form method="POST" action="/ark/servers/{{ server.id }}/stop" style="display: inline;" onsubmit="showOperationStatus('Leállítás', 'A szerver leállítása folyamatban...', 'warning'); return true;">
                                                 <button type="submit" class="btn btn-sm btn-warning" title="Szerver leállítása">
                                                     <i class="fas fa-stop"></i> Leállítás
                                                 </button>
@@ -141,13 +159,13 @@
                                             <button type="button" class="btn btn-sm btn-warning" onclick="showShutdownModal({{ server.id }})" title="Késleltetett leállítás">
                                                 <i class="fas fa-clock"></i> Shutdown
                                             </button>
-                                            <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;">
+                                            <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;" onsubmit="showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info'); return true;">
                                                 <button type="submit" class="btn btn-sm btn-info" title="Szerver újraindítása">
                                                     <i class="fas fa-redo"></i> Újraindítás
                                                 </button>
                                             </form>
                                         {% else %}
-                                            <form method="POST" action="/ark/servers/{{ server.id }}/start" style="display: inline;">
+                                            <form method="POST" action="/ark/servers/{{ server.id }}/start" style="display: inline;" onsubmit="showOperationStatus('Indítás', 'A szerver indítása folyamatban...', 'success'); return true;">
                                                 <button type="submit" class="btn btn-sm btn-success" title="Szerver indítása">
                                                     <i class="fas fa-play"></i> Indítás
                                                 </button>
@@ -598,6 +616,8 @@ async function confirmShutdown() {
         return;
     }
     
+    showOperationStatus('Shutdown ütemezés', `Leállítás ütemezése ${minutes} percre...`, 'warning');
+    
     try {
         const response = await fetch(`/ark/servers/${shutdownServerId}/shutdown`, {
             method: 'POST',
@@ -616,10 +636,14 @@ async function confirmShutdown() {
             document.getElementById('shutdownConfirmBtn').style.display = 'none';
             document.getElementById('shutdownCancelScheduledBtn').style.display = 'inline-block';
             document.getElementById('shutdownCountdown').style.display = 'block';
+            updateOperationStatus(`Leállítás ütemezve ${minutes} percre`);
+            setTimeout(() => hideOperationStatus(), 3000);
         } else {
+            hideOperationStatus();
             alert('Hiba: ' + (data.message || 'Nem sikerült beállítani a leállítást'));
         }
     } catch (error) {
+        hideOperationStatus();
         alert('Hiba a leállítás beállításakor: ' + error.message);
     }
 }
@@ -713,6 +737,88 @@ if (shutdownModal) {
         }
     });
 }
+
+// Operation Status Notification
+function showOperationStatus(title, message, type = 'info') {
+    const statusDiv = document.getElementById('operationStatus');
+    const titleDiv = document.getElementById('operationTitle');
+    const messageDiv = document.getElementById('operationMessage');
+    
+    if (!statusDiv || !titleDiv || !messageDiv) {
+        return;
+    }
+    
+    // Színek típus szerint
+    const colors = {
+        'success': '#28a745',
+        'warning': '#ffc107',
+        'info': '#17a2b8',
+        'danger': '#dc3545'
+    };
+    
+    const color = colors[type] || colors['info'];
+    statusDiv.style.borderLeftColor = color;
+    statusDiv.querySelector('.spinner').style.borderTopColor = color;
+    
+    titleDiv.textContent = title;
+    messageDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    // Automatikus elrejtés 30 másodperc után (ha még nem törölték)
+    setTimeout(() => {
+        if (statusDiv.style.display === 'block') {
+            hideOperationStatus();
+        }
+    }, 30000);
+}
+
+function hideOperationStatus() {
+    const statusDiv = document.getElementById('operationStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+    }
+}
+
+function updateOperationStatus(message) {
+    const messageDiv = document.getElementById('operationMessage');
+    if (messageDiv) {
+        messageDiv.textContent = message;
+    }
+}
+
+// Form submit után figyeljük a válaszokat
+document.addEventListener('DOMContentLoaded', function() {
+    // Intercept form submissions
+    const forms = document.querySelectorAll('form[action*="/ark/servers/"]');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Ha már van onsubmit handler, ne akadályozzuk
+            if (form.onsubmit) {
+                return;
+            }
+            
+            const action = form.getAttribute('action');
+            if (action.includes('/start')) {
+                showOperationStatus('Indítás', 'A szerver indítása folyamatban...', 'success');
+            } else if (action.includes('/stop')) {
+                showOperationStatus('Leállítás', 'A szerver leállítása folyamatban...', 'warning');
+            } else if (action.includes('/restart')) {
+                showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info');
+            } else if (action.includes('/delete')) {
+                showOperationStatus('Törlés', 'A szerver törlése folyamatban...', 'danger');
+            }
+        });
+    });
+    
+    // Oldal betöltése után ellenőrizzük, hogy van-e success/error üzenet
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('success') || urlParams.has('error')) {
+        // Ha van success/error üzenet, elrejtjük a status-t
+        setTimeout(() => {
+            hideOperationStatus();
+        }, 2000);
+    }
+});
 </script>
 {% endblock %}
 

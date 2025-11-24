@@ -1198,6 +1198,7 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
 def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
     """
     Szerver újraindítása Docker-rel
+    Először saveworld parancsot küld, vár 10 másodpercet, majd leállítja és újraindítja
     
     Args:
         server: ServerInstance objektum
@@ -1207,6 +1208,39 @@ def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         Dict az eredménnyel
     """
     try:
+        # Ellenőrizzük, hogy a konténer fut-e
+        container_name = f"zedin_asa_{server.id}"
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "-q", "-f", f"name=^{container_name}$"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            container_running = result.returncode == 0 and result.stdout.strip()
+        except Exception as e:
+            logger.warning(f"Konténer ellenőrzés hiba: {e}")
+            container_running = False
+        
+        # Ha a konténer fut, küldjük a saveworld parancsot RCON-on keresztül
+        if container_running:
+            try:
+                # RCON beállítások lekérése
+                config = server.config or {}
+                rcon_enabled = config.get("RCON_ENABLED", True)
+                rcon_port = server.rcon_port or 27020
+                server_admin_password = config.get("SERVER_ADMIN_PASSWORD", "")
+                
+                if rcon_enabled and server_admin_password:
+                    logger.info(f"Saveworld parancs küldése RCON-on keresztül (port: {rcon_port}) restart előtt...")
+                    send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld")
+                    logger.info("Saveworld parancs elküldve, várakozás 10 másodpercet...")
+                    time.sleep(10)
+                else:
+                    logger.info("RCON nincs engedélyezve vagy nincs admin jelszó, saveworld parancs kihagyva")
+            except Exception as rcon_error:
+                logger.warning(f"RCON saveworld parancs hiba (folytatjuk a restart-tal): {rcon_error}")
+        
         # Először leállítjuk
         stop_result = stop_server(server, db)
         if not stop_result["success"]:
