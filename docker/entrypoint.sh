@@ -315,6 +315,12 @@ if [ ! -f "${SERVER_BINARY}" ]; then
         echo ""
         echo "linux64 mappa tartalma:"
         ls -la "${ARK_SERVER_DIR}/linux64" || true
+        if [ -f "${ARK_SERVER_DIR}/linux64/ShooterGameServer" ]; then
+            echo ""
+            echo "✓ ShooterGameServer megtalálva a linux64 mappában! Használjuk ezt."
+            SERVER_BINARY="${ARK_SERVER_DIR}/linux64/ShooterGameServer"
+            USE_WINE=false
+        fi
     fi
     if [ -d "${ARK_SERVER_DIR}/ShooterGame" ]; then
         echo ""
@@ -324,6 +330,29 @@ if [ ! -f "${SERVER_BINARY}" ]; then
             echo ""
             echo "Binaries mappa tartalma:"
             ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries" || true
+            # Próbáljuk meg a Linux binárist (Ark Survival Evolved)
+            if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" ]; then
+                echo ""
+                echo "Linux mappa tartalma:"
+                ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" || true
+                if [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer" ]; then
+                    echo ""
+                    echo "✓ ShooterGameServer megtalálva a Binaries/Linux mappában! Használjuk ezt."
+                    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/ShooterGameServer"
+                    USE_WINE=false
+                fi
+            fi
+            if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64" ]; then
+                echo ""
+                echo "Linux64 mappa tartalma:"
+                ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64" || true
+                if [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64/ShooterGameServer" ]; then
+                    echo ""
+                    echo "✓ ShooterGameServer megtalálva a Binaries/Linux64 mappában! Használjuk ezt."
+                    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux64/ShooterGameServer"
+                    USE_WINE=false
+                fi
+            fi
             if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64" ]; then
                 echo ""
                 echo "Win64 mappa tartalma:"
