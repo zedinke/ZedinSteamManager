@@ -950,7 +950,8 @@ async def get_rcon_status(
     config = server.config or {}
     rcon_enabled = config.get("RCON_ENABLED", True)
     rcon_port = server.rcon_port or 27020
-    server_admin_password = config.get("SERVER_ADMIN_PASSWORD", "")
+    # A jelszó lehet SERVER_ADMIN_PASSWORD vagy ServerAdminPassword kulccsal
+    server_admin_password = config.get("SERVER_ADMIN_PASSWORD") or config.get("ServerAdminPassword", "")
     
     if not rcon_enabled:
         return JSONResponse({
@@ -969,8 +970,39 @@ async def get_rcon_status(
         })
     
     # RCON kapcsolat tesztelése
+    # A szervergép IP-jét használjuk (nem localhost-ot)
+    # A request host-ját használjuk, vagy ha nincs, akkor socket-tel meghatározzuk
+    import socket
+    try:
+        # Próbáljuk meg a request host-ját használni
+        request_host = request.url.hostname
+        # Ha localhost vagy 127.0.0.1, akkor meghatározzuk a szerver IP-jét
+        if request_host in ['localhost', '127.0.0.1', '0.0.0.0']:
+            # Socket-tel meghatározzuk a szerver IP-jét
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                # Csatlakozunk egy külső DNS-hez (nem küldünk adatot)
+                s.connect(('8.8.8.8', 80))
+                server_ip = s.getsockname()[0]
+            except Exception:
+                # Ha nem sikerül, akkor localhost-ot használunk
+                server_ip = '127.0.0.1'
+            finally:
+                s.close()
+        else:
+            server_ip = request_host
+    except Exception:
+        # Ha bármi hiba van, akkor socket-tel meghatározzuk
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            server_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            server_ip = '127.0.0.1'
+    
     from app.services.server_control_service import test_rcon_connection
-    rcon_working = test_rcon_connection("localhost", rcon_port, server_admin_password, timeout=3)
+    rcon_working = test_rcon_connection(server_ip, rcon_port, server_admin_password, timeout=3)
     
     return JSONResponse({
         "success": True,
