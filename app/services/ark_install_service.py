@@ -617,21 +617,19 @@ async def install_ark_server_files(
                     await log(f"⚠️ Újratelepítés sikertelen: {e}")
             
             # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
-            # Lehet, hogy a linux64/ mappában van közvetlenül (más rendszerekben így van)
+            # Csak a linux64/ mappát ellenőrizzük (a ShooterGame/Binaries/Linux nem létezik)
             # Várunk egy kicsit, hogy a fájlrendszer biztosan frissüljön
             await asyncio.sleep(2)
             
-            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
-            # Először a ShooterGame/Binaries/Linux-t, majd a linux64/ mappát ellenőrizzük
-            linux_binary = linux_binary_shootergame if linux_binary_shootergame.exists() else (linux_binary_linux64 if linux_binary_linux64.exists() else None)
+            # Csak a linux64/ mappát ellenőrizzük
+            linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
             
             # Részletes ellenőrzés logolása
             await log(f"Bináris ellenőrzés:")
             await log(f"  - Linux (linux64/): {linux_binary_linux64.exists()}")
-            await log(f"  - Linux (ShooterGame/Binaries/Linux): {linux_binary_shootergame.exists()}")
             await log(f"  - Windows: {win64_binary.exists()}")
             
             if not linux_binary and not win64_binary.exists():
@@ -652,14 +650,7 @@ async def install_ark_server_files(
                             await log(f"  - Binaries mappa létezik: {binaries.exists()}")
                             binaries_contents = list(binaries.iterdir())
                             await log(f"  - Binaries tartalma ({len(binaries_contents)} elem): {[item.name for item in binaries_contents]}")
-                            linux_bin = binaries / "Linux"
-                            if linux_bin.exists():
-                                await log(f"  - Linux mappa létezik: {linux_bin.exists()}")
-                                linux_contents = list(linux_bin.iterdir())
-                                await log(f"  - Linux mappa tartalma ({len(linux_contents)} elem): {[item.name for item in linux_contents[:20]]}")
-                            else:
-                                await log(f"  - Linux mappa NEM létezik!")
-                                await log(f"  - Próbáljuk meg újratelepíteni a szerverfájlokat!")
+                            # Linux mappa ellenőrzése eltávolítva - csak linux64/ mappa létezik
                         else:
                             await log(f"  - Binaries mappa NEM létezik!")
                             await log(f"  - A telepítés hiányos! Próbáljuk meg újratelepíteni!")
@@ -679,9 +670,8 @@ async def install_ark_server_files(
             await log("Ellenőrizzük, hogy a telepítés sikeres volt-e...")
             
             # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
-            # Először a linux64/ mappát, majd a ShooterGame/Binaries/Linux-t ellenőrizzük
+            # Csak a linux64/ mappát ellenőrizzük (a ShooterGame/Binaries/Linux nem létezik)
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
-            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
             # Várunk, amíg a bináris létrejön (max 60 másodperc, de csak akkor várunk, ha még nincs)
@@ -691,8 +681,8 @@ async def install_ark_server_files(
             
             while waited_time < max_wait_time:
                 # Részletes ellenőrzés
-                # Először a linux64/ mappát, majd a ShooterGame/Binaries/Linux-t ellenőrizzük
-                linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else (linux_binary_shootergame if linux_binary_shootergame.exists() else None)
+                # Csak a linux64/ mappát ellenőrizzük
+                linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
                 
                 if linux_binary:
                     await log(f"✓ Linux bináris megtalálva: {linux_binary}")
@@ -731,11 +721,10 @@ async def install_ark_server_files(
             # Mégis ellenőrizzük, hogy esetleg a bináris létezik-e
             await asyncio.sleep(2)
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
-            linux_binary_shootergame = install_path / "ShooterGame" / "Binaries" / "Linux" / "ShooterGameServer"
             win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
-            # Először a linux64/ mappát, majd a ShooterGame/Binaries/Linux-t ellenőrizzük
-            linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else (linux_binary_shootergame if linux_binary_shootergame.exists() else None)
+            # Csak a linux64/ mappát ellenőrizzük
+            linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
             
             if linux_binary:
                 await log("⚠️ Linux bináris mégis létezik, telepítés valószínűleg sikeres volt!")
