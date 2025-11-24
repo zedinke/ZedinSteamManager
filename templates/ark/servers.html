@@ -800,6 +800,9 @@ window._showShutdownModalImpl = function(serverId) {
     checkScheduledShutdown(serverId);
 };
 
+// A placeholder-t felülírjuk a teljes implementációval
+window.showShutdownModal = window._showShutdownModalImpl;
+
 function closeShutdownModal() {
     if (shutdownModal) {
         shutdownModal.style.display = 'none';
