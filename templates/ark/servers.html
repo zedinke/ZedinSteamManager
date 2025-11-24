@@ -68,15 +68,17 @@ window.showServerLogs = function(serverId) {
         const logsContent = document.getElementById('logsContent');
         
         if (!logsModal || !logsContent) {
-            // Ha még nincs modal, próbáljuk meg újra (max 10x, 100ms-ig várva)
-            if (retryCount < 10) {
-                console.log('Logs modal elemek még nem találhatók, újrapróbálás...', retryCount + 1);
+            // Ha még nincs modal, próbáljuk meg újra (max 50x, 200ms-ig várva)
+            if (retryCount < 50) {
+                console.log('Logs modal elemek még nem találhatók, újrapróbálás...', retryCount + 1, '/50');
                 setTimeout(function() {
                     doShowLogs(retryCount + 1);
-                }, 100);
+                }, 200);
                 return;
             }
-            console.error('Logs modal elemek nem találhatók 10 próbálkozás után');
+            console.error('Logs modal elemek nem találhatók 50 próbálkozás után');
+            console.error('Available elements with id containing "logs":', 
+                Array.from(document.querySelectorAll('[id*="logs"]')).map(el => el.id));
             alert('Hiba: A logok modal nem található. Kérlek, frissítsd az oldalt.');
             return;
         }
@@ -118,30 +120,38 @@ window.showServerLogs = function(serverId) {
     // Várunk, amíg a DOM teljesen betöltődik
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(doShowLogs, 100); // Extra 100ms késleltetés, hogy biztosan betöltődjenek az elemek
+            console.log('DOMContentLoaded fired for logs, waiting 500ms...');
+            setTimeout(doShowLogs, 500); // Extra 500ms késleltetés
         });
     } else {
         // Ha már betöltődött, várunk egy kicsit, hogy biztosan létezzenek az elemek
-        setTimeout(doShowLogs, 100);
+        console.log('DOM already loaded for logs, waiting 500ms...');
+        setTimeout(doShowLogs, 500);
     }
 };
 
 window.showShutdownModal = function(serverId) {
     console.log('showShutdownModal called, serverId:', serverId);
+    console.log('Document readyState:', document.readyState);
+    console.log('Looking for shutdownModal element...');
+    
     // Várunk, amíg a DOM betöltődik, ha még nem
     function doShowShutdown(retryCount = 0) {
         const shutdownModal = document.getElementById('shutdownModal');
+        console.log('Attempt', retryCount + 1, '- shutdownModal found:', !!shutdownModal);
         
         if (!shutdownModal) {
-            // Ha még nincs modal, próbáljuk meg újra (max 10x, 100ms-ig várva)
-            if (retryCount < 10) {
-                console.log('Shutdown modal még nem található, újrapróbálás...', retryCount + 1);
+            // Ha még nincs modal, próbáljuk meg újra (max 50x, 200ms-ig várva)
+            if (retryCount < 50) {
+                console.log('Shutdown modal még nem található, újrapróbálás...', retryCount + 1, '/50');
                 setTimeout(function() {
                     doShowShutdown(retryCount + 1);
-                }, 100);
+                }, 200);
                 return;
             }
-            console.error('Shutdown modal nem található 10 próbálkozás után');
+            console.error('Shutdown modal nem található 50 próbálkozás után');
+            console.error('Available elements with id containing "shutdown":', 
+                Array.from(document.querySelectorAll('[id*="shutdown"]')).map(el => el.id));
             alert('Hiba: A shutdown modal nem található. Kérlek, frissítsd az oldalt.');
             return;
         }
@@ -167,11 +177,13 @@ window.showShutdownModal = function(serverId) {
     // Várunk, amíg a DOM teljesen betöltődik
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(doShowShutdown, 100); // Extra 100ms késleltetés, hogy biztosan betöltődjenek az elemek
+            console.log('DOMContentLoaded fired, waiting 500ms before trying to find modal...');
+            setTimeout(doShowShutdown, 500); // Extra 500ms késleltetés
         });
     } else {
         // Ha már betöltődött, várunk egy kicsit, hogy biztosan létezzenek az elemek
-        setTimeout(doShowShutdown, 100);
+        console.log('DOM already loaded, waiting 500ms before trying to find modal...');
+        setTimeout(doShowShutdown, 500);
     }
 };
 
