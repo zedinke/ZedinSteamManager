@@ -3,7 +3,7 @@ Admin router
 """
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import (
@@ -341,24 +341,54 @@ async def update_user_role(
 @router.post("/admin/users/delete")
 async def delete_user(
     request: Request,
-    user_id: int = Form(...),
     db: Session = Depends(get_db)
 ):
     """Felhasználó törlése"""
-    current_user = require_manager_admin(request, db)
+    try:
+        current_user = require_manager_admin(request, db)
+    except HTTPException as http_ex:
+        return JSONResponse(
+            status_code=http_ex.status_code,
+            content={"success": False, "error": http_ex.detail}
+        )
+    
+    # Form adatok lekérése
+    try:
+        form = await request.form()
+        user_id = int(form.get("user_id", 0))
+    except (ValueError, KeyError) as e:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Érvénytelen user_id paraméter"}
+        )
+    
+    if not user_id:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "user_id paraméter hiányzik"}
+        )
     
     # Felhasználó lekérése
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Felhasználó nem található")
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "error": "Felhasználó nem található"}
+        )
     
     # Nem lehet saját magunkat törölni
     if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Nem törölheted a saját fiókodat")
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "Nem törölheted a saját fiókodat"}
+        )
     
     # Manager admin nem törölhető (biztonsági okokból)
     if user.role == UserRole.MANAGER_ADMIN:
-        raise HTTPException(status_code=403, detail="Manager Admin felhasználó nem törölhető")
+        return JSONResponse(
+            status_code=403,
+            content={"success": False, "error": "Manager Admin felhasználó nem törölhető"}
+        )
     
     try:
         # Kapcsolódó adatok törlése (sorrend fontos!)
@@ -366,17 +396,17 @@ async def delete_user(
         server_instances = db.query(ServerInstance).filter(ServerInstance.server_admin_id == user_id).all()
         if server_instances:
             # Ha van szerver, akkor nem törölhető (vagy először törölni kell a szervereket)
-            raise HTTPException(
-                status_code=400, 
-                detail=f"A felhasználónak {len(server_instances)} szervere van. Először töröld a szervereket!"
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": f"A felhasználónak {len(server_instances)} szervere van. Először töröld a szervereket!"}
             )
         
         # 2. Server-ek (ha server_admin)
         servers = db.query(Server).filter(Server.server_admin_id == user_id).all()
         if servers:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=400,
-                detail=f"A felhasználónak {len(servers)} szervere van. Először töröld a szervereket!"
+                content={"success": False, "error": f"A felhasználónak {len(servers)} szervere van. Először töröld a szervereket!"}
             )
         
         # 3. Cluster-ek (ha server_admin)
@@ -426,15 +456,16 @@ async def delete_user(
         db.query(RamPurchase).filter(RamPurchase.user_id == user_id).delete()
         
         # 14. Felhasználó törlése
+        username = user.username  # Elmentjük a nevet, mielőtt törölnénk
         db.delete(user)
         db.commit()
         
-        request.session["success"] = f"{user.username} felhasználó sikeresen törölve!"
-        return RedirectResponse(url="/admin/users", status_code=302)
+        # JSONResponse-t adunk vissza, hogy a frontend megfelelően kezelje
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": f"{username} felhasználó sikeresen törölve!"}
+        )
         
-    except HTTPException:
-        # HTTPException-t tovább dobjuk
-        raise
     except Exception as e:
         db.rollback()
         error_msg = str(e)
@@ -443,5 +474,8 @@ async def delete_user(
             error_msg = f"Törlési hiba: A felhasználóhoz még kapcsolódó adatok vannak. Részletek: {error_msg}"
         else:
             error_msg = f"Törlési hiba: {error_msg}"
-        raise HTTPException(status_code=500, detail=error_msg)
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": error_msg}
+        )
 

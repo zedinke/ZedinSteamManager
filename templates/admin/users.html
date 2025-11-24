@@ -223,36 +223,46 @@ document.querySelectorAll('.delete-user-btn').forEach(btn => {
             const response = await fetch(`/admin/users/delete`, {
                 method: 'POST',
                 body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                },
                 redirect: 'manual'  // Ne kövesse automatikusan a redirect-et
             });
             
-            if (response.ok || response.status === 302) {
-                alert('Felhasználó sikeresen törölve!');
+            // Ellenőrizzük, hogy a válasz érkezett-e
+            if (!response) {
+                throw new Error('Nem érkezett válasz a szervertől');
+            }
+            
+            // Próbáljuk meg JSON-ként olvasni a választ
+            let responseData;
+            try {
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    responseData = await response.json();
+                } else {
+                    // Ha nem JSON, próbáljuk meg szövegként
+                    const text = await response.text();
+                    if (text) {
+                        responseData = { success: false, error: text };
+                    } else {
+                        responseData = { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
+                    }
+                }
+            } catch (parseError) {
+                responseData = { success: false, error: `HTTP ${response.status}: ${response.statusText || 'Ismeretlen hiba'}` };
+            }
+            
+            if (response.ok && responseData.success) {
+                alert(responseData.message || 'Felhasználó sikeresen törölve!');
                 location.reload();
             } else {
-                // Próbáljuk meg JSON-ként olvasni a választ
-                let errorMessage = 'Ismeretlen hiba';
-                try {
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        const error = await response.json();
-                        errorMessage = error.detail || error.message || 'Ismeretlen hiba';
-                    } else {
-                        // Ha nem JSON, próbáljuk meg szövegként
-                        const text = await response.text();
-                        if (text) {
-                            errorMessage = text;
-                        } else {
-                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                        }
-                    }
-                } catch (parseError) {
-                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                }
+                const errorMessage = responseData.error || responseData.detail || 'Ismeretlen hiba';
                 alert('Hiba: ' + errorMessage);
             }
         } catch (error) {
-            alert('Hiba: ' + (error.message || 'Ismeretlen hiba történt'));
+            console.error('Delete user error:', error);
+            alert('Hiba: ' + (error.message || 'Ismeretlen hiba történt. Ellenőrizd a konzolt a részletekért.'));
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
