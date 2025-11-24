@@ -621,14 +621,33 @@ async def install_ark_server_files(
             # Várunk egy kicsit, hogy a fájlrendszer biztosan frissüljön
             await asyncio.sleep(2)
             
-            linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
+            linux64_path = install_path / "linux64"
+            linux_binary_linux64 = linux64_path / "ShooterGameServer"
             
-            # Csak a linux64/ mappát ellenőrizzük
-            linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
+            # Ellenőrizzük, hogy a linux64 mappa létezik-e és mi van benne
+            linux_binary = None
+            if linux64_path.exists():
+                linux64_contents = list(linux64_path.iterdir())
+                await log(f"linux64 mappa tartalma ({len(linux64_contents)} elem): {[item.name for item in linux64_contents]}")
+                
+                # Keresünk minden lehetséges bináris fájlt a linux64 mappában
+                for item in linux64_contents:
+                    if item.is_file():
+                        # Ellenőrizzük, hogy végrehajtható-e vagy bináris név
+                        if item.name.startswith("ShooterGame") or (os.access(item, os.X_OK) and not item.name.endswith('.so')):
+                            linux_binary = item
+                            await log(f"✓ Bináris megtalálva: {linux_binary.name}")
+                            break
+                
+                # Ha nem találtunk, próbáljuk meg a standard nevet
+                if not linux_binary and linux_binary_linux64.exists():
+                    linux_binary = linux_binary_linux64
             
             # Részletes ellenőrzés logolása
             await log(f"Bináris ellenőrzés:")
-            await log(f"  - Linux (linux64/): {linux_binary_linux64.exists()}")
+            await log(f"  - Linux (linux64/ShooterGameServer): {linux_binary_linux64.exists()}")
+            if linux_binary:
+                await log(f"  - Bináris megtalálva: {linux_binary}")
             
             if not linux_binary:
                 error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer bináris nem található a linux64/ mappában"
@@ -638,20 +657,13 @@ async def install_ark_server_files(
                 if install_path.exists():
                     install_contents = list(install_path.iterdir())
                     await log(f"  - Install path tartalma ({len(install_contents)} elem): {[item.name for item in install_contents[:10]]}")
-                    shooter_game = install_path / "ShooterGame"
-                    if shooter_game.exists():
-                        await log(f"  - ShooterGame mappa létezik: {shooter_game.exists()}")
-                        shooter_contents = list(shooter_game.iterdir())
-                        await log(f"  - ShooterGame tartalma ({len(shooter_contents)} elem): {[item.name for item in shooter_contents[:20]]}")
-                        binaries = shooter_game / "Binaries"
-                        if binaries.exists():
-                            await log(f"  - Binaries mappa létezik: {binaries.exists()}")
-                            binaries_contents = list(binaries.iterdir())
-                            await log(f"  - Binaries tartalma ({len(binaries_contents)} elem): {[item.name for item in binaries_contents]}")
-                            # Linux mappa ellenőrzése eltávolítva - csak linux64/ mappa létezik
-                        else:
-                            await log(f"  - Binaries mappa NEM létezik!")
-                            await log(f"  - A telepítés hiányos! Próbáljuk meg újratelepíteni!")
+                    if linux64_path.exists():
+                        linux64_contents = list(linux64_path.iterdir())
+                        await log(f"  - linux64 mappa tartalma ({len(linux64_contents)} elem): {[item.name for item in linux64_contents]}")
+                        # Keresünk minden fájlt, ami lehet bináris
+                        for item in linux64_contents:
+                            if item.is_file():
+                                await log(f"    - Fájl: {item.name} (végrehajtható: {os.access(item, os.X_OK)})")
                 return False, '\n'.join(log_lines)
             
             if linux_binary:
