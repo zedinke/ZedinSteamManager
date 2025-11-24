@@ -991,48 +991,67 @@ async def get_rcon_status(
         })
     
     # RCON kapcsolat tesztelése
-    # A szervergép IP-jét használjuk (nem localhost-ot)
-    # A request host-ját használjuk, vagy ha nincs, akkor socket-tel meghatározzuk
+    # Próbáljuk meg több módon meghatározni a helyes IP-t
     import socket
+    
+    # 1. Próbáljuk meg a request client IP-jét (ha a szerver ugyanazon a gépen van)
+    # 2. Próbáljuk meg a request host-ját
+    # 3. Próbáljuk meg socket-tel meghatározni
+    # 4. Próbáljuk meg localhost-ot
+    
+    server_ips_to_try = []
+    
+    # Request host (ha nem localhost)
     try:
-        # Próbáljuk meg a request host-ját használni
         request_host = request.url.hostname
-        # Ha localhost vagy 127.0.0.1, akkor meghatározzuk a szerver IP-jét
-        if request_host in ['localhost', '127.0.0.1', '0.0.0.0']:
-            # Socket-tel meghatározzuk a szerver IP-jét
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            try:
-                # Csatlakozunk egy külső DNS-hez (nem küldünk adatot)
-                s.connect(('8.8.8.8', 80))
-                server_ip = s.getsockname()[0]
-            except Exception:
-                # Ha nem sikerül, akkor localhost-ot használunk
-                server_ip = '127.0.0.1'
-            finally:
-                s.close()
-        else:
-            server_ip = request_host
+        if request_host and request_host not in ['localhost', '127.0.0.1', '0.0.0.0']:
+            server_ips_to_try.append(request_host)
     except Exception:
-        # Ha bármi hiba van, akkor socket-tel meghatározzuk
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(('8.8.8.8', 80))
-            server_ip = s.getsockname()[0]
-            s.close()
-        except Exception:
-            server_ip = '127.0.0.1'
+        pass
+    
+    # Socket módszer (belső IP)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        internal_ip = s.getsockname()[0]
+        s.close()
+        if internal_ip and internal_ip not in server_ips_to_try:
+            server_ips_to_try.append(internal_ip)
+    except Exception:
+        pass
+    
+    # Localhost (mindig próbáljuk meg)
+    server_ips_to_try.append('127.0.0.1')
     
     from app.services.server_control_service import test_rcon_connection
-    logger.info(f"RCON státusz ellenőrzés: server_id={server_id}, ip={server_ip}, port={rcon_port}, password_len={len(server_admin_password) if server_admin_password else 0}")
+    logger.info(f"RCON státusz ellenőrzés: server_id={server_id}, port={rcon_port}, password_len={len(server_admin_password) if server_admin_password else 0}, IP-k próbálása: {server_ips_to_try}")
     
-    # Próbáljuk meg először a szerver IP-t, majd ha nem működik, akkor localhost-ot
-    rcon_working = test_rcon_connection(server_ip, rcon_port, server_admin_password, timeout=5)
-    if not rcon_working and server_ip != '127.0.0.1':
-        # Ha a szerver IP nem működik, próbáljuk meg localhost-ot is
-        logger.info(f"RCON teszt szerver IP-vel sikertelen, próbáljuk localhost-ot: 127.0.0.1:{rcon_port}")
-        rcon_working = test_rcon_connection('127.0.0.1', rcon_port, server_admin_password, timeout=5)
+    # Próbáljuk meg mindegyik IP-t
+    rcon_working = False
+    working_ip = None
+    for server_ip in server_ips_to_try:
+        logger.info(f"RCON teszt próbálás: {server_ip}:{rcon_port}")
+        rcon_working = test_rcon_connection(server_ip, rcon_port, server_admin_password, timeout=5)
         if rcon_working:
-            server_ip = '127.0.0.1'
+            working_ip = server_ip
+            logger.info(f"RCON teszt sikeres: {server_ip}:{rcon_port}")
+            break
+        else:
+            logger.warning(f"RCON teszt sikertelen: {server_ip}:{rcon_port}")
+    
+    server_ip = working_ip if working_ip else server_ips_to_try[0]
+    
+    # Ha nem működik, próbáljuk meg a szerver külső IP-jét is (ha van beállítva)
+    if not rcon_working:
+        # Lehet, hogy a szerver külső IP-je más, mint amit meghatároztunk
+        # Próbáljuk meg a config-ból vagy a szerver beállításaiból
+        server_external_ip = config.get("SERVER_EXTERNAL_IP") or config.get("EXTERNAL_IP")
+        if server_external_ip:
+            logger.info(f"RCON teszt külső IP-vel: {server_external_ip}:{rcon_port}")
+            rcon_working = test_rcon_connection(server_external_ip, rcon_port, server_admin_password, timeout=5)
+            if rcon_working:
+                server_ip = server_external_ip
+                logger.info(f"RCON teszt sikeres külső IP-vel: {server_external_ip}:{rcon_port}")
     
     return JSONResponse({
         "success": True,
