@@ -9,6 +9,9 @@ from fastapi import Request
 from app.config import settings
 from app.services.smtp_config import get_smtp_settings
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def send_email(to: str, subject: str, body: str, is_html: bool = True, domain: str = None) -> bool:
     """Email küldése"""
