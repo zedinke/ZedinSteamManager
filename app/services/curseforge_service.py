@@ -5,16 +5,20 @@ CurseForge API szolgáltatás - mod keresés
 import httpx
 from typing import List, Dict, Optional
 import logging
+import re
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-# CurseForge API v1 endpoint (public, nincs API key szükséges)
+# CurseForge API v1 endpoint
 CURSEFORGE_API_BASE = "https://api.curseforge.com/v1"
-CURSEFORGE_GAME_ID = 432  # Ark: Survival Evolved (ASA is használhatja)
+# Ark Survival Ascended game ID a CurseForge-on
+CURSEFORGE_GAME_ID_ASA = 1000230000  # Ark: Survival Ascended
+CURSEFORGE_GAME_ID_ASE = 432  # Ark: Survival Evolved (backup)
 
 async def search_mods(query: str, limit: int = 20) -> List[Dict]:
     """
-    Mod keresés CurseForge-on
+    Mod keresés CurseForge-on Ark Survival Ascended-hoz
     
     Args:
         query: Keresési kifejezés
@@ -24,59 +28,23 @@ async def search_mods(query: str, limit: int = 20) -> List[Dict]:
         Mod lista dict formátumban
     """
     try:
-        # CurseForge API v1 használata
-        # Megjegyzés: A CurseForge API v1 public, de lehet, hogy rate limit van
-        # Alternatíva: web scraping vagy más API
+        # Először próbáljuk meg a CurseForge web scraping-et
+        results = await search_curseforge_web(query, limit)
+        if results:
+            return results
         
-        # Próbáljuk meg a CurseForge API-t
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # CurseForge API v1 search endpoint
-            # Mivel a public API korlátozott lehet, használjuk a web scraping-et
-            # Vagy egy másik megközelítést
-            
-            # Alternatíva: CurseForge web scraping
-            search_url = f"https://www.curseforge.com/ark-survival-ascended/search?search={query}"
-            
-            # Web scraping helyett használjuk a CurseForge API-t, ha elérhető
-            # Vagy egy proxy/alternatív API-t
-            
-            # Most egy egyszerűbb megoldás: Steam Workshop API használata
-            # Mivel az Ark modok általában Steam Workshop-on vannak
-            
-            return await search_steam_workshop(query, limit)
+        # Ha nincs találat, próbáljuk meg a CurseForge API-t (ha van API key)
+        # Jelenleg nincs API key, ezért a web scraping-et használjuk
+        
+        return []
             
     except Exception as e:
         logger.error(f"CurseForge keresés hiba: {e}")
         return []
 
-async def search_steam_workshop(query: str, limit: int = 20) -> List[Dict]:
-    """
-    Mod keresés Steam Workshop-on (Ark modok általában itt vannak)
-    
-    Args:
-        query: Keresési kifejezés
-        limit: Maximum találatok száma
-    
-    Returns:
-        Mod lista dict formátumban
-    """
-    try:
-        # Steam Workshop API használata
-        # Steam Web API: ISteamRemoteStorage/GetPublishedFileDetails
-        
-        # Alternatíva: web scraping a Steam Workshop oldalról
-        # Vagy használjuk a CurseForge web scraping-et
-        
-        # Most egy egyszerűbb megoldás: CurseForge web scraping
-        return await search_curseforge_web(query, limit)
-        
-    except Exception as e:
-        logger.error(f"Steam Workshop keresés hiba: {e}")
-        return []
-
 async def search_curseforge_web(query: str, limit: int = 20) -> List[Dict]:
     """
-    CurseForge web scraping (fallback)
+    CurseForge web scraping Ark Survival Ascended modokhoz
     
     Args:
         query: Keresési kifejezés
@@ -86,27 +54,128 @@ async def search_curseforge_web(query: str, limit: int = 20) -> List[Dict]:
         Mod lista dict formátumban
     """
     try:
-        # CurseForge web scraping
-        # Megjegyzés: A CurseForge dinamikus, ezért nehézkes lehet
-        # Alternatíva: Steam Workshop API használata
+        # CurseForge web scraping Ark Survival Ascended modokhoz
+        search_url = f"https://www.curseforge.com/ark-survival-ascended/search?search={query}"
         
-        # Most egy egyszerűbb megoldás: 
-        # A felhasználó manuálisan adja meg a mod ID-t és nevet
-        # A keresés csak egy placeholder, a valódi keresés később implementálható
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
         
-        # Ha a query egy szám, akkor lehet, hogy mod ID
-        if query.strip().isdigit():
-            return [{
-                "id": query.strip(),
-                "name": f"Mod {query.strip()}",
-                "icon_url": None,
-                "url": f"https://steamcommunity.com/sharedfiles/filedetails/?id={query.strip()}",
-                "description": "Add meg a mod nevét és ikonját manuálisan"
-            }]
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            response = await client.get(search_url, headers=headers)
+            response.raise_for_status()
+            
+            # HTML parsing
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = []
+            
+            # CurseForge mod keresés eredmények
+            # A CurseForge dinamikus, de próbáljuk meg a mod linkeket megtalálni
+            mod_links = soup.find_all('a', href=re.compile(r'/ark-survival-ascended/mods/'))
+            
+            for link in mod_links[:limit]:
+                try:
+                    href = link.get('href', '')
+                    mod_id_match = re.search(r'/mods/(\d+)', href)
+                    if not mod_id_match:
+                        continue
+                    
+                    mod_id = mod_id_match.group(1)
+                    mod_name = link.get_text(strip=True)
+                    
+                    # Mod URL
+                    if href.startswith('/'):
+                        mod_url = f"https://www.curseforge.com{href}"
+                    else:
+                        mod_url = href
+                    
+                    # Ikon keresés
+                    icon_url = None
+                    icon_img = link.find('img')
+                    if icon_img:
+                        icon_url = icon_img.get('src') or icon_img.get('data-src')
+                        if icon_url and not icon_url.startswith('http'):
+                            icon_url = f"https://www.curseforge.com{icon_url}"
+                    
+                    # Leírás keresés
+                    description = None
+                    parent = link.find_parent()
+                    if parent:
+                        desc_elem = parent.find('p', class_=re.compile(r'description|summary'))
+                        if desc_elem:
+                            description = desc_elem.get_text(strip=True)
+                    
+                    results.append({
+                        "id": mod_id,
+                        "name": mod_name or f"Mod {mod_id}",
+                        "icon_url": icon_url,
+                        "url": mod_url,
+                        "description": description or f"Ark Survival Ascended mod: {mod_name or mod_id}"
+                    })
+                except Exception as e:
+                    logger.debug(f"Mod parsing hiba: {e}")
+                    continue
+            
+            # Ha nincs találat a linkekből, próbáljuk meg más módon
+            if not results:
+                # Próbáljuk meg a mod kártyákat megtalálni
+                mod_cards = soup.find_all('div', class_=re.compile(r'mod|card|item'))
+                for card in mod_cards[:limit]:
+                    try:
+                        # Mod link keresés a kártyában
+                        mod_link = card.find('a', href=re.compile(r'/ark-survival-ascended/mods/'))
+                        if not mod_link:
+                            continue
+                        
+                        href = mod_link.get('href', '')
+                        mod_id_match = re.search(r'/mods/(\d+)', href)
+                        if not mod_id_match:
+                            continue
+                        
+                        mod_id = mod_id_match.group(1)
+                        mod_name = mod_link.get_text(strip=True) or card.find('h3') or card.find('h4')
+                        if mod_name:
+                            mod_name = mod_name.get_text(strip=True) if hasattr(mod_name, 'get_text') else str(mod_name)
+                        
+                        if href.startswith('/'):
+                            mod_url = f"https://www.curseforge.com{href}"
+                        else:
+                            mod_url = href
+                        
+                        icon_url = None
+                        icon_img = card.find('img')
+                        if icon_img:
+                            icon_url = icon_img.get('src') or icon_img.get('data-src')
+                            if icon_url and not icon_url.startswith('http'):
+                                icon_url = f"https://www.curseforge.com{icon_url}"
+                        
+                        results.append({
+                            "id": mod_id,
+                            "name": mod_name or f"Mod {mod_id}",
+                            "icon_url": icon_url,
+                            "url": mod_url,
+                            "description": f"Ark Survival Ascended mod: {mod_name or mod_id}"
+                        })
+                    except Exception as e:
+                        logger.debug(f"Mod card parsing hiba: {e}")
+                        continue
+            
+            # Ha még mindig nincs találat és a query szám, akkor lehet mod ID
+            if not results and query.strip().isdigit():
+                mod_id = query.strip()
+                return [{
+                    "id": mod_id,
+                    "name": f"Mod {mod_id}",
+                    "icon_url": None,
+                    "url": f"https://www.curseforge.com/ark-survival-ascended/mods/{mod_id}",
+                    "description": "Add meg a mod nevét és ikonját manuálisan"
+                }]
+            
+            return results[:limit]
         
-        # Egyébként üres lista (manuális hozzáadás ajánlott)
+    except httpx.HTTPError as e:
+        logger.error(f"CurseForge HTTP hiba: {e}")
         return []
-        
     except Exception as e:
         logger.error(f"CurseForge web scraping hiba: {e}")
         return []
