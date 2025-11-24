@@ -102,12 +102,17 @@
                     <i class="fas fa-chevron-down nav-category-icon"></i>
                 </div>
                 <div class="nav-category-content">
-                    {% if "Ascended" in game.name or game.name == "Ark Survival Ascended" or game.name == "Ark: Survival Ascended" %}
+                    {% set game_name_lower = game.name|lower %}
+                    {% if "ascended" in game_name_lower %}
                     <a href="/admin/ark/files" class="nav-item nav-sub-item">
                         <i class="fas fa-server"></i> Szerverfájlok kezelése
                     </a>
-                    {% elif "Evolved" in game.name or game.name == "Ark Survival Evolved" or game.name == "Ark: Survival Evolved" %}
+                    {% elif "evolved" in game_name_lower %}
                     <a href="/admin/ark/files?game_id={{ game.id }}" class="nav-item nav-sub-item">
+                        <i class="fas fa-server"></i> Szerverfájlok kezelése
+                    </a>
+                    {% else %}
+                    <a href="/admin/ark/files" class="nav-item nav-sub-item">
                         <i class="fas fa-server"></i> Szerverfájlok kezelése
                     </a>
                     {% endif %}
