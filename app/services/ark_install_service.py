@@ -616,13 +616,12 @@ async def install_ark_server_files(
                 except Exception as e:
                     await log(f"⚠️ Újratelepítés sikertelen: {e}")
             
-            # Ellenőrizzük, hogy a bináris létezik-e (Linux vagy Windows)
-            # Csak a linux64/ mappát ellenőrizzük (a ShooterGame/Binaries/Linux nem létezik)
+            # Ellenőrizzük, hogy a bináris létezik-e
+            # Csak a linux64/ mappát ellenőrizzük
             # Várunk egy kicsit, hogy a fájlrendszer biztosan frissüljön
             await asyncio.sleep(2)
             
             linux_binary_linux64 = install_path / "linux64" / "ShooterGameServer"
-            win64_binary = install_path / "ShooterGame" / "Binaries" / "Win64" / "ShooterGameServer.exe"
             
             # Csak a linux64/ mappát ellenőrizzük
             linux_binary = linux_binary_linux64 if linux_binary_linux64.exists() else None
@@ -630,10 +629,9 @@ async def install_ark_server_files(
             # Részletes ellenőrzés logolása
             await log(f"Bináris ellenőrzés:")
             await log(f"  - Linux (linux64/): {linux_binary_linux64.exists()}")
-            await log(f"  - Windows: {win64_binary.exists()}")
             
-            if not linux_binary and not win64_binary.exists():
-                error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer bináris nem található (sem Linux, sem Windows)"
+            if not linux_binary:
+                error_msg = f"HIBA: A telepítés sikeres volt, de a ShooterGameServer bináris nem található a linux64/ mappában"
                 await log(f"✗ {error_msg}")
                 await log("Ellenőrzés:")
                 await log(f"  - Install path létezik: {install_path.exists()}")
