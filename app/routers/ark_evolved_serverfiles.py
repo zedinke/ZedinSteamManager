@@ -110,7 +110,12 @@ async def start_install(
         # Ha nincs találat, próbáljuk meg case-insensitive kereséssel
         ark_game = db.query(Game).filter(Game.name.ilike("%ark%evolved%")).first()
     
-    game_id = ark_game.id if ark_game else None
+    # FONTOS: Ez az ark_evolved_serverfiles router, tehát MINDIG az Ark Evolved útvonalat használjuk
+    # Ha nincs játék az adatbázisban, akkor is az Evolved útvonalat használjuk
+    from app.config import settings
+    base_path = Path(settings.ark_evolved_serverfiles_base)
+    user_serverfiles = base_path / f"user_{current_user.id}"
+    install_path = user_serverfiles / version
     
     # Debug log
     import logging
@@ -118,14 +123,13 @@ async def start_install(
     if ark_game:
         logger.info(f"start_install: Found Ark Survival Evolved game: id={ark_game.id}, name={ark_game.name}, is_active={ark_game.is_active}")
     else:
-        logger.warning(f"start_install: Ark Survival Evolved game NOT FOUND in database!")
+        logger.warning(f"start_install: Ark Survival Evolved game NOT FOUND in database, but using Evolved path anyway (this is ark_evolved_serverfiles router)")
         # Listázuk az összes Ark játékot debug céljából
         all_ark_games = db.query(Game).filter(Game.name.ilike("%ark%")).all()
         logger.warning(f"start_install: All Ark games in database: {[(g.id, g.name, g.is_active) for g in all_ark_games]}")
     
-    # Telepítési útvonal (játék-specifikus)
-    user_serverfiles = get_user_serverfiles_path(current_user.id, game_id=game_id, db=db)
-    install_path = user_serverfiles / version
+    logger.info(f"start_install: Using Ark Evolved base path: {base_path}")
+    logger.info(f"start_install: Calculated install_path: {install_path}")
     
     logger.info(f"start_install: Calculated install_path: {install_path}")
     
@@ -541,12 +545,11 @@ async def start_update(
         )
     
     # Telepítési útvonal
-    # Ark Survival Evolved játék lekérése az adatbázisból
-    ark_game = db.query(Game).filter(Game.name == "Ark Survival Evolved").first()
-    game_id = ark_game.id if ark_game else None
-    
-    # Telepítési útvonal (játék-specifikus)
-    user_serverfiles = get_user_serverfiles_path(current_user.id, game_id=game_id, db=db)
+    # FONTOS: Ez az ark_evolved_serverfiles router, tehát MINDIG az Ark Evolved útvonalat használjuk
+    from app.config import settings
+    from pathlib import Path
+    base_path = Path(settings.ark_evolved_serverfiles_base)
+    user_serverfiles = base_path / f"user_{current_user.id}"
     install_path = user_serverfiles / "latest"
     
     # Új rekord létrehozása frissítéshez
