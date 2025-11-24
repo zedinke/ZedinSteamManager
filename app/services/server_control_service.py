@@ -1121,9 +1121,10 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 
                 if rcon_enabled and server_admin_password:
                     logger.info(f"Saveworld parancs küldése RCON-on keresztül (port: {rcon_port})...")
-                    send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld")
-                    logger.info("Saveworld parancs elküldve, várakozás 10 másodpercet...")
-                    time.sleep(10)
+                    # 3 másodperces timeout-tal küldjük (mint a POK-manager.sh-ben)
+                    send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld", timeout=3)
+                    logger.info("Saveworld parancs elküldve, várakozás 5 másodpercet...")
+                    time.sleep(5)  # 5 másodperc várakozás (mint a POK-manager.sh-ben)
                 else:
                     logger.info("RCON nincs engedélyezve vagy nincs admin jelszó, saveworld parancs kihagyva")
             except Exception as rcon_error:
@@ -1252,9 +1253,10 @@ def restart_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 
                 if rcon_enabled and server_admin_password:
                     logger.info(f"Saveworld parancs küldése RCON-on keresztül (port: {rcon_port}) restart előtt...")
-                    send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld")
-                    logger.info("Saveworld parancs elküldve, várakozás 10 másodpercet...")
-                    time.sleep(10)
+                    # 3 másodperces timeout-tal küldjük (mint a POK-manager.sh-ben)
+                    send_rcon_command("localhost", rcon_port, server_admin_password, "saveworld", timeout=3)
+                    logger.info("Saveworld parancs elküldve, várakozás 5 másodpercet...")
+                    time.sleep(5)  # 5 másodperc várakozás (mint a POK-manager.sh-ben)
                 else:
                     logger.info("RCON nincs engedélyezve vagy nincs admin jelszó, saveworld parancs kihagyva")
             except Exception as rcon_error:
