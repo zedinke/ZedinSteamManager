@@ -296,9 +296,29 @@ if [ "${USE_WINE}" = "true" ]; then
     # A Wine automatikusan inicializálja, de ellenőrizzük, hogy a kernel32.dll létezik-e
     if [ ! -f "${WINEPREFIX}/drive_c/windows/system32/kernel32.dll" ]; then
         echo "Wine prefix inicializálása (kernel32.dll hiányzik)..."
-        # Próbáljuk meg inicializálni a Wine prefix-et
-        WINEDLLOVERRIDES="mscoree,mshtml=" wineboot --init 2>&1 | head -10 || echo "FIGYELMEZTETÉS: Wine prefix inicializálás figyelmeztetéseket adott"
-        sleep 2
+        echo "Ez 30-60 másodpercet vehet igénybe..."
+        # Próbáljuk meg inicializálni a Wine prefix-et timeout-tal
+        # A wineboot --init időbe telhet, ezért timeout-ot használunk
+        if timeout 90 wineboot --init > /tmp/wine_init.log 2>&1; then
+            echo "✓ Wine prefix inicializálás sikeres"
+        else
+            EXIT_CODE=$?
+            echo "FIGYELMEZTETÉS: Wine prefix inicializálás kilépési kód: $EXIT_CODE"
+            if [ -f /tmp/wine_init.log ]; then
+                echo "Wine inicializálás részletei (utolsó 20 sor):"
+                tail -20 /tmp/wine_init.log || true
+            fi
+            # Mégis folytatjuk, mert a Wine prefix lehet, hogy létrejött
+            if [ -f "${WINEPREFIX}/drive_c/windows/system32/kernel32.dll" ]; then
+                echo "✓ Wine prefix inicializálva (kernel32.dll létezik)"
+            else
+                echo "FIGYELMEZTETÉS: Wine prefix inicializálás nem fejeződött be, de folytatjuk..."
+                echo "A Wine automatikusan inicializálja a prefix-et az első futtatáskor"
+            fi
+        fi
+        sleep 1
+    else
+        echo "✓ Wine prefix már inicializálva (kernel32.dll létezik)"
     fi
     
     # Szerver indítása Wine-nal
