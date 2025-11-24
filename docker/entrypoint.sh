@@ -106,25 +106,45 @@ if [ ! -f "${SERVER_BINARY}" ]; then
     echo "HIBA: ARK szerver bináris nem található: ${SERVER_BINARY}"
     echo "Ellenőrizd, hogy a szerverfájlok telepítve vannak-e a volume-on!"
     echo "ARK_SERVER_DIR: ${ARK_SERVER_DIR}"
+    echo "Keresett bináris: ${SERVER_BINARY}"
+    echo ""
     echo "Mappa tartalma:"
     ls -la "${ARK_SERVER_DIR}" || echo "Mappa nem létezik vagy nem elérhető"
+    if [ -d "${ARK_SERVER_DIR}/linux64" ]; then
+        echo ""
+        echo "linux64 mappa tartalma:"
+        ls -la "${ARK_SERVER_DIR}/linux64" || true
+    fi
     if [ -d "${ARK_SERVER_DIR}/ShooterGame" ]; then
+        echo ""
         echo "ShooterGame mappa tartalma:"
         ls -la "${ARK_SERVER_DIR}/ShooterGame" || true
         if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries" ]; then
+            echo ""
             echo "Binaries mappa tartalma:"
             ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries" || true
-            if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" ]; then
-                echo "Linux mappa tartalma:"
-                ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux" || true
-            fi
             if [ -d "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64" ]; then
+                echo ""
                 echo "Win64 mappa tartalma:"
                 ls -la "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64" || true
+                if [ -f "${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe" ]; then
+                    echo ""
+                    echo "✓ ArkAscendedServer.exe megtalálva! Használjuk ezt."
+                    SERVER_BINARY="${ARK_SERVER_DIR}/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
+                    USE_WINE=true
+                else
+                    echo ""
+                    echo "✗ ArkAscendedServer.exe nem található a Win64 mappában"
+                fi
             fi
         fi
     fi
-    exit 1
+    # Ha még mindig nincs bináris, kilépünk
+    if [ ! -f "${SERVER_BINARY}" ]; then
+        echo ""
+        echo "✗ Bináris nem található sehol. Kilépés."
+        exit 1
+    fi
 fi
 
 # Szerver indítási parancs összeállítása
