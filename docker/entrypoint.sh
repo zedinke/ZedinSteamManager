@@ -308,9 +308,11 @@ QUERY_PARAMS+=("SessionName=\"${SESSION_NAME}\"")
 if [ "${RCON_ENABLED}" = "True" ]; then
     QUERY_PARAMS+=("RCONEnabled=True")
     QUERY_PARAMS+=("RCONPort=${RCON_PORT}")
-    if [ -n "${SERVER_ADMIN_PASSWORD}" ]; then
-        QUERY_PARAMS+=("ServerAdminPassword=${SERVER_ADMIN_PASSWORD}")
-    fi
+fi
+
+# ServerAdminPassword mindig szerepeljen, ha van értéke (függetlenül az RCON állapotától)
+if [ -n "${SERVER_ADMIN_PASSWORD}" ]; then
+    QUERY_PARAMS+=("ServerAdminPassword=${SERVER_ADMIN_PASSWORD}")
 fi
 
 if [ -n "${SERVER_PASSWORD}" ]; then
