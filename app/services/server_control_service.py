@@ -669,7 +669,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 game = db.query(Game).filter(Game.id == server.game_id).first()
                 if game and game.name == "Ark Survival Evolved":
                     is_evolved = True
-                    ark_app_id = "346110"  # Ark Survival Evolved App ID
+                    ark_app_id = "376030"  # Ark Survival Evolved dedikált szerver App ID
             except Exception:
                 # Ha hiba van, az eredeti értékeket használjuk
                 pass
@@ -715,7 +715,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                         f'API={"True" if config_values.get("API", False) else "False"}',
                         f'ARK_SERVER_DIR={container_work_dir}',  # A mountolt mappa, ahol a ServerFiles található
                         f'UPDATE_SERVER=False',  # Ne telepítsen újra, ha a fájlok már a hoston vannak
-                        f'ARK_APP_ID={ark_app_id}',  # Steam App ID (2430930 = Ascended, 346110 = Evolved)
+                        f'ARK_APP_ID={ark_app_id}',  # Steam App ID (2430930 = Ascended, 376030 = Evolved)
                     ],
                 }
             }
