@@ -479,6 +479,24 @@ if [ -n "${THIRD_PART}" ]; then
     SERVER_ARGS="${SERVER_ARGS} ${THIRD_PART}"
 fi
 
+# steam_appid.txt ellenőrzése és javítása (ha szükséges)
+# Ez fontos, mert a szerver ezt használja az App ID meghatározásához
+STEAM_APPID_FILE="${ARK_SERVER_DIR}/ShooterGame/Binaries/Linux/steam_appid.txt"
+if [ -f "${STEAM_APPID_FILE}" ]; then
+    CURRENT_APPID=$(cat "${STEAM_APPID_FILE}" 2>/dev/null | tr -d '\n\r ')
+    if [ "${CURRENT_APPID}" != "${ARK_APP_ID}" ]; then
+        echo "steam_appid.txt javítása: ${CURRENT_APPID} -> ${ARK_APP_ID}"
+        echo "${ARK_APP_ID}" > "${STEAM_APPID_FILE}"
+    else
+        echo "steam_appid.txt helyes: ${ARK_APP_ID}"
+    fi
+else
+    # Ha nincs, létrehozzuk
+    echo "steam_appid.txt létrehozása: ${ARK_APP_ID}"
+    mkdir -p "$(dirname "${STEAM_APPID_FILE}")"
+    echo "${ARK_APP_ID}" > "${STEAM_APPID_FILE}"
+fi
+
 # Szerver indítása
 echo "=========================================="
 echo "ZedinArkManager - ARK Server Starting"
