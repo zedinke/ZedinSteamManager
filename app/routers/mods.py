@@ -162,22 +162,29 @@ async def delete_mod(
     """Server Admin: Mod törlése a tárolóból"""
     current_user = require_server_admin(request, db)
     
-    mod = db.query(UserMod).filter(
-        and_(
-            UserMod.id == mod_id,
-            UserMod.user_id == current_user.id
-        )
-    ).first()
+    # Ellenőrizzük, hogy a mod létezik-e
+    mod = db.query(UserMod).filter(UserMod.id == mod_id).first()
     
     if not mod:
-        raise HTTPException(status_code=404, detail="Mod nem található")
+        return JSONResponse(
+            status_code=404,
+            content={"success": False, "detail": "Mod nem található"}
+        )
     
+    # Ellenőrizzük, hogy a mod a felhasználóhoz tartozik-e
+    if mod.user_id != current_user.id:
+        return JSONResponse(
+            status_code=403,
+            content={"success": False, "detail": "Nincs jogosultságod ezt a modot törölni"}
+        )
+    
+    mod_name = mod.name
     db.delete(mod)
     db.commit()
     
     return JSONResponse({
         "success": True,
-        "message": "Mod törölve"
+        "message": f"'{mod_name}' mod sikeresen törölve"
     })
 
 @router.get("/api/list")
