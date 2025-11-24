@@ -169,21 +169,7 @@ def get_servers_base_path() -> Path:
     if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
         base_dir = Path(settings.ark_serverfiles_base).parent
     else:
-        # Ark Survival Evolved esetén külön base dir, egyébként az eredeti
         base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
-        if server and server.game_id:
-            try:
-                from app.database import Game, SessionLocal
-                db = SessionLocal()
-                try:
-                    game = db.query(Game).filter(Game.id == server.game_id).first()
-                    if game and game.name == "Ark Survival Evolved":
-                        base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkEvolved")
-                finally:
-                    db.close()
-            except Exception:
-                # Ha hiba van, az eredeti base dir-t használjuk
-                pass
     
     servers_base = base_dir / "Servers"
     return servers_base
