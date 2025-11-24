@@ -152,6 +152,12 @@
             </a>
         {% endif %}
         
+        {% if user_role == "user" %}
+            <a href="/cart" class="nav-item">
+                <i class="fas fa-shopping-cart"></i> Kosaram
+            </a>
+        {% endif %}
+        
         {% if user_role in ["manager_admin", "server_admin"] %}
             <div class="nav-category">
                 <div class="nav-category-header" onclick="toggleCategory(this)">

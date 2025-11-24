@@ -517,13 +517,13 @@ async def request_token_extension(
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Token hosszabbítási kérés küldése"""
+    """User/Server Admin: Token hosszabbítási kérés küldése"""
     user_id = request.session.get("user_id")
     if not user_id:
         return RedirectResponse(url="/login", status_code=302)
     
     current_user = db.query(User).filter(User.id == user_id).first()
-    if not current_user or current_user.role.value != "server_admin":
+    if not current_user or current_user.role.value not in ["user", "server_admin"]:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
     # Periódus ellenőrzése - csak a kijelölt periódusok engedélyezettek
@@ -581,13 +581,13 @@ async def request_token(
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Token igénylés (kosárba vagy ingyenes)"""
+    """User/Server Admin: Token igénylés (kosárba vagy ingyenes)"""
     user_id = request.session.get("user_id")
     if not user_id:
         return RedirectResponse(url="/login", status_code=302)
     
     current_user = db.query(User).filter(User.id == user_id).first()
-    if not current_user or current_user.role.value != "server_admin":
+    if not current_user or current_user.role.value not in ["user", "server_admin"]:
         raise HTTPException(status_code=403, detail="Nincs jogosultságod")
     
     if token_type not in ["server_admin", "user"]:

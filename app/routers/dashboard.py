@@ -54,6 +54,19 @@ async def dashboard(
         
         # Tokenek lekérése
         tokens = db.query(Token).filter(Token.user_id == current_user.id).all()
+    elif current_user.role.value == "user":
+        # Sima user statisztikái
+        stats["my_tokens"] = db.query(func.count(Token.id)).filter(
+            Token.user_id == current_user.id,
+            Token.is_active == True
+        ).scalar()
+        
+        stats["cart_count"] = db.query(func.count(CartItem.id)).filter(
+            CartItem.user_id == current_user.id
+        ).scalar()
+        
+        # Tokenek lekérése
+        tokens = db.query(Token).filter(Token.user_id == current_user.id).all()
     else:
         tokens = []
     
@@ -65,6 +78,6 @@ async def dashboard(
             "request": request,
             "user": current_user,
             "stats": stats,
-            "tokens": tokens if current_user.role.value == "server_admin" else []
+            "tokens": tokens if current_user.role.value in ["server_admin", "user"] else []
         }
     )

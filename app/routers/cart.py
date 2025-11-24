@@ -11,15 +11,15 @@ from datetime import datetime
 
 router = APIRouter()
 
-def require_server_admin(request: Request, db: Session = Depends(get_db)) -> User:
-    """Server Admin jogosultság ellenőrzése"""
+def require_user(request: Request, db: Session = Depends(get_db)) -> User:
+    """User vagy Server Admin jogosultság ellenőrzése"""
     user_id = request.session.get("user_id")
     if not user_id:
         raise HTTPException(status_code=302, detail="Nincs bejelentkezve", headers={"Location": "/login"})
     
     current_user = db.query(User).filter(User.id == user_id).first()
-    if not current_user or current_user.role.value != "server_admin":
-        raise HTTPException(status_code=403, detail="Nincs jogosultságod - Server Admin szükséges")
+    if not current_user or current_user.role.value not in ["user", "server_admin"]:
+        raise HTTPException(status_code=403, detail="Nincs jogosultságod - Bejelentkezés szükséges")
     return current_user
 
 @router.get("/cart", response_class=HTMLResponse)
@@ -27,8 +27,8 @@ async def show_cart(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Kosár megjelenítése"""
-    current_user = require_server_admin(request, db)
+    """User/Server Admin: Kosár megjelenítése"""
+    current_user = require_user(request, db)
     
     # Kosár elemek lekérése
     cart_items = db.query(CartItem).filter(
@@ -123,8 +123,8 @@ async def add_token_request(
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Token igénylés hozzáadása a kosárhoz"""
-    current_user = require_server_admin(request, db)
+    """User/Server Admin: Token igénylés hozzáadása a kosárhoz"""
+    current_user = require_user(request, db)
     
     if token_type not in ["server_admin", "user"]:
         raise HTTPException(status_code=400, detail="Érvénytelen token típus")
@@ -162,8 +162,8 @@ async def add_extension_request(
     notes: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Token hosszabbítási kérés hozzáadása a kosárhoz"""
-    current_user = require_server_admin(request, db)
+    """User/Server Admin: Token hosszabbítási kérés hozzáadása a kosárhoz"""
+    current_user = require_user(request, db)
     
     # Periódus ellenőrzése
     from app.services.pricing_service import AVAILABLE_PERIODS
@@ -210,8 +210,8 @@ async def add_ram_upgrade(
     ram_gb: int,
     db: Session = Depends(get_db)
 ):
-    """Server Admin: RAM bővítés hozzáadása a kosárhoz"""
-    current_user = require_server_admin(request, db)
+    """User/Server Admin: RAM bővítés hozzáadása a kosárhoz"""
+    current_user = require_user(request, db)
     
     # Szerver ellenőrzése
     from app.database import ServerInstance
@@ -259,8 +259,8 @@ async def remove_cart_item(
     item_id: int,
     db: Session = Depends(get_db)
 ):
-    """Server Admin: Elem eltávolítása a kosárból"""
-    current_user = require_server_admin(request, db)
+    """User/Server Admin: Elem eltávolítása a kosárból"""
+    current_user = require_user(request, db)
     
     cart_item = db.query(CartItem).filter(
         CartItem.id == item_id,
