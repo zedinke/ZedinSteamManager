@@ -58,7 +58,7 @@ async def session_role_refresh_middleware(request: Request, call_next):
                 not request.url.path.startswith("/static/") and
                 not request.url.path.startswith("/_") and
                 request.method == "GET"):  # Csak GET request-eknél, hogy ne lassítsuk a POST-okat
-                from app.database import SessionLocal, User
+                from app.database import SessionLocal, User, Game
                 
                 # Adatbázis session létrehozása
                 db = SessionLocal()
@@ -70,11 +70,22 @@ async def session_role_refresh_middleware(request: Request, call_next):
                         if current_role != current_user.role.value:
                             # Frissítjük a session-t
                             request.session["user_role"] = current_user.role.value
+                    
+                    # Ark játékok lekérése a template-ekhez (sidebar-hoz)
+                    ark_games = db.query(Game).filter(
+                        Game.name.ilike("%ark%"),
+                        Game.is_active == True
+                    ).order_by(Game.name).all()
+                    request.state.ark_games = ark_games
                 finally:
                     db.close()
         except Exception:
             # Ha hiba történik, ne akadályozza a request feldolgozását
-            pass
+            # Üres lista, ha hiba van
+            request.state.ark_games = []
+    else:
+        # Ha nincs bejelentkezve, üres lista
+        request.state.ark_games = []
     
     response = await call_next(request)
     return response

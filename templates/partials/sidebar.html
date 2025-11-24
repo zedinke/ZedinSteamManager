@@ -94,17 +94,26 @@
                 </div>
             </div>
             
+            {% set ark_games = request.state.get('ark_games', []) %}
+            {% for game in ark_games %}
             <div class="nav-category">
                 <div class="nav-category-header" onclick="toggleCategory(this)">
-                    <i class="fas fa-dinosaur"></i> Ark Survival Ascended
+                    <i class="fas fa-dinosaur"></i> {{ game.name }}
                     <i class="fas fa-chevron-down nav-category-icon"></i>
                 </div>
                 <div class="nav-category-content">
+                    {% if game.name == "Ark Survival Ascended" %}
                     <a href="/admin/ark/files" class="nav-item nav-sub-item">
                         <i class="fas fa-server"></i> Szerverfájlok kezelése
                     </a>
+                    {% elif game.name == "Ark Survival Evolved" %}
+                    <a href="/admin/ark/files?game_id={{ game.id }}" class="nav-item nav-sub-item">
+                        <i class="fas fa-server"></i> Szerverfájlok kezelése
+                    </a>
+                    {% endif %}
                 </div>
             </div>
+            {% endfor %}
         {% endif %}
         
         {% if user_role == "server_admin" %}
@@ -123,12 +132,15 @@
                 </div>
             </div>
             
+            {% set ark_games = request.state.get('ark_games', []) %}
+            {% for game in ark_games %}
             <div class="nav-category">
                 <div class="nav-category-header" onclick="toggleCategory(this)">
-                    <i class="fas fa-dinosaur"></i> Ark Survival Ascended
+                    <i class="fas fa-dinosaur"></i> {{ game.name }}
                     <i class="fas fa-chevron-down nav-category-icon"></i>
                 </div>
                 <div class="nav-category-content">
+                    {% if game.name == "Ark Survival Ascended" %}
                     <a href="/ark/clusters" class="nav-item nav-sub-item">
                         <i class="fas fa-network-wired"></i> Cluster-ek
                     </a>
@@ -141,8 +153,23 @@
                     <a href="/mods" class="nav-item nav-sub-item">
                         <i class="fas fa-box"></i> Mod Tároló
                     </a>
+                    {% elif game.name == "Ark Survival Evolved" %}
+                    <a href="/ark/clusters?game_id={{ game.id }}" class="nav-item nav-sub-item">
+                        <i class="fas fa-network-wired"></i> Cluster-ek
+                    </a>
+                    <a href="/ark/servers?game_id={{ game.id }}" class="nav-item nav-sub-item">
+                        <i class="fas fa-server"></i> Ark Szerverek
+                    </a>
+                    <a href="/ark/serverfiles?game_id={{ game.id }}" class="nav-item nav-sub-item">
+                        <i class="fas fa-folder-open"></i> Szerverfájlok
+                    </a>
+                    <a href="/mods?game_id={{ game.id }}" class="nav-item nav-sub-item">
+                        <i class="fas fa-box"></i> Mod Tároló
+                    </a>
+                    {% endif %}
                 </div>
             </div>
+            {% endfor %}
             
             <a href="/cart" class="nav-item">
                 <i class="fas fa-shopping-cart"></i> Kosaram
