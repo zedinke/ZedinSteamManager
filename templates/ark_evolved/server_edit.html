@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}Ark Szerver Szerkesztése - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-edit"></i> Ark Szerver Szerkesztése</h2>
+        <p>{{ server.name }} szerver beállításainak módosítása</p>
+        <div style="margin-top: 10px;">
+            <a href="/ark-evolved/servers/{{ server.id }}/config?config_file=GameUserSettings" class="btn btn-info">
+                <i class="fas fa-cog"></i> GameUserSettings.ini Beállítások
+            </a>
+            <a href="/ark-evolved/servers/{{ server.id }}/config?config_file=Game" class="btn btn-info">
+                <i class="fas fa-cog"></i> Game.ini Beállítások
+            </a>
+            <a href="/ark-evolved/servers/{{ server.id }}/backup" class="btn btn-warning">
+                <i class="fas fa-database"></i> Backup Kezelés
+            </a>
+        </div>
+    </div>
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-cog"></i> Szerver Beállítások</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Információ:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li>A cluster módosítása újra létrehozza a szerver symlink-jét</li>
+                    <li>A modok módosítása csak a szerver újraindítása után lép életbe</li>
+                </ul>
+            </div>
+            
+            <form method="POST" action="/ark-evolved/servers/{{ server.id }}/edit" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label for="cluster_id">
+                        <i class="fas fa-network-wired"></i> Cluster <span style="color: red;">*</span>
+                    </label>
+                    <select id="cluster_id" name="cluster_id" required 
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        {% for cluster in clusters %}
+                            <option value="{{ cluster.id }}" {% if server.cluster_id == cluster.id %}selected{% endif %}>
+                                {{ cluster.name }} ({{ cluster.cluster_id }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-puzzle-piece"></i> Modok Kezelése
+                    </label>
+                    <div style="margin-bottom: 10px;">
+                        <a href="/mods" target="_blank" class="btn btn-sm btn-secondary" style="margin-right: 5px;">
+                            <i class="fas fa-box"></i> Mod Tároló
+                        </a>
+                        <a href="/mods" target="_blank" class="btn btn-sm btn-info">
+                            <i class="fas fa-box"></i> Mod Tároló
+                        </a>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 15px; align-items: start;">
+                        <!-- Elérhető Modok -->
+                        <div>
+                            <label style="font-weight: bold; margin-bottom: 5px; display: block;">Elérhető Modok</label>
+                            <select id="available_mods_select" multiple 
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; min-height: 200px;">
+                                <!-- Modok betöltése JavaScript-tel -->
+                            </select>
+                        </div>
+                        
+                        <!-- Mozgatás gombok -->
+                        <div style="display: flex; flex-direction: column; gap: 10px; justify-content: center; padding-top: 30px;">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="moveToActive()" title="Aktív modokhoz">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="moveToPassive()" title="Passzív modokhoz">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-warning" onclick="removeFromActive()" title="Eltávolítás aktívból">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-warning" onclick="removeFromPassive()" title="Eltávolítás passzívból">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Aktív és Passzív Modok -->
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            <div>
+                                <label style="font-weight: bold; margin-bottom: 5px; display: block;">
+                                    <i class="fas fa-check-circle" style="color: #28a745;"></i> Aktív Modok
+                                </label>
+                                <select id="active_mods_select" multiple 
+                                        style="width: 100%; padding: 8px; border: 1px solid #28a745; border-radius: 5px; min-height: 90px;">
+                                    <!-- Kiválasztott aktív modok -->
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; margin-bottom: 5px; display: block;">
+                                    <i class="fas fa-pause-circle" style="color: #ffc107;"></i> Passzív Modok
+                                </label>
+                                <select id="passive_mods_select" multiple 
+                                        style="width: 100%; padding: 8px; border: 1px solid #ffc107; border-radius: 5px; min-height: 90px;">
+                                    <!-- Kiválasztott passzív modok -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="active_mods" name="active_mods" 
+                           value="{% if server.active_mods %}{{ server.active_mods|join(',') }}{% endif %}">
+                    <input type="hidden" id="passive_mods" name="passive_mods" 
+                           value="{% if server.passive_mods %}{{ server.passive_mods|join(',') }}{% endif %}">
+                    <small style="color: #666; display: block; margin-top: 10px;">
+                        Válassz modokat az "Elérhető Modok" listából, majd mozgasd az aktív vagy passzív listába a nyilakkal.
+                    </small>
+                </div>
+                
+                <!-- Szerver Beállítások -->
+                <div class="form-group" style="margin-top: 30px; border-top: 2px solid #ddd; padding-top: 20px;">
+                    <h3 style="margin-bottom: 20px;"><i class="fas fa-cog"></i> Szerver Beállítások</h3>
+                    
+                    {% set config = server.config or {} %}
+                    
+                    <!-- Alapbeállítások -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label for="timezone">
+                                <i class="fas fa-clock"></i> Időzóna
+                            </label>
+                            <select id="timezone" name="timezone" 
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="Europe/Budapest" {% if config.get('TZ', 'Europe/Budapest') == 'Europe/Budapest' %}selected{% endif %}>Europe/Budapest</option>
+                                <option value="UTC" {% if config.get('TZ') == 'UTC' %}selected{% endif %}>UTC</option>
+                                <option value="Europe/London" {% if config.get('TZ') == 'Europe/London' %}selected{% endif %}>Europe/London</option>
+                                <option value="America/New_York" {% if config.get('TZ') == 'America/New_York' %}selected{% endif %}>America/New_York</option>
+                                <option value="America/Los_Angeles" {% if config.get('TZ') == 'America/Los_Angeles' %}selected{% endif %}>America/Los_Angeles</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="map_name">
+                                <i class="fas fa-map"></i> Térkép
+                            </label>
+                            <select id="map_name" name="map_name" 
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="TheIsland" {% if config.get('MAP_NAME', 'TheIsland') == 'TheIsland' %}selected{% endif %}>The Island</option>
+                                <option value="TheCenter" {% if config.get('MAP_NAME') == 'TheCenter' %}selected{% endif %}>The Center</option>
+                                <option value="ScorchedEarth" {% if config.get('MAP_NAME') == 'ScorchedEarth' %}selected{% endif %}>Scorched Earth</option>
+                                <option value="Ragnarok" {% if config.get('MAP_NAME') == 'Ragnarok' %}selected{% endif %}>Ragnarok</option>
+                                <option value="Aberration" {% if config.get('MAP_NAME') == 'Aberration' %}selected{% endif %}>Aberration</option>
+                                <option value="Extinction" {% if config.get('MAP_NAME') == 'Extinction' %}selected{% endif %}>Extinction</option>
+                                <option value="Valguero" {% if config.get('MAP_NAME') == 'Valguero' %}selected{% endif %}>Valguero</option>
+                                <option value="Genesis" {% if config.get('MAP_NAME') == 'Genesis' %}selected{% endif %}>Genesis</option>
+                                <option value="CrystalIsles" {% if config.get('MAP_NAME') == 'CrystalIsles' %}selected{% endif %}>Crystal Isles</option>
+                                <option value="Fjordur" {% if config.get('MAP_NAME') == 'Fjordur' %}selected{% endif %}>Fjordur</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="session_name">
+                            <i class="fas fa-tag"></i> Szerver Munkamenet Neve
+                        </label>
+                        <input type="text" id="session_name" name="session_name" 
+                               value="{{ config.get('SESSION_NAME', '') }}" 
+                               placeholder="pl. Rexodon - The Island" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label for="server_admin_password">
+                                <i class="fas fa-key"></i> Szerver Admin Jelszó <span style="color: red;">*</span>
+                            </label>
+                            <input type="text" id="server_admin_password" name="server_admin_password" 
+                                   value="{{ config.get('ServerAdminPassword', '') }}" 
+                                   placeholder="Admin jelszó (kötelező)" 
+                                   required
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="server_password">
+                                <i class="fas fa-lock"></i> Szerver Jelszó (opcionális)
+                            </label>
+                            <input type="password" id="server_password" name="server_password" 
+                                   placeholder="Játékos jelszó (üres = nyilvános)" 
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        </div>
+                    </div>
+                    
+                    <!-- Boolean beállítások -->
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 10px;">Beállítások</h4>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="battleeye" value="true" {% if config.get('BATTLEEYE', False) %}checked{% endif %} style="width: auto;">
+                                <span>BattleEye</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="api" value="true" {% if config.get('API', False) %}checked{% endif %} style="width: auto;">
+                                <span>API</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="rcon_enabled" value="true" {% if config.get('RCON_ENABLED', True) %}checked{% endif %} style="width: auto;">
+                                <span>RCON Engedélyezve</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="display_manager_monitor_message" value="true" {% if config.get('DISPLAY_MANAGER_MONITOR_MESSAGE', False) %}checked{% endif %} style="width: auto;">
+                                <span>ZedinArkManager Monitor Üzenet</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="random_startup_delay" value="true" {% if config.get('RANDOM_STARTUP_DELAY', True) %}checked{% endif %} style="width: auto;">
+                                <span>Véletlenszerű Indítási Késleltetés</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="cpu_optimization" value="true" {% if config.get('CPU_OPTIMIZATION', True) %}checked{% endif %} style="width: auto;">
+                                <span>CPU Optimalizálás</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="enable_motd" value="true" {% if config.get('ENABLE_MOTD', True) %}checked{% endif %} style="width: auto;">
+                                <span>MOTD Engedélyezve</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" name="show_admin_commands_in_chat" value="true" {% if config.get('SHOW_ADMIN_COMMANDS_IN_CHAT', False) %}checked{% endif %} style="width: auto;">
+                                <span>Admin Parancsok Chat-ben</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- MOTD beállítások -->
+                    <div class="form-group" id="motd_settings" style="display: {% if config.get('ENABLE_MOTD', True) %}block{% else %}none{% endif %};">
+                        <label for="motd">
+                            <i class="fas fa-comment"></i> MOTD Üzenet
+                        </label>
+                        <input type="text" id="motd" name="motd" 
+                               value="{{ config.get('MOTD', '') }}" 
+                               placeholder="pl. Welcome To Rexodon Cluster!" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                            <div>
+                                <label for="motd_duration">MOTD Időtartam (másodperc)</label>
+                                <input type="number" id="motd_duration" name="motd_duration" value="{{ config.get('MOTD_DURATION', 30) }}" min="1" 
+                                       style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Backup beállítások -->
+                    <div class="form-group" style="margin-top: 20px;">
+                        <h4 style="margin-bottom: 10px;">Automatikus Backup Beállítások</h4>
+                        <div>
+                            <label for="auto_backup_interval">Automatikus Backup Intervallum</label>
+                            <select id="auto_backup_interval" name="auto_backup_interval" 
+                                    style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">
+                                <option value="">Nincs automatikus backup</option>
+                                <option value="3" {% if config.get('AUTO_BACKUP_INTERVAL') == 3 %}selected{% endif %}>3 óra</option>
+                                <option value="6" {% if config.get('AUTO_BACKUP_INTERVAL') == 6 %}selected{% endif %}>6 óra</option>
+                                <option value="12" {% if config.get('AUTO_BACKUP_INTERVAL') == 12 %}selected{% endif %}>12 óra</option>
+                                <option value="24" {% if config.get('AUTO_BACKUP_INTERVAL') == 24 %}selected{% endif %}>24 óra</option>
+                            </select>
+                            <small style="color: #666; display: block; margin-top: 5px;">
+                                A rendszer automatikusan készít backup-ot a Saved mappa teljes tartalmából a megadott időközönként.
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Egyedi Szerver Argumentumok -->
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="custom_server_args">
+                            <i class="fas fa-code"></i> Egyedi Szerver Argumentumok
+                        </label>
+                        <textarea id="custom_server_args" name="custom_server_args" rows="3" 
+                                  placeholder="Egyedi argumentumok (opcionális)" 
+                                  style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px;">{{ config.get('CUSTOM_SERVER_ARGS', '') }}</textarea>
+                    </div>
+                </div>
+                
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px;">
+                    <h4 style="margin-top: 0;">Szerver Információ</h4>
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Név:</td>
+                            <td style="padding: 5px;">{{ server.name }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Port:</td>
+                            <td style="padding: 5px;">{{ server.port }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Query Port:</td>
+                            <td style="padding: 5px;">{{ server.query_port }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">RCON Port:</td>
+                            <td style="padding: 5px;">{{ server.rcon_port or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Max Játékosok:</td>
+                            <td style="padding: 5px;">{{ server.max_players }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-weight: bold;">Státusz:</td>
+                            <td style="padding: 5px;">
+                                {% if server.status.value == 'running' %}
+                                    <span class="badge badge-success">Fut</span>
+                                {% elif server.status.value == 'stopped' %}
+                                    <span class="badge badge-secondary">Leállítva</span>
+                                {% else %}
+                                    <span class="badge badge-warning">Újraindítás</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Módosítások Mentése
+                    </button>
+                    <a href="/ark-evolved/servers" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+let allMods = [];
+
+// Modok betöltése
+async function loadMods() {
+    try {
+        const response = await fetch('/mods/api/list');
+        const data = await response.json();
+        
+        if (data.success && data.mods) {
+            allMods = data.mods;
+            const availableSelect = document.getElementById('available_mods_select');
+            const activeSelect = document.getElementById('active_mods_select');
+            const passiveSelect = document.getElementById('passive_mods_select');
+            
+            // Aktuális mod ID-k
+            const currentActiveMods = document.getElementById('active_mods').value.split(',').filter(id => id.trim());
+            const currentPassiveMods = document.getElementById('passive_mods').value.split(',').filter(id => id.trim());
+            
+            // Modok hozzáadása
+            data.mods.forEach(mod => {
+                const modId = mod.mod_id;
+                const isActive = currentActiveMods.includes(modId);
+                const isPassive = currentPassiveMods.includes(modId);
+                
+                // Minden mod az elérhető listába kerül
+                const availableOption = document.createElement('option');
+                availableOption.value = modId;
+                availableOption.textContent = mod.name;
+                availableSelect.appendChild(availableOption);
+                
+                // Ha aktív, akkor az aktív listába is
+                if (isActive) {
+                    const activeOption = document.createElement('option');
+                    activeOption.value = modId;
+                    activeOption.textContent = mod.name;
+                    activeSelect.appendChild(activeOption);
+                }
+                
+                // Ha passzív, akkor a passzív listába is
+                if (isPassive) {
+                    const passiveOption = document.createElement('option');
+                    passiveOption.value = modId;
+                    passiveOption.textContent = mod.name;
+                    passiveSelect.appendChild(passiveOption);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Modok betöltése hiba:', error);
+    }
+}
+
+// Mod mozgatása aktív listába
+function moveToActive() {
+    const availableSelect = document.getElementById('available_mods_select');
+    const activeSelect = document.getElementById('active_mods_select');
+    const passiveSelect = document.getElementById('passive_mods_select');
+    const selected = Array.from(availableSelect.selectedOptions);
+    
+    selected.forEach(option => {
+        // Ellenőrizzük, hogy nincs-e már az aktív vagy passzív listában
+        const modId = option.value;
+        const existsInActive = Array.from(activeSelect.options).some(opt => opt.value === modId);
+        const existsInPassive = Array.from(passiveSelect.options).some(opt => opt.value === modId);
+        
+        if (!existsInActive && !existsInPassive) {
+            // Hozzáadás az aktív listához (de az elérhető listában marad)
+            const newOption = document.createElement('option');
+            newOption.value = option.value;
+            newOption.textContent = option.textContent;
+            activeSelect.appendChild(newOption);
+        } else {
+            // Duplikáció esetén figyelmeztetés
+            alert(`A "${option.textContent}" mod már szerepel az aktív vagy passzív modok között!`);
+        }
+    });
+    
+    // Kijelölés törlése
+    availableSelect.selectedIndex = -1;
+}
+
+// Mod mozgatása passzív listába
+function moveToPassive() {
+    const availableSelect = document.getElementById('available_mods_select');
+    const activeSelect = document.getElementById('active_mods_select');
+    const passiveSelect = document.getElementById('passive_mods_select');
+    const selected = Array.from(availableSelect.selectedOptions);
+    
+    selected.forEach(option => {
+        // Ellenőrizzük, hogy nincs-e már az aktív vagy passzív listában
+        const modId = option.value;
+        const existsInActive = Array.from(activeSelect.options).some(opt => opt.value === modId);
+        const existsInPassive = Array.from(passiveSelect.options).some(opt => opt.value === modId);
+        
+        if (!existsInActive && !existsInPassive) {
+            // Hozzáadás a passzív listához (de az elérhető listában marad)
+            const newOption = document.createElement('option');
+            newOption.value = option.value;
+            newOption.textContent = option.textContent;
+            passiveSelect.appendChild(newOption);
+        } else {
+            // Duplikáció esetén figyelmeztetés
+            alert(`A "${option.textContent}" mod már szerepel az aktív vagy passzív modok között!`);
+        }
+    });
+    
+    // Kijelölés törlése
+    availableSelect.selectedIndex = -1;
+}
+
+// Mod eltávolítása aktív listából
+function removeFromActive() {
+    const activeSelect = document.getElementById('active_mods_select');
+    const selected = Array.from(activeSelect.selectedOptions);
+    
+    selected.forEach(option => {
+        // Csak eltávolítjuk az aktív listából, az elérhető listában marad
+        option.remove();
+    });
+}
+
+// Mod eltávolítása passzív listából
+function removeFromPassive() {
+    const passiveSelect = document.getElementById('passive_mods_select');
+    const selected = Array.from(passiveSelect.selectedOptions);
+    
+    selected.forEach(option => {
+        // Csak eltávolítjuk a passzív listából, az elérhető listában marad
+        option.remove();
+    });
+}
+
+// Form submit előtt mod ID-k összegyűjtése
+document.addEventListener('DOMContentLoaded', function() {
+    loadMods();
+    
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Aktív modok
+            const activeSelect = document.getElementById('active_mods_select');
+            const activeModIds = Array.from(activeSelect.options).map(opt => opt.value);
+            document.getElementById('active_mods').value = activeModIds.join(',');
+            
+            // Passzív modok
+            const passiveSelect = document.getElementById('passive_mods_select');
+            const passiveModIds = Array.from(passiveSelect.options).map(opt => opt.value);
+            document.getElementById('passive_mods').value = passiveModIds.join(',');
+        });
+    }
+});
+
+// Dinamikus beállítások megjelenítése/elrejtése
+document.addEventListener('DOMContentLoaded', function() {
+    const enableMotdCheckbox = document.querySelector('input[name="enable_motd"]');
+    const motdSettings = document.getElementById('motd_settings');
+    const updateServerCheckbox = document.querySelector('input[name="update_server"]');
+    const updateSettings = document.getElementById('update_settings');
+    
+    if (enableMotdCheckbox && motdSettings) {
+        function toggleMotdSettings() {
+            motdSettings.style.display = enableMotdCheckbox.checked ? 'block' : 'none';
+        }
+        enableMotdCheckbox.addEventListener('change', toggleMotdSettings);
+    }
+    
+});
+</script>
+{% endblock %}
+{% endblock %}
+

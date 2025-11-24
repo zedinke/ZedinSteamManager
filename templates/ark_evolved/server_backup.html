@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Backup Kezelés - {{ server.name }} - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-database"></i> Backup Kezelés</h2>
+        <p>{{ server.name }} szerver backup kezelése</p>
+        <div style="margin-top: 10px;">
+            <a href="/ark-evolved/servers/{{ server.id }}/edit" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Vissza a szerver szerkesztéshez
+            </a>
+        </div>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-database"></i> Backup Kezelés</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong><i class="fas fa-info-circle"></i> Információ:</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li>A backup tartalmazza a Saved mappa teljes tartalmát</li>
+                    <li>Kompatibilis más rendszerekkel (tar.gz, zip formátumok)</li>
+                    <li>Restore előtt automatikusan készül biztonsági másolat</li>
+                    <li>Automatikus backup beállítása a szerver szerkesztés oldalon történik</li>
+                </ul>
+            </div>
+            
+            <!-- Backup korlátok információ -->
+            <div class="alert alert-warning" style="margin-top: 20px;">
+                <strong><i class="fas fa-exclamation-triangle"></i> Backup Korlátok:</strong>
+                <div style="margin-top: 10px;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>Szerver-specifikus korlát:</strong> 
+                        <span style="color: {% if current_backup_count >= max_backup_per_server * 0.8 %}red{% elif current_backup_count >= max_backup_per_server * 0.6 %}orange{% else %}green{% endif %};">
+                            {{ current_backup_count }} / {{ max_backup_per_server }} backup
+                        </span>
+                        {% if current_server_backup_size_gb > 0 %}
+                            ({{ "%.2f"|format(current_server_backup_size_gb) }} GB)
+                        {% endif %}
+                    </div>
+                    <div>
+                        <strong>Rendszer-szintű korlát:</strong> 
+                        <span style="color: {% if total_backup_size_gb >= max_total_backup_size_gb * 0.8 %}red{% elif total_backup_size_gb >= max_total_backup_size_gb * 0.6 %}orange{% else %}green{% endif %};">
+                            {{ "%.2f"|format(total_backup_size_gb) }} / {{ max_total_backup_size_gb }} GB
+                        </span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                        <i class="fas fa-info-circle"></i> Ha valamelyik korlát megtelik, a legrégebbi backup automatikusan törlődik.
+                    </div>
+                </div>
+            </div>
+            
+            {% if warnings %}
+                <div class="alert alert-warning" style="margin-top: 15px;">
+                    {% for warning in warnings %}
+                        <div style="margin-bottom: 5px;">
+                            <i class="fas fa-exclamation-triangle"></i> {{ warning }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <form method="POST" action="/ark-evolved/servers/{{ server.id }}/backup/create" style="display: inline;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Új Backup Készítése
+                    </button>
+                </form>
+                
+                <form method="POST" action="/ark-evolved/servers/{{ server.id }}/backup/upload" enctype="multipart/form-data" style="display: inline;">
+                    <input type="file" name="file" accept=".tar.gz,.tar,.zip" required style="display: none;" id="backup_upload_input" onchange="this.form.submit()">
+                    <button type="button" class="btn btn-info" onclick="document.getElementById('backup_upload_input').click()">
+                        <i class="fas fa-upload"></i> Backup Feltöltése
+                    </button>
+                </form>
+            </div>
+            
+            {% if auto_backup_interval %}
+                <div class="alert alert-success" style="margin-bottom: 20px;" id="auto_backup_status">
+                    <i class="fas fa-clock"></i> Automatikus backup beállítva: {{ auto_backup_interval }} óránként
+                    {% if next_backup_time %}
+                        <br>
+                        <strong id="next_backup_countdown" style="margin-top: 10px; display: block;">
+                            Következő backup: <span id="countdown_text">Számítás...</span>
+                        </strong>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="alert alert-warning" style="margin-bottom: 20px;">
+                    <i class="fas fa-exclamation-triangle"></i> Automatikus backup nincs beállítva. 
+                    <a href="/ark-evolved/servers/{{ server.id }}/edit">Beállítás itt</a>
+                </div>
+            {% endif %}
+            
+            <h4 style="margin-top: 30px; margin-bottom: 15px;">Backup Lista</h4>
+            
+            {% if backups %}
+                <table class="table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 12px; text-align: left;">Fájl Név</th>
+                            <th style="padding: 12px; text-align: left;">Méret</th>
+                            <th style="padding: 12px; text-align: left;">Létrehozva</th>
+                            <th style="padding: 12px; text-align: center;">Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for backup in backups %}
+                            <tr style="border-bottom: 1px solid #dee2e6;">
+                                <td style="padding: 12px;">
+                                    <i class="fas fa-file-archive"></i> {{ backup.name }}
+                                </td>
+                                <td style="padding: 12px;">{{ backup.size_mb }} MB</td>
+                                <td style="padding: 12px;">{{ backup.created.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td style="padding: 12px; text-align: center;">
+                                    <div style="display: flex; gap: 5px; justify-content: center;">
+                                        <a href="/ark-evolved/servers/{{ server.id }}/backup/{{ backup.name }}/download" class="btn btn-sm btn-info" title="Letöltés">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                        <form method="POST" action="/ark-evolved/servers/{{ server.id }}/backup/{{ backup.name }}/restore" style="display: inline;" onsubmit="return confirm('Biztosan visszaállítja ezt a backup-ot? A jelenlegi Saved mappa tartalma biztonsági másolatba kerül.');">
+                                            <button type="submit" class="btn btn-sm btn-warning" title="Visszaállítás">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="/ark-evolved/servers/{{ server.id }}/backup/{{ backup.name }}/delete" style="display: inline;" onsubmit="return confirm('Biztosan törli ezt a backup-ot?');">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Törlés">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Még nincs backup létrehozva.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if auto_backup_interval and next_backup_time %}
+<script>
+// Dinamikus countdown frissítés
+function updateCountdown() {
+    const nextBackupTime = new Date('{{ next_backup_time.strftime("%Y-%m-%d %H:%M:%S") }}');
+    const now = new Date();
+    const diff = nextBackupTime - now;
+    
+    if (diff <= 0) {
+        // Ha lejárt az idő, akkor frissítjük az oldalt
+        document.getElementById('countdown_text').textContent = 'Hamarosan...';
+        setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+        return;
+    }
+    
+    // Idő számítása
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    // Szöveg formázása
+    let countdownText = '';
+    if (hours > 0) {
+        countdownText = `${hours} óra ${minutes} perc ${seconds} másodperc`;
+    } else if (minutes > 0) {
+        countdownText = `${minutes} perc ${seconds} másodperc`;
+    } else {
+        countdownText = `${seconds} másodperc`;
+    }
+    
+    document.getElementById('countdown_text').textContent = countdownText;
+}
+
+// Frissítés másodpercenként
+updateCountdown();
+setInterval(updateCountdown, 1000);
+</script>
+{% endif %}
+
+{% endblock %}
+

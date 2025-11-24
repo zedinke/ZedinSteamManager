@@ -1,0 +1,1266 @@
+{% extends "base.html" %}
+
+{% block title %}Ark Szerverek - ZedinArkManager{% endblock %}
+
+{% block extra_head %}
+<script>
+// FONTOS: A függvényeket AZONNAL definiáljuk, hogy biztosan elérhetők legyenek
+// Még mielőtt a HTML betöltődne, már elérhetők legyenek a függvények
+
+// Operation Status Notification - GLOBÁLIS FÜGGVÉNYEK
+window.showOperationStatus = function(title, message, type = 'info') {
+    const statusDiv = document.getElementById('operationStatus');
+    const titleDiv = document.getElementById('operationTitle');
+    const messageDiv = document.getElementById('operationMessage');
+    
+    if (!statusDiv || !titleDiv || !messageDiv) {
+        console.warn('Operation status elemek nem találhatók');
+        return;
+    }
+    
+    const colors = {
+        'success': '#28a745',
+        'warning': '#ffc107',
+        'info': '#17a2b8',
+        'danger': '#dc3545'
+    };
+    
+    const color = colors[type] || colors['info'];
+    statusDiv.style.borderLeftColor = color;
+    const spinner = statusDiv.querySelector('.spinner');
+    if (spinner) {
+        spinner.style.borderTopColor = color;
+    }
+    
+    titleDiv.textContent = title;
+    messageDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        if (statusDiv.style.display === 'block') {
+            window.hideOperationStatus();
+        }
+    }, 30000);
+};
+
+window.hideOperationStatus = function() {
+    const statusDiv = document.getElementById('operationStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+    }
+};
+
+window.updateOperationStatus = function(message) {
+    const messageDiv = document.getElementById('operationMessage');
+    if (messageDiv) {
+        messageDiv.textContent = message;
+    }
+};
+
+// Shutdown függvények
+function scheduleShutdown(serverId) {
+    const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+    const statusDiv = document.getElementById(`shutdownStatus_${serverId}`);
+    const countdownDiv = document.getElementById(`shutdownCountdown_${serverId}`);
+    const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+    
+    if (!minutesInput) {
+        alert('Shutdown input mező nem található');
+        return;
+    }
+    
+    const minutes = parseInt(minutesInput.value);
+    if (isNaN(minutes) || minutes < 1 || minutes > 60) {
+        alert('Kérlek, adj meg egy érvényes számot 1-60 perc között!');
+        return;
+    }
+    
+    showOperationStatus('Shutdown ütemezés', `Leállítás ütemezése ${minutes} percre...`, 'warning');
+    
+    fetch(`/ark-evolved/servers/${serverId}/shutdown`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ minutes: minutes })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showOperationStatus('Shutdown ütemezve', `Leállítás ütemezve ${minutes} percre`, 'success');
+            if (statusDiv) statusDiv.style.display = 'block';
+            if (cancelBtn) cancelBtn.style.display = 'inline-block';
+            minutesInput.disabled = true;
+            
+            // Countdown indítása
+            startShutdownCountdown(serverId, minutes);
+        } else {
+            showOperationStatus('Hiba', data.message || 'Shutdown ütemezése sikertelen', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Shutdown hiba:', error);
+        showOperationStatus('Hiba', 'Shutdown ütemezése sikertelen', 'danger');
+    });
+}
+
+function cancelShutdown(serverId) {
+    fetch(`/ark-evolved/servers/${serverId}/shutdown/cancel`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showOperationStatus('Shutdown törölve', 'Az ütemezett leállítás törölve', 'info');
+            const statusDiv = document.getElementById(`shutdownStatus_${serverId}`);
+            const countdownDiv = document.getElementById(`shutdownCountdown_${serverId}`);
+            const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+            const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+            
+            if (statusDiv) statusDiv.style.display = 'none';
+            if (countdownDiv) countdownDiv.textContent = '';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (minutesInput) minutesInput.disabled = false;
+            
+            // Countdown leállítása
+            if (window.shutdownIntervals && window.shutdownIntervals[serverId]) {
+                clearInterval(window.shutdownIntervals[serverId]);
+                delete window.shutdownIntervals[serverId];
+            }
+        } else {
+            alert(data.message || 'Shutdown törlése sikertelen');
+        }
+    })
+    .catch(error => {
+        console.error('Shutdown törlés hiba:', error);
+        alert('Shutdown törlése sikertelen');
+    });
+}
+
+function startShutdownCountdown(serverId, minutes) {
+    // Countdown intervallumok tárolása
+    if (!window.shutdownIntervals) {
+        window.shutdownIntervals = {};
+    }
+    
+    // Ha már van countdown, töröljük
+    if (window.shutdownIntervals[serverId]) {
+        clearInterval(window.shutdownIntervals[serverId]);
+    }
+    
+    const countdownDiv = document.getElementById(`shutdownCountdown_${serverId}`);
+    if (!countdownDiv) return;
+    
+    let totalSeconds = minutes * 60;
+    
+    // Frissítés másodpercenként
+    window.shutdownIntervals[serverId] = setInterval(function() {
+        // Ellenőrizzük a státuszt
+        fetch(`/ark-evolved/servers/${serverId}/shutdown/status`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success || !data.scheduled) {
+                    // Shutdown törölve
+                    clearInterval(window.shutdownIntervals[serverId]);
+                    delete window.shutdownIntervals[serverId];
+                    const statusDiv = document.getElementById(`shutdownStatus_${serverId}`);
+                    const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+                    const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+                    if (statusDiv) statusDiv.style.display = 'none';
+                    if (countdownDiv) countdownDiv.textContent = '';
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    if (minutesInput) minutesInput.disabled = false;
+                    return;
+                }
+                
+                // Számoljuk a hátralévő időt
+                const shutdownTime = new Date(data.shutdown_time);
+                const now = new Date();
+                const remaining = Math.max(0, Math.floor((shutdownTime - now) / 1000));
+                
+                if (remaining <= 0) {
+                    clearInterval(window.shutdownIntervals[serverId]);
+                    delete window.shutdownIntervals[serverId];
+                    countdownDiv.textContent = 'Leállítás...';
+                    return;
+                }
+                
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                
+                if (remaining <= 30) {
+                    // 30 másodperctől másodpercenként
+                    countdownDiv.textContent = `Leállítás ${secs} másodperc múlva!`;
+                } else {
+                    // Percekben
+                    countdownDiv.textContent = `Leállítás ${mins}:${secs.toString().padStart(2, '0')} múlva`;
+                }
+            })
+            .catch(error => {
+                console.error('Shutdown status hiba:', error);
+            });
+    }, 1000);
+}
+
+// RCON Status ellenőrzés
+function checkRconStatus(serverId) {
+    fetch(`/ark-evolved/servers/${serverId}/rcon/status`)
+        .then(response => response.json())
+        .then(data => {
+            const statusDiv = document.getElementById(`rconStatus_${serverId}`);
+            if (!statusDiv) return;
+            
+            if (data.success) {
+                if (!data.rcon_enabled) {
+                    statusDiv.innerHTML = '<span class="badge badge-secondary"><i class="fas fa-ban"></i> RCON kikapcsolva</span>';
+                } else if (data.rcon_working) {
+                    statusDiv.innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> RCON OK</span>';
+                } else {
+                    statusDiv.innerHTML = '<span class="badge badge-danger"><i class="fas fa-times-circle"></i> RCON nem elérhető</span>';
+                }
+            } else {
+                statusDiv.innerHTML = '<span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> Hiba</span>';
+            }
+        })
+        .catch(error => {
+            console.error(`RCON status hiba szerver ${serverId}:`, error);
+            const statusDiv = document.getElementById(`rconStatus_${serverId}`);
+            if (statusDiv) {
+                statusDiv.innerHTML = '<span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> Hiba</span>';
+            }
+        });
+}
+
+// Oldal betöltésekor ellenőrizzük a shutdown státuszokat és RCON státuszokat
+document.addEventListener('DOMContentLoaded', function() {
+    // RCON státusz ellenőrzése minden szerverhez
+    {% for item in servers_data %}
+    {% set server = item.server %}
+    checkRconStatus({{ server.id }});
+    {% endfor %}
+    
+    // Minden futó szerverhez ellenőrizzük a shutdown státuszt
+    const shutdownStatusDivs = document.querySelectorAll('[id^="shutdownStatus_"]');
+    shutdownStatusDivs.forEach(function(div) {
+        const serverId = div.id.replace('shutdownStatus_', '');
+        fetch(`/ark-evolved/servers/${serverId}/shutdown/status`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.scheduled) {
+                    const shutdownTime = new Date(data.shutdown_time);
+                    const now = new Date();
+                    const remaining = Math.max(0, Math.floor((shutdownTime - now) / 1000));
+                    
+                    if (remaining > 0) {
+                        const minutes = Math.floor(remaining / 60);
+                        div.style.display = 'block';
+                        const cancelBtn = document.getElementById(`cancelShutdownBtn_${serverId}`);
+                        const minutesInput = document.getElementById(`shutdownMinutes_${serverId}`);
+                        if (cancelBtn) cancelBtn.style.display = 'inline-block';
+                        if (minutesInput) minutesInput.disabled = true;
+                        startShutdownCountdown(serverId, minutes);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Shutdown status ellenőrzés hiba:', error);
+            });
+    });
+});
+
+// Logs és Shutdown függvények - EGYSZERŰ, KÖZVETLEN IMPLEMENTÁCIÓ
+// Ezek a függvények azonnal elérhetők, még mielőtt a script blokk betöltődne
+
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- Operation Status Notification -->
+<div id="operationStatus" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 2000; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-width: 300px; border-left: 4px solid #007bff;">
+    <div style="display: flex; align-items: center; gap: 15px;">
+        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite;"></div>
+        <div style="flex: 1;">
+            <div style="font-weight: bold; color: #333; margin-bottom: 3px;" id="operationTitle">Művelet folyamatban...</div>
+            <div style="font-size: 12px; color: #666;" id="operationMessage">Kérlek várj...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-server"></i> Ark Szerverek</h2>
+        <p>Ark Survival Evolved szerverek kezelése</p>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div style="margin-bottom: 20px;">
+        <a href="/ark-evolved/servers/create" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Új Szerver Létrehozása
+        </a>
+        <a href="/ark-evolved/clusters" class="btn btn-secondary" style="margin-left: 10px;">
+            <i class="fas fa-network-wired"></i> Cluster-ek
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list"></i> Szerverek</h3>
+        </div>
+        <div class="card-body">
+            {% if servers_data %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Név</th>
+                            <th>Cluster</th>
+                            <th>Port</th>
+                            <th>Query Port</th>
+                            <th>RCON Port</th>
+                            <th>Max Játékosok</th>
+                            <th>RAM Limit</th>
+                            <th>Vásárolt RAM</th>
+                            <th>Státusz</th>
+                            <th>RCON Status</th>
+                            <th>Token információk</th>
+                            <th>Létrehozva</th>
+                            <th>Műveletek</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in servers_data %}
+                        {% set server = item.server %}
+                            <tr>
+                                <td><strong>{{ server.name }}</strong></td>
+                                <td>
+                                    {% if server.cluster %}
+                                        <code>{{ server.cluster.cluster_id }}</code>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ server.port or '-' }}</td>
+                                <td>{{ server.query_port or '-' }}</td>
+                                <td>{{ server.rcon_port or '-' }}</td>
+                                <td>{{ server.max_players }}</td>
+                                <td>
+                                    {% if server.ram_limit_gb %}
+                                        {{ server.ram_limit_gb }} GB
+                                        {% if is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-secondary" onclick="showRamLimitModal({{ server.id }}, {{ server.ram_limit_gb }})" title="RAM limit módosítása">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Nincs beállítva</span>
+                                        {% if is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-primary" onclick="showRamLimitModal({{ server.id }}, 0)" title="RAM limit beállítása">
+                                                <i class="fas fa-plus"></i> Beállítás
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if server.purchased_ram_gb and server.purchased_ram_gb > 0 %}
+                                        {{ server.purchased_ram_gb }} GB
+                                        {% if not is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-success" onclick="showRamPurchaseModal({{ server.id }}, {{ server.purchased_ram_gb }})" title="RAM bővítés vásárlása">
+                                                <i class="fas fa-shopping-cart"></i> Bővítés
+                                            </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">0 GB</span>
+                                        {% if not is_manager_admin %}
+                                            <br><button type="button" class="btn btn-xs btn-success" onclick="showRamPurchaseModal({{ server.id }}, 0)" title="RAM bővítés vásárlása">
+                                                <i class="fas fa-shopping-cart"></i> Vásárlás
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if server.status.value == 'running' %}
+                                        <span class="badge badge-success">Fut</span>
+                                    {% elif server.status.value == 'stopped' %}
+                                        <span class="badge badge-secondary">Leállítva</span>
+                                    {% elif server.status.value == 'restarting' %}
+                                        <span class="badge badge-warning">Újraindítás</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div id="rconStatus_{{ server.id }}" style="display: inline-block;">
+                                        <span class="badge badge-secondary">
+                                            <i class="fas fa-spinner fa-spin"></i> Ellenőrzés...
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if server.token_used_id %}
+                                        {% if item.token_expired %}
+                                            <div class="text-danger">
+                                                <i class="fas fa-exclamation-triangle"></i> Token lejárt
+                                            </div>
+                                        {% else %}
+                                            {% if item.token_days_left is not none %}
+                                                <div class="text-info">
+                                                    <i class="fas fa-key"></i> {{ item.token_days_left }} nap
+                                                </div>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Nincs token</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ server.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                        {% if server.status.value == 'running' %}
+                                            <form method="POST" action="/ark-evolved/servers/{{ server.id }}/stop" style="display: inline;" onsubmit="showOperationStatus('Leállítás', 'A szerver leállítása folyamatban...', 'warning'); return true;">
+                                                <button type="submit" class="btn btn-sm btn-warning" title="Szerver leállítása">
+                                                    <i class="fas fa-stop"></i> Leállítás
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="/ark-evolved/servers/{{ server.id }}/restart" style="display: inline;" onsubmit="showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info'); return true;">
+                                                <button type="submit" class="btn btn-sm btn-info" title="Szerver újraindítása">
+                                                    <i class="fas fa-redo"></i> Újraindítás
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <form method="POST" action="/ark-evolved/servers/{{ server.id }}/start" style="display: inline;" onsubmit="showOperationStatus('Indítás', 'A szerver indítása folyamatban...', 'success'); return true;">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Szerver indítása">
+                                                    <i class="fas fa-play"></i> Indítás
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        <a href="/ark-evolved/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary" title="Szerver szerkesztése">
+                                            <i class="fas fa-edit"></i> Szerkesztés
+                                        </a>
+                                        <a href="/ark-evolved/servers/{{ server.id }}/logs/page" class="btn btn-sm btn-info" title="Szerver logok megtekintése">
+                                            <i class="fas fa-file-alt"></i> Logok
+                                        </a>
+                                        <form method="POST" action="/ark-evolved/servers/{{ server.id }}/delete" 
+                                              style="display: inline;"
+                                              onsubmit="return confirm('Biztosan törlöd ezt a szervert? Ez a művelet nem visszavonható!');">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Szerver törlése">
+                                                <i class="fas fa-trash"></i> Törlés
+                                            </button>
+                                            </form>
+                                        </div>
+                                        {% if server.status.value == 'running' %}
+                                        <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; display: flex; gap: 10px; align-items: center;">
+                                            <label style="margin: 0; font-weight: bold;">Shutdown (perc):</label>
+                                            <input type="number" id="shutdownMinutes_{{ server.id }}" min="1" max="60" value="5" style="width: 80px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                                            <button type="button" class="btn btn-sm btn-warning" onclick="scheduleShutdown({{ server.id }})" title="Késleltetett leállítás">
+                                                <i class="fas fa-clock"></i> Shutdown
+                                            </button>
+                                            <div id="shutdownStatus_{{ server.id }}" style="margin-left: 10px; font-weight: bold; color: #dc3545; display: none;">
+                                                <span id="shutdownCountdown_{{ server.id }}"></span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% if item.start_command %}
+                            <tr class="command-row" style="background-color: #f8f9fa;">
+                                <td colspan="12" style="padding: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <strong style="min-width: 120px;">Indítási parancs:</strong>
+                                        <code style="flex: 1; background: #1e1e1e; color: #d4d4d4; padding: 8px 12px; border-radius: 4px; font-size: 12px; word-break: break-all; white-space: pre-wrap;">{{ item.start_command }}</code>
+                                        <button type="button" class="btn btn-sm btn-secondary" onclick="copyCommand(this)" title="Parancs másolása">
+                                            <i class="fas fa-copy"></i> Másolás
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Még nincs létrehozott Ark szerver. 
+                    <a href="/ark-evolved/servers/create">Hozz létre egyet most!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyCommand(button) {
+    const codeElement = button.closest('td').querySelector('code');
+    const text = codeElement.textContent;
+    
+    // Clipboard API használata
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i> Másolva!';
+            button.classList.add('btn-success');
+            button.classList.remove('btn-secondary');
+            
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('btn-success');
+                button.classList.add('btn-secondary');
+            }, 2000);
+        }).catch(err => {
+            console.error('Hiba a másolás során:', err);
+            alert('Nem sikerült a másolás');
+        });
+    } else {
+        // Fallback: régi módszer
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i> Másolva!';
+            button.classList.add('btn-success');
+            button.classList.remove('btn-secondary');
+            
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.classList.remove('btn-success');
+                button.classList.add('btn-secondary');
+            }, 2000);
+        } catch (err) {
+            alert('Nem sikerült a másolás');
+        }
+        document.body.removeChild(textarea);
+    }
+}
+
+{% if is_manager_admin %}
+// RAM Limit Modal (Manager Admin)
+function showRamLimitModal(serverId, currentLimit) {
+    const limit = prompt('Adja meg a RAM limitet GB-ban:', currentLimit || '');
+    if (limit !== null && limit !== '') {
+        const limitValue = parseInt(limit);
+        if (isNaN(limitValue) || limitValue < 0) {
+            alert('Érvénytelen érték! Kérjük, adjon meg egy pozitív számot.');
+            return;
+        }
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/ark-evolved/servers/${serverId}/ram-limit`;
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'ram_limit_gb';
+        input.value = limitValue;
+        form.appendChild(input);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+{% endif %}
+
+{% if not is_manager_admin and ram_pricing %}
+// RAM Purchase Modal (Server Admin)
+function showRamPurchaseModal(serverId, currentPurchased) {
+    const ramGb = prompt('Hány GB RAM-ot szeretne vásárolni?', '');
+    if (ramGb !== null && ramGb !== '') {
+        const ramValue = parseInt(ramGb);
+        if (isNaN(ramValue) || ramValue <= 0) {
+            alert('Érvénytelen érték! Kérjük, adjon meg egy pozitív számot.');
+            return;
+        }
+        
+        const pricePerGb = {{ ram_pricing.price_per_gb_eur / 100 }};
+        const totalPrice = ramValue * pricePerGb;
+        
+        if (confirm(`RAM bővítés vásárlása:\n\nMennyiség: ${ramValue} GB\nÁr: ${totalPrice.toFixed(2)} EUR\n\nFolytatja?`)) {
+            // Hozzáadás a kosárhoz
+            window.location.href = `/cart/add-ram-upgrade?server_id=${serverId}&ram_gb=${ramValue}`;
+        }
+    }
+}
+{% endif %}
+
+<script>
+// FONTOS: A függvényeket előre definiáljuk, hogy biztosan elérhetők legyenek
+// Operation Status Notification - GLOBÁLIS FÜGGVÉNYEK (előre definiálva)
+window.showOperationStatus = function(title, message, type = 'info') {
+    const statusDiv = document.getElementById('operationStatus');
+    const titleDiv = document.getElementById('operationTitle');
+    const messageDiv = document.getElementById('operationMessage');
+    
+    if (!statusDiv || !titleDiv || !messageDiv) {
+        console.warn('Operation status elemek nem találhatók');
+        return;
+    }
+    
+    // Színek típus szerint
+    const colors = {
+        'success': '#28a745',
+        'warning': '#ffc107',
+        'info': '#17a2b8',
+        'danger': '#dc3545'
+    };
+    
+    const color = colors[type] || colors['info'];
+    statusDiv.style.borderLeftColor = color;
+    const spinner = statusDiv.querySelector('.spinner');
+    if (spinner) {
+        spinner.style.borderTopColor = color;
+    }
+    
+    titleDiv.textContent = title;
+    messageDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    // Automatikus elrejtés 30 másodperc után (ha még nem törölték)
+    setTimeout(() => {
+        if (statusDiv.style.display === 'block') {
+            window.hideOperationStatus();
+        }
+    }, 30000);
+};
+
+window.hideOperationStatus = function() {
+    const statusDiv = document.getElementById('operationStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+    }
+};
+
+window.updateOperationStatus = function(message) {
+    const messageDiv = document.getElementById('operationMessage');
+    if (messageDiv) {
+        messageDiv.textContent = message;
+    }
+};
+
+// Logs modal változók
+let currentServerId = null;
+let logsModal = null;
+let logsContent = null;
+let liveLogsInterval = null;
+let currentLogType = 'docker';
+
+// Inicializáljuk a DOM elemeket, amikor a script betöltődik
+function initLogsModal() {
+    if (!logsModal) {
+        logsModal = document.getElementById('logsModal');
+    }
+    if (!logsContent) {
+        logsContent = document.getElementById('logsContent');
+    }
+}
+
+// DOM betöltése után inicializálás
+function initializeLogsSystem() {
+    initLogsModal();
+    // Ellenőrizzük, hogy a modal elemek léteznek-e
+    if (!logsModal) {
+        console.warn('logsModal nem található inicializáláskor');
+    }
+    if (!logsContent) {
+        console.warn('logsContent nem található inicializáláskor');
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeLogsSystem);
+} else {
+    initializeLogsSystem();
+}
+
+function closeLogsModal() {
+    if (logsModal) {
+        logsModal.style.display = 'none';
+    }
+    currentServerId = null;
+    stopLiveLogs();
+}
+
+function toggleLiveLogs() {
+    const toggle = document.getElementById('liveLogsToggle');
+    if (toggle.checked) {
+        startLiveLogs();
+    } else {
+        stopLiveLogs();
+    }
+}
+
+function changeLogType() {
+    const select = document.getElementById('logTypeSelect');
+    currentLogType = select.value;
+    if (currentServerId) {
+        showServerLogs(currentServerId, true);
+    }
+}
+
+function startLiveLogs() {
+    stopLiveLogs(); // Leállítjuk, ha már fut
+    if (currentServerId) {
+        liveLogsInterval = setInterval(() => {
+            loadLogs(currentServerId, false); // false = ne scrolloljon le, ha a felhasználó fent van
+        }, 2000); // 2 másodpercenként frissít
+    }
+}
+
+function stopLiveLogs() {
+    if (liveLogsInterval) {
+        clearInterval(liveLogsInterval);
+        liveLogsInterval = null;
+    }
+}
+
+function refreshLogs() {
+    if (currentServerId) {
+        loadLogs(currentServerId, true); // true = scrolloljon le az új sorokhoz
+    }
+}
+
+// Globális függvény, hogy elérhető legyen az onclick eseményhez
+// Teljes implementáció (backup, ha a fenti egyszerű verzió nem elég)
+window._showServerLogsImpl = async function(serverId, scrollToBottom = true) {
+    console.log('showServerLogs called with serverId:', serverId);
+    
+    // Inicializáljuk a modal elemeket
+    initLogsModal();
+    
+    // Ha még mindig nincs modal, próbáljuk meg újra
+    if (!logsModal) {
+        logsModal = document.getElementById('logsModal');
+    }
+    if (!logsContent) {
+        logsContent = document.getElementById('logsContent');
+    }
+    
+    if (!logsModal || !logsContent) {
+        console.error('Logs modal elemek nem találhatók');
+        console.error('logsModal:', logsModal);
+        console.error('logsContent:', logsContent);
+        alert('Hiba: A logok modal nem található. Kérlek, frissítsd az oldalt.');
+        return;
+    }
+    
+    console.log('Modal elemek megtalálva, megnyitás...');
+    currentServerId = serverId;
+    logsModal.style.display = 'flex';
+    logsContent.innerHTML = '<p>Logok betöltése...</p>';
+    
+    // Live logok indítása, ha be van kapcsolva
+    const toggle = document.getElementById('liveLogsToggle');
+    if (toggle && toggle.checked) {
+        startLiveLogs();
+    }
+    
+    await loadLogs(serverId, scrollToBottom);
+};
+
+// A placeholder-t felülírjuk a teljes implementációval
+// A fenti egyszerű implementációt használjuk az extra_head block-ban
+// window.showServerLogs = window._showServerLogsImpl; // Kommentálva, mert az extra_head-ban van definiálva
+
+// Futtassuk le a queue-ban lévő függvényhívásokat (ha még van)
+if (window._functionQueue && window._functionQueue.length > 0) {
+    console.log('Futtatom a queue-ban lévő függvényhívásokat:', window._functionQueue.length);
+    window._functionQueue.forEach(function(item) {
+        if (item.func === 'showServerLogs' && window._showServerLogsImpl) {
+            window._showServerLogsImpl.apply(null, item.args);
+        } else if (item.func === 'showShutdownModal' && window._showShutdownModalImpl) {
+            window._showShutdownModalImpl.apply(null, item.args);
+        }
+    });
+    window._functionQueue = [];
+}
+
+async function loadLogs(serverId, scrollToBottom = false) {
+    try {
+        const logType = currentLogType || 'docker';
+        const response = await fetch(`/ark-evolved/servers/${serverId}/logs?log_type=${logType}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            let html = `<div style="margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px;">`;
+            
+            if (data.log_type === 'docker') {
+                html += `<strong>Log típus:</strong> Docker konténer logok<br>`;
+                html += `<strong>Konténer:</strong> ${data.container_name || 'N/A'}<br>`;
+                html += `<strong>Státusz:</strong> <span class="badge ${data.container_status === 'running' ? 'badge-success' : 'badge-secondary'}">${data.container_status === 'running' ? 'Fut' : 'Leállítva'}</span><br>`;
+                if (data.log_source) {
+                    html += `<strong>Forrás:</strong> ${data.log_source === 'server_log_file' ? 'Saved/Logs/server.log' : 'Docker logs'}<br>`;
+                }
+                html += `<strong>Sorok:</strong> ${data.log_lines || 0}`;
+                if (data.total_lines) {
+                    html += ` / ${data.total_lines}`;
+                }
+            } else {
+                html += `<strong>Log típus:</strong> Indítási logok<br>`;
+                html += `<strong>Log fájl:</strong> ${data.log_file || 'N/A'}<br>`;
+                html += `<strong>Méret:</strong> ${data.file_size ? (data.file_size / 1024).toFixed(2) + ' KB' : 'N/A'}`;
+            }
+            html += `</div>`;
+            
+            const textareaId = 'logsTextarea';
+            const existingTextarea = document.getElementById(textareaId);
+            const wasAtBottom = existingTextarea ? 
+                (existingTextarea.scrollHeight - existingTextarea.scrollTop <= existingTextarea.clientHeight + 10) : true;
+            
+            html += `<textarea id="${textareaId}" readonly style="width: 100%; height: 500px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; white-space: pre-wrap; background: #1e1e1e; color: #d4d4d4; overflow-y: auto;">${escapeHtml(data.log_content)}</textarea>`;
+            html += `<div style="margin-top: 10px;">`;
+            html += `<button onclick="copyLogs()" class="btn btn-primary"><i class="fas fa-copy"></i> Másolás</button>`;
+            html += `</div>`;
+            logsContent.innerHTML = html;
+            
+            // Auto-scroll, ha a felhasználó alul volt, vagy ha explicit kértük
+            if (scrollToBottom || wasAtBottom) {
+                const textarea = document.getElementById(textareaId);
+                if (textarea) {
+                    textarea.scrollTop = textarea.scrollHeight;
+                }
+            }
+        } else {
+            logsContent.innerHTML = `<div class="alert alert-error">${data.message || 'Logok betöltése sikertelen'}</div>`;
+        }
+    } catch (error) {
+        logsContent.innerHTML = `<div class="alert alert-error">Hiba a logok betöltése során: ${error.message}</div>`;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function copyLogs() {
+    const textarea = logsContent.querySelector('textarea');
+    if (textarea) {
+        textarea.select();
+        document.execCommand('copy');
+        alert('Logok másolva a vágólapra!');
+    }
+}
+
+// Modal bezárása kattintásra a háttérre
+if (logsModal) {
+    logsModal.addEventListener('click', function(e) {
+        if (e.target === logsModal) {
+            closeLogsModal();
+        }
+    });
+}
+
+// Shutdown Modal kezelés
+let shutdownModal = null;
+let shutdownServerId = null;
+let shutdownCountdownInterval = null;
+let shutdownScheduledTime = null;
+
+function initShutdownModal() {
+    if (!shutdownModal) {
+        shutdownModal = document.getElementById('shutdownModal');
+    }
+}
+
+// DOM betöltése után inicializálás
+function initializeShutdownSystem() {
+    initShutdownModal();
+    // Ellenőrizzük, hogy a modal elem létezik-e
+    if (!shutdownModal) {
+        console.warn('shutdownModal nem található inicializáláskor');
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeShutdownSystem);
+} else {
+    initializeShutdownSystem();
+}
+
+// Globális függvény, hogy elérhető legyen az onclick eseményhez
+// A placeholder-t felülírjuk a teljes implementációval
+window._showShutdownModalImpl = function(serverId) {
+    console.log('showShutdownModal called with serverId:', serverId);
+    
+    // Inicializáljuk a modal elemeket
+    initShutdownModal();
+    
+    // Ha még mindig nincs modal, próbáljuk meg újra
+    if (!shutdownModal) {
+        shutdownModal = document.getElementById('shutdownModal');
+    }
+    
+    if (!shutdownModal) {
+        console.error('Shutdown modal nem található');
+        console.error('shutdownModal:', shutdownModal);
+        alert('Hiba: A shutdown modal nem található. Kérlek, frissítsd az oldalt.');
+        return;
+    }
+    
+    console.log('Shutdown modal megtalálva, megnyitás...');
+    shutdownServerId = serverId;
+    shutdownModal.style.display = 'flex';
+    
+    // Ellenőrizzük, hogy az input elemek léteznek-e
+    const minutesInput = document.getElementById('shutdownMinutes');
+    const countdownDiv = document.getElementById('shutdownCountdown');
+    const confirmBtn = document.getElementById('shutdownConfirmBtn');
+    const cancelScheduledBtn = document.getElementById('shutdownCancelScheduledBtn');
+    const cancelBtn = document.getElementById('shutdownCancelBtn');
+    
+    if (minutesInput) {
+        minutesInput.value = 5;
+    }
+    if (countdownDiv) {
+        countdownDiv.style.display = 'none';
+    }
+    if (confirmBtn) {
+        confirmBtn.style.display = 'inline-block';
+    }
+    if (cancelScheduledBtn) {
+        cancelScheduledBtn.style.display = 'none';
+    }
+    if (cancelBtn) {
+        cancelBtn.style.display = 'inline-block';
+    }
+    
+    // Ellenőrizzük, hogy van-e már ütemezett leállítás
+    checkScheduledShutdown(serverId);
+};
+
+// A fenti egyszerű implementációt használjuk, de ha kell, felülírhatjuk
+// window.showShutdownModal = window._showShutdownModalImpl;
+
+function closeShutdownModal() {
+    if (shutdownModal) {
+        shutdownModal.style.display = 'none';
+    }
+    shutdownServerId = null;
+    if (shutdownCountdownInterval) {
+        clearInterval(shutdownCountdownInterval);
+        shutdownCountdownInterval = null;
+    }
+}
+
+async function confirmShutdown() {
+    const minutes = parseInt(document.getElementById('shutdownMinutes').value);
+    if (isNaN(minutes) || minutes < 1 || minutes > 60) {
+        alert('Kérlek, adj meg egy érvényes számot 1-60 perc között!');
+        return;
+    }
+    
+    if (!shutdownServerId) {
+        alert('Hiba: Szerver ID nem található');
+        return;
+    }
+    
+    showOperationStatus('Shutdown ütemezés', `Leállítás ütemezése ${minutes} percre...`, 'warning');
+    
+    try {
+        const response = await fetch(`/ark-evolved/servers/${shutdownServerId}/shutdown`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ minutes: minutes })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Countdown indítása
+            shutdownScheduledTime = new Date(data.shutdown_time);
+            startShutdownCountdown();
+            document.getElementById('shutdownConfirmBtn').style.display = 'none';
+            document.getElementById('shutdownCancelScheduledBtn').style.display = 'inline-block';
+            document.getElementById('shutdownCountdown').style.display = 'block';
+            updateOperationStatus(`Leállítás ütemezve ${minutes} percre`);
+            setTimeout(() => hideOperationStatus(), 3000);
+        } else {
+            hideOperationStatus();
+            alert('Hiba: ' + (data.message || 'Nem sikerült beállítani a leállítást'));
+        }
+    } catch (error) {
+        hideOperationStatus();
+        alert('Hiba a leállítás beállításakor: ' + error.message);
+    }
+}
+
+async function cancelScheduledShutdown() {
+    if (!shutdownServerId) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/ark-evolved/servers/${shutdownServerId}/shutdown/cancel`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            if (shutdownCountdownInterval) {
+                clearInterval(shutdownCountdownInterval);
+                shutdownCountdownInterval = null;
+            }
+            document.getElementById('shutdownCountdown').style.display = 'none';
+            document.getElementById('shutdownConfirmBtn').style.display = 'inline-block';
+            document.getElementById('shutdownCancelScheduledBtn').style.display = 'none';
+            shutdownScheduledTime = null;
+        } else {
+            alert('Hiba: ' + (data.message || 'Nem sikerült törölni a leállítást'));
+        }
+    } catch (error) {
+        alert('Hiba a leállítás törlésekor: ' + error.message);
+    }
+}
+
+async function checkScheduledShutdown(serverId) {
+    try {
+        const response = await fetch(`/ark-evolved/servers/${serverId}/shutdown/status`);
+        const data = await response.json();
+        
+        if (data.success && data.scheduled) {
+            shutdownScheduledTime = new Date(data.shutdown_time);
+            startShutdownCountdown();
+            document.getElementById('shutdownConfirmBtn').style.display = 'none';
+            document.getElementById('shutdownCancelScheduledBtn').style.display = 'inline-block';
+            document.getElementById('shutdownCountdown').style.display = 'block';
+        }
+    } catch (error) {
+        // Csendben hibázunk, ha nincs ütemezett leállítás
+    }
+}
+
+function startShutdownCountdown() {
+    if (shutdownCountdownInterval) {
+        clearInterval(shutdownCountdownInterval);
+    }
+    
+    function updateCountdown() {
+        if (!shutdownScheduledTime) {
+            return;
+        }
+        
+        const now = new Date();
+        const diff = shutdownScheduledTime - now;
+        
+        if (diff <= 0) {
+            // Lejárt az idő, leállítjuk a szervert
+            clearInterval(shutdownCountdownInterval);
+            shutdownCountdownInterval = null;
+            document.getElementById('countdownTime').textContent = 'Leállítás...';
+            // Automatikus oldal frissítés, hogy lássuk a leállított státuszt
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+            return;
+        }
+        
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        document.getElementById('countdownTime').textContent = 
+            String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    }
+    
+    updateCountdown();
+    shutdownCountdownInterval = setInterval(updateCountdown, 1000);
+}
+
+// Shutdown modal bezárása kattintásra a háttérre
+if (shutdownModal) {
+    shutdownModal.addEventListener('click', function(e) {
+        if (e.target === shutdownModal) {
+            closeShutdownModal();
+        }
+    });
+}
+
+// Operation Status Notification - GLOBÁLIS FÜGGVÉNYEK (előre definiálva, hogy elérhetők legyenek)
+window.showOperationStatus = function(title, message, type = 'info') {
+    const statusDiv = document.getElementById('operationStatus');
+    const titleDiv = document.getElementById('operationTitle');
+    const messageDiv = document.getElementById('operationMessage');
+    
+    if (!statusDiv || !titleDiv || !messageDiv) {
+        console.warn('Operation status elemek nem találhatók');
+        return;
+    }
+    
+    // Színek típus szerint
+    const colors = {
+        'success': '#28a745',
+        'warning': '#ffc107',
+        'info': '#17a2b8',
+        'danger': '#dc3545'
+    };
+    
+    const color = colors[type] || colors['info'];
+    statusDiv.style.borderLeftColor = color;
+    const spinner = statusDiv.querySelector('.spinner');
+    if (spinner) {
+        spinner.style.borderTopColor = color;
+    }
+    
+    titleDiv.textContent = title;
+    messageDiv.textContent = message;
+    statusDiv.style.display = 'block';
+    
+    // Automatikus elrejtés 30 másodperc után (ha még nem törölték)
+    setTimeout(() => {
+        if (statusDiv.style.display === 'block') {
+            window.hideOperationStatus();
+        }
+    }, 30000);
+};
+
+window.hideOperationStatus = function() {
+    const statusDiv = document.getElementById('operationStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+    }
+};
+
+window.updateOperationStatus = function(message) {
+    const messageDiv = document.getElementById('operationMessage');
+    if (messageDiv) {
+        messageDiv.textContent = message;
+    }
+};
+
+// Form submit után figyeljük a válaszokat
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded fired');
+    
+    // Event delegation használata - így működik, még ha a gombok később is jönnek létre
+    document.addEventListener('click', function(e) {
+        console.log('Click event detected, target:', e.target, 'tagName:', e.target.tagName, 'className:', e.target.className);
+        
+        // Logok gomb
+        const logsBtn = e.target.closest('.logs-btn');
+        if (logsBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const serverId = parseInt(logsBtn.getAttribute('data-server-id'));
+            console.log('Logs button clicked via delegation, serverId:', serverId);
+            if (serverId) {
+                if (window.showServerLogs) {
+                    console.log('Calling window.showServerLogs');
+                    window.showServerLogs(serverId);
+                } else {
+                    console.error('window.showServerLogs nem elérhető');
+                    alert('Hiba: A logok függvény nem elérhető. Kérlek, frissítsd az oldalt.');
+                }
+            } else {
+                console.error('Logs button: serverId nem található, data-server-id:', logsBtn.getAttribute('data-server-id'));
+            }
+            return false;
+        }
+        
+        // Shutdown gomb
+        const shutdownBtn = e.target.closest('.shutdown-btn');
+        if (shutdownBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const serverId = parseInt(shutdownBtn.getAttribute('data-server-id'));
+            console.log('Shutdown button clicked via delegation, serverId:', serverId);
+            if (serverId) {
+                if (window.showShutdownModal) {
+                    console.log('Calling window.showShutdownModal');
+                    window.showShutdownModal(serverId);
+                } else {
+                    console.error('window.showShutdownModal nem elérhető');
+                    alert('Hiba: A shutdown függvény nem elérhető. Kérlek, frissítsd az oldalt.');
+                }
+            } else {
+                console.error('Shutdown button: serverId nem található, data-server-id:', shutdownBtn.getAttribute('data-server-id'));
+            }
+            return false;
+        }
+    });
+    
+    // Direkt event listener-ek is (backup)
+    setTimeout(function() {
+        const logsButtons = document.querySelectorAll('.logs-btn');
+        console.log('Found logs buttons:', logsButtons.length);
+        logsButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const serverId = parseInt(this.getAttribute('data-server-id'));
+                console.log('Logs button clicked (direct listener), serverId:', serverId);
+                if (serverId && window.showServerLogs) {
+                    window.showServerLogs(serverId);
+                }
+            });
+        });
+        
+        const shutdownButtons = document.querySelectorAll('.shutdown-btn');
+        console.log('Found shutdown buttons:', shutdownButtons.length);
+        shutdownButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const serverId = parseInt(this.getAttribute('data-server-id'));
+                console.log('Shutdown button clicked (direct listener), serverId:', serverId);
+                if (serverId && window.showShutdownModal) {
+                    window.showShutdownModal(serverId);
+                }
+            });
+        });
+    }, 100);
+    
+    // Intercept form submissions
+    const forms = document.querySelectorAll('form[action*="/ark-evolved/servers/"]');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Ha már van onsubmit handler, ne akadályozzuk
+            if (form.onsubmit) {
+                return;
+            }
+            
+            const action = form.getAttribute('action');
+            if (action.includes('/start')) {
+                showOperationStatus('Indítás', 'A szerver indítása folyamatban...', 'success');
+            } else if (action.includes('/stop')) {
+                showOperationStatus('Leállítás', 'A szerver leállítása folyamatban...', 'warning');
+            } else if (action.includes('/restart')) {
+                showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info');
+            } else if (action.includes('/delete')) {
+                showOperationStatus('Törlés', 'A szerver törlése folyamatban...', 'danger');
+            }
+        });
+    });
+    
+    // Oldal betöltése után ellenőrizzük, hogy van-e success/error üzenet
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('success') || urlParams.has('error')) {
+        // Ha van success/error üzenet, elrejtjük a status-t
+        setTimeout(() => {
+            hideOperationStatus();
+        }, 2000);
+    }
+});
+</script>
+{% endblock %}
+

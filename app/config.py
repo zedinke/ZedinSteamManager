@@ -40,14 +40,18 @@ class Settings(BaseSettings):
     # Session
     session_secret_key: str = ""
     
-    # Ark Server
+    # Ark Server (Ascended)
     ark_base_path: str = "/opt/ark_servers"  # Alap útvonal az Ark szerverekhez
     ark_install_path: str = "/opt/ark_server_files"  # Telepített szerverfájlok útvonala
-    ark_serverfiles_base: str = "/home/ai_developer/ZedinSteamManager/Server/ArkAscended/ServerFiles"  # Felhasználó-alapú serverfiles mappák alap útvonala
+    ark_serverfiles_base: str = "/home/ai_developer/ZedinSteamManager/Server/ArkAscended/ServerFiles"  # Felhasználó-alapú serverfiles mappák alap útvonala (Ark Ascended)
     ark_default_port: int = 7777  # Alapértelmezett port
     ark_default_query_port: int = 27015  # Alapértelmezett query port
     ark_default_rcon_port: int = 27015  # Alapértelmezett RCON port
     ark_docker_image: str = "zedinarkmanager/ark-server:latest"  # Docker image neve (saját image)
+    
+    # Ark Survival Evolved
+    ark_evolved_serverfiles_base: str = "/home/ai_developer/ZedinSteamManager/Server/ArkEvolved/ServerFiles"  # Felhasználó-alapú serverfiles mappák alap útvonala (Ark Evolved)
+    ark_evolved_docker_image: str = "zedinarkmanager/ark-server:latest"  # Docker image neve (ugyanaz, de külön kezelve)
     
     # Backup korlátok
     backup_max_per_server: int = 20  # Maximum backup száma szerverenként

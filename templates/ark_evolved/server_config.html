@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Szerver Konfiguráció - {{ config_file_name }} - ZedinArkManager{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="page-header">
+        <h2><i class="fas fa-cog"></i> Szerver Konfiguráció</h2>
+        <p>{{ server.name }} - {{ config_file_name }}</p>
+        <div style="margin-top: 10px;">
+            <a href="/ark-evolved/servers/{{ server.id }}/edit" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Vissza a szerver szerkesztéshez
+            </a>
+            <a href="/ark-evolved/servers/{{ server.id }}/config?config_file=GameUserSettings" 
+               class="btn {% if config_file == 'GameUserSettings' %}btn-primary{% else %}btn-info{% endif %}">
+                <i class="fas fa-file-ini"></i> GameUserSettings.ini
+            </a>
+            <a href="/ark-evolved/servers/{{ server.id }}/config?config_file=Game" 
+               class="btn {% if config_file == 'Game' %}btn-primary{% else %}btn-info{% endif %}">
+                <i class="fas fa-file-ini"></i> Game.ini
+            </a>
+            <a href="/ark-evolved/servers/{{ server.id }}/config/{{ config_file }}/raw" class="btn btn-warning">
+                <i class="fas fa-code"></i> Raw Szerkesztő
+            </a>
+        </div>
+    </div>
+    
+    {% if request.query_params.get("success") %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> {{ request.query_params.get("success") }}
+        </div>
+    {% endif %}
+    
+    {% if request.query_params.get("error") %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ request.query_params.get("error") }}
+        </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-file-code"></i> {{ config_file_name }} Szerkesztése</h3>
+        </div>
+        <div class="card-body">
+            {% if not settings_by_category or settings_by_category|length == 0 %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> A konfigurációs fájl még nem létezik vagy üres.
+                    <br>Az első mentéskor létrejön a fájl az alapértelmezett beállításokkal.
+                </div>
+            {% else %}
+                <!-- Kereső mező -->
+                <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;">
+                    <label for="configSearch" style="display: block; margin-bottom: 8px; font-weight: bold; color: #333;">
+                        <i class="fas fa-search"></i> Keresés beállítások között:
+                    </label>
+                    <input type="text" 
+                           id="configSearch" 
+                           placeholder="Keresés beállítás neve, leírás vagy kategória szerint..." 
+                           style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 14px;"
+                           onkeyup="filterSettings()">
+                    <div id="searchResults" style="margin-top: 10px; color: #666; font-size: 13px;"></div>
+                </div>
+            {% endif %}
+            
+            <form method="POST" action="/ark-evolved/servers/{{ server.id }}/config/{{ config_file }}/save" id="configForm">
+                {% if settings_by_category and settings_by_category|length > 0 %}
+                    {% for category in sorted_categories %}
+                        {% if settings_by_category[category] %}
+                            <div class="config-category" data-category="{{ category }}" style="margin-bottom: 40px; border: 2px solid #007bff; border-radius: 8px; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                                <h3 style="color: #007bff; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #007bff; font-size: 22px; font-weight: bold; display: flex; align-items: center; gap: 10px;">
+                                    <i class="fas fa-tags" style="font-size: 24px;"></i> 
+                                    <span class="category-name">{{ category }}</span>
+                                </h3>
+                                
+                                {% for setting in settings_by_category[category] %}
+                                    <div class="form-group setting-item" 
+                                         data-key="{{ setting.key }}" 
+                                         data-description="{{ setting.description|lower }}" 
+                                         data-category="{{ category|lower }}"
+                                         style="margin-bottom: 15px; background-color: white; padding: 15px; border-radius: 5px; border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                        <label for="{{ setting.field_name }}" style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #333; margin-bottom: 8px;">
+                                            {% if setting.is_boolean %}
+                                                <input type="hidden" name="{{ setting.field_name }}" value="false">
+                                                <input type="checkbox" 
+                                                       class="setting-checkbox"
+                                                       id="{{ setting.field_name }}" 
+                                                       name="{{ setting.field_name }}" 
+                                                       value="true"
+                                                       {% if setting.value == True or setting.value == 'True' or setting.value == 'true' or setting.value == '1' %}checked{% endif %}
+                                                       style="width: auto; margin-right: 5px; transform: scale(1.2);">
+                                                <span style="font-size: 16px;" class="setting-key">{{ setting.key }}</span>
+                                            {% else %}
+                                                <span style="font-size: 16px;" class="setting-key">{{ setting.key }}</span>
+                                            {% endif %}
+                                        </label>
+                                        
+                                        {% if not setting.is_boolean %}
+                                            <input type="text" 
+                                                   id="{{ setting.field_name }}" 
+                                                   name="{{ setting.field_name }}" 
+                                                   value="{{ setting.value }}" 
+                                                   class="setting-input"
+                                                   style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; margin-top: 8px; font-family: 'Courier New', monospace; font-size: 14px; transition: border-color 0.3s;"
+                                                   onfocus="this.style.borderColor='#007bff';"
+                                                   onblur="this.style.borderColor='#ddd';">
+                                        {% endif %}
+                                        
+                                        <div class="setting-description" style="display: block; color: #555; margin-top: 8px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; font-size: 13px; line-height: 1.5;">
+                                            <i class="fas fa-info-circle" style="color: #007bff; margin-right: 5px;"></i>
+                                            <span>{% if setting.description %}{{ setting.description }}{% else %}<em style="color: #999;">Nincs leírás</em>{% endif %}</span>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Nincs beállítás a fájlban. Az első mentéskor létrejönnek az alapértelmezett beállítások.
+                    </div>
+                {% endif %}
+                
+                <div style="display: flex; gap: 10px; margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Konfiguráció Mentése
+                    </button>
+                    <a href="/ark-evolved/servers/{{ server.id }}/edit" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Mégse
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.config-category {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.config-category:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.config-category h3 {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.form-group {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.form-group:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.form-group label {
+    cursor: pointer;
+}
+
+.form-group input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.form-group input[type="text"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.config-category.hidden {
+    display: none;
+}
+
+.form-group.hidden {
+    display: none;
+}
+
+.form-group.highlight {
+    background-color: #fff3cd !important;
+    border-color: #ffc107 !important;
+}
+</style>
+
+<script>
+function filterSettings() {
+    const searchTerm = document.getElementById('configSearch').value.toLowerCase().trim();
+    const categories = document.querySelectorAll('.config-category');
+    const settings = document.querySelectorAll('.setting-item');
+    const resultsDiv = document.getElementById('searchResults');
+    
+    let visibleCount = 0;
+    let hiddenCount = 0;
+    
+    if (searchTerm === '') {
+        // Ha nincs keresés, minden látható
+        categories.forEach(cat => {
+            cat.classList.remove('hidden');
+            cat.style.display = 'block';
+        });
+        settings.forEach(setting => {
+            setting.classList.remove('hidden', 'highlight');
+            setting.style.display = 'block';
+        });
+        resultsDiv.textContent = '';
+        return;
+    }
+    
+    // Keresés
+    settings.forEach(setting => {
+        const key = setting.getAttribute('data-key').toLowerCase();
+        const description = setting.getAttribute('data-description') || '';
+        const category = setting.getAttribute('data-category') || '';
+        
+        const matches = key.includes(searchTerm) || 
+                       description.includes(searchTerm) || 
+                       category.includes(searchTerm);
+        
+        if (matches) {
+            setting.classList.remove('hidden');
+            setting.classList.add('highlight');
+            setting.style.display = 'block';
+            visibleCount++;
+        } else {
+            setting.classList.add('hidden');
+            setting.classList.remove('highlight');
+            setting.style.display = 'none';
+            hiddenCount++;
+        }
+    });
+    
+    // Kategóriák elrejtése/megjelenítése
+    categories.forEach(cat => {
+        const categorySettings = cat.querySelectorAll('.setting-item:not(.hidden)');
+        if (categorySettings.length > 0) {
+            cat.classList.remove('hidden');
+            cat.style.display = 'block';
+        } else {
+            cat.classList.add('hidden');
+            cat.style.display = 'none';
+        }
+    });
+    
+    // Eredmények megjelenítése
+    if (visibleCount > 0) {
+        resultsDiv.innerHTML = `<i class="fas fa-check-circle" style="color: green;"></i> ${visibleCount} beállítás találat`;
+        resultsDiv.style.color = 'green';
+    } else {
+        resultsDiv.innerHTML = `<i class="fas fa-times-circle" style="color: red;"></i> Nincs találat`;
+        resultsDiv.style.color = 'red';
+    }
+}
+
+// Enter billentyű esemény
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('configSearch');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
