@@ -202,8 +202,43 @@ function startShutdownCountdown(serverId, minutes) {
     }, 1000);
 }
 
-// Oldal betöltésekor ellenőrizzük a shutdown státuszokat
+// RCON Status ellenőrzés
+function checkRconStatus(serverId) {
+    fetch(`/ark/servers/${serverId}/rcon/status`)
+        .then(response => response.json())
+        .then(data => {
+            const statusDiv = document.getElementById(`rconStatus_${serverId}`);
+            if (!statusDiv) return;
+            
+            if (data.success) {
+                if (!data.rcon_enabled) {
+                    statusDiv.innerHTML = '<span class="badge badge-secondary"><i class="fas fa-ban"></i> RCON kikapcsolva</span>';
+                } else if (data.rcon_working) {
+                    statusDiv.innerHTML = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> RCON OK</span>';
+                } else {
+                    statusDiv.innerHTML = '<span class="badge badge-danger"><i class="fas fa-times-circle"></i> RCON nem elérhető</span>';
+                }
+            } else {
+                statusDiv.innerHTML = '<span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> Hiba</span>';
+            }
+        })
+        .catch(error => {
+            console.error(`RCON status hiba szerver ${serverId}:`, error);
+            const statusDiv = document.getElementById(`rconStatus_${serverId}`);
+            if (statusDiv) {
+                statusDiv.innerHTML = '<span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> Hiba</span>';
+            }
+        });
+}
+
+// Oldal betöltésekor ellenőrizzük a shutdown státuszokat és RCON státuszokat
 document.addEventListener('DOMContentLoaded', function() {
+    // RCON státusz ellenőrzése minden szerverhez
+    {% for item in servers_data %}
+    {% set server = item.server %}
+    checkRconStatus({{ server.id }});
+    {% endfor %}
+    
     // Minden futó szerverhez ellenőrizzük a shutdown státuszt
     const shutdownStatusDivs = document.querySelectorAll('[id^="shutdownStatus_"]');
     shutdownStatusDivs.forEach(function(div) {
