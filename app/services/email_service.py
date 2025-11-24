@@ -5,6 +5,7 @@ Email szolgáltatás
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from fastapi import Request
 from app.config import settings
 from app.services.smtp_config import get_smtp_settings
 from pathlib import Path
@@ -107,7 +108,6 @@ def get_email_template(template_name: str, **kwargs) -> str:
 
 async def send_verification_email(email: str, username: str, token: str, request: Request = None) -> bool:
     """Email verifikációs email küldése"""
-    from fastapi import Request
     
     # Ha a base_url localhost, próbáljuk meg a request-ből meghatározni
     base_url = settings.base_url
