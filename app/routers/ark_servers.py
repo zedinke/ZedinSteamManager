@@ -1627,6 +1627,36 @@ async def start_server_endpoint(
     if not server:
         raise HTTPException(status_code=404, detail="Szerver nem található")
     
+    # Token ellenőrzés - ha nincs token vagy lejárt, ne engedje elindítani
+    from datetime import datetime
+    if not server.token_used_id:
+        return RedirectResponse(
+            url=f"/ark/servers?error=Nincs token hozzárendelve a szerverhez. A szerver nem indítható.",
+            status_code=302
+        )
+    
+    # Ellenőrizzük, hogy a token még érvényes-e
+    from app.database import Token
+    token = db.query(Token).filter(Token.id == server.token_used_id).first()
+    if not token:
+        return RedirectResponse(
+            url=f"/ark/servers?error=A token nem található. A szerver nem indítható.",
+            status_code=302
+        )
+    
+    if not token.is_active or (token.expires_at and token.expires_at <= datetime.utcnow()):
+        return RedirectResponse(
+            url=f"/ark/servers?error=A token lejárt vagy inaktív. A szerver nem indítható.",
+            status_code=302
+        )
+    
+    # Ellenőrizzük a server.token_expires_at is (ha van)
+    if server.token_expires_at and server.token_expires_at <= datetime.utcnow():
+        return RedirectResponse(
+            url=f"/ark/servers?error=A token lejárt. A szerver nem indítható.",
+            status_code=302
+        )
+    
     from app.services.server_control_service import start_server
     result = start_server(server, db)
     
