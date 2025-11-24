@@ -953,6 +953,27 @@ async def get_rcon_status(
     # A jelszó lehet SERVER_ADMIN_PASSWORD vagy ServerAdminPassword kulccsal
     server_admin_password = config.get("SERVER_ADMIN_PASSWORD") or config.get("ServerAdminPassword", "")
     
+    # Ha még mindig nincs jelszó, próbáljuk meg a Docker Compose fájlból is
+    if not server_admin_password:
+        try:
+            from app.services.server_control_service import get_docker_compose_file
+            import yaml
+            compose_file = get_docker_compose_file(server)
+            if compose_file.exists():
+                with open(compose_file, 'r', encoding='utf-8') as f:
+                    compose_data = yaml.safe_load(f)
+                env_vars = compose_data.get('services', {}).get('asaserver', {}).get('environment', [])
+                for env_var in env_vars:
+                    if isinstance(env_var, str) and env_var.startswith('SERVER_ADMIN_PASSWORD='):
+                        server_admin_password = env_var.split('=', 1)[1]
+                        logger.info(f"RCON jelszó Docker Compose fájlból beolvasva")
+                        break
+        except Exception as e:
+            logger.warning(f"RCON jelszó Docker Compose fájlból való beolvasása sikertelen: {e}")
+    
+    # Debug: logoljuk a config tartalmát
+    logger.info(f"RCON beállítások: server_id={server_id}, rcon_enabled={rcon_enabled}, rcon_port={rcon_port}, password_present={bool(server_admin_password)}, password_len={len(server_admin_password) if server_admin_password else 0}, password_preview={server_admin_password[:3] + '...' if server_admin_password and len(server_admin_password) > 3 else '(üres)'}, config_keys={list(config.keys())}")
+    
     if not rcon_enabled:
         return JSONResponse({
             "success": True,
@@ -1002,13 +1023,23 @@ async def get_rcon_status(
             server_ip = '127.0.0.1'
     
     from app.services.server_control_service import test_rcon_connection
-    rcon_working = test_rcon_connection(server_ip, rcon_port, server_admin_password, timeout=3)
+    logger.info(f"RCON státusz ellenőrzés: server_id={server_id}, ip={server_ip}, port={rcon_port}, password_len={len(server_admin_password) if server_admin_password else 0}")
+    
+    # Próbáljuk meg először a szerver IP-t, majd ha nem működik, akkor localhost-ot
+    rcon_working = test_rcon_connection(server_ip, rcon_port, server_admin_password, timeout=5)
+    if not rcon_working and server_ip != '127.0.0.1':
+        # Ha a szerver IP nem működik, próbáljuk meg localhost-ot is
+        logger.info(f"RCON teszt szerver IP-vel sikertelen, próbáljuk localhost-ot: 127.0.0.1:{rcon_port}")
+        rcon_working = test_rcon_connection('127.0.0.1', rcon_port, server_admin_password, timeout=5)
+        if rcon_working:
+            server_ip = '127.0.0.1'
     
     return JSONResponse({
         "success": True,
         "rcon_enabled": True,
         "rcon_working": rcon_working,
         "rcon_port": rcon_port,
+        "rcon_host": server_ip,
         "message": "RCON működik" if rcon_working else "RCON nem elérhető"
     })
 

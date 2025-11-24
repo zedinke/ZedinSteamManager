@@ -43,31 +43,57 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
         sock.settimeout(timeout)
         
         # Kapcsolódás
+        logger.debug(f"RCON kapcsolódás: {host}:{port}")
         sock.connect((host, port))
+        logger.debug(f"RCON kapcsolat létrejött: {host}:{port}")
         
         # RCON autentikáció
         # SERVERDATA_AUTH packet
-        auth_packet = struct.pack('<III', 0, 3, len(password)) + password.encode('utf-8') + b'\x00\x00'
+        # ID: 0 (autentikációhoz), Type: 3 (SERVERDATA_AUTH), Body: password + null terminátorok
+        password_bytes = password.encode('utf-8')
+        auth_packet = struct.pack('<III', 0, 3, len(password_bytes)) + password_bytes + b'\x00\x00'
         auth_packet = struct.pack('<I', len(auth_packet)) + auth_packet
+        logger.debug(f"RCON autentikáció küldés: jelszó hossza={len(password_bytes)}, packet hossza={len(auth_packet)}")
         sock.send(auth_packet)
         
         # Válasz olvasása (2 packet: SERVERDATA_AUTH_RESPONSE és SERVERDATA_RESPONSE_VALUE)
         try:
             response = sock.recv(4096)
+            logger.debug(f"RCON autentikáció válasz: hossz={len(response)}, első 20 byte={response[:20].hex() if len(response) >= 20 else response.hex()}")
             if len(response) < 4:
-                logger.warning("RCON autentikáció válasz túl rövid")
+                logger.warning(f"RCON autentikáció válasz túl rövid: {len(response)} byte")
+                sock.close()
+                return None
+            
+            # Válasz packet struktúra: [4 byte length][4 byte ID][4 byte type][body]
+            response_length = struct.unpack('<I', response[0:4])[0]
+            if len(response) < 12:
+                logger.warning(f"RCON autentikáció válasz túl rövid a header-hez: {len(response)} byte")
                 sock.close()
                 return None
             
             # Ellenőrizzük, hogy az autentikáció sikeres volt-e
-            # Ha a válasz ID -1, akkor sikertelen volt
+            # Ha a válasz ID -1 (0xFFFFFFFF), akkor sikertelen volt
             response_id = struct.unpack('<I', response[4:8])[0]
+            response_type = struct.unpack('<I', response[8:12])[0]
+            logger.debug(f"RCON autentikáció válasz: ID={response_id} (0x{response_id:08X}), Type={response_type}, Length={response_length}")
+            
             if response_id == 0xFFFFFFFF:
-                logger.warning("RCON autentikáció sikertelen")
+                logger.warning(f"RCON autentikáció sikertelen: {host}:{port} - rossz jelszó vagy RCON nincs engedélyezve")
                 sock.close()
                 return None
+            
+            # Ha az ID 0 és a Type 2 (SERVERDATA_AUTH_RESPONSE), akkor sikeres
+            # De az ARK szerverek 2 packet-et küldenek: egy AUTH_RESPONSE-t és egy RESPONSE_VALUE-t
+            # Olvassuk be a második packet-et is
+            if len(response) < response_length + 4:
+                # Ha nem kaptuk meg az egész packet-et, próbáljuk meg újra olvasni
+                remaining = response_length + 4 - len(response)
+                additional = sock.recv(remaining)
+                response += additional
+                logger.debug(f"RCON autentikáció további adat olvasva: {len(additional)} byte")
         except socket.timeout:
-            logger.warning("RCON autentikáció timeout")
+            logger.warning(f"RCON autentikáció timeout: {host}:{port}")
             sock.close()
             return None
         
@@ -92,16 +118,25 @@ def send_rcon_command(host: str, port: int, password: str, command: str, timeout
         sock.close()
         return None
         
+    except socket.timeout as e:
+        logger.warning(f"RCON parancs timeout: {host}:{port} - {e}")
+        return None
+    except ConnectionRefusedError as e:
+        logger.warning(f"RCON kapcsolat megtagadva: {host}:{port} - {e}")
+        return None
+    except OSError as e:
+        logger.warning(f"RCON hálózati hiba: {host}:{port} - {e}")
+        return None
     except Exception as e:
-        logger.error(f"RCON parancs hiba: {e}")
+        logger.error(f"RCON parancs hiba: {host}:{port} - {e}", exc_info=True)
         return None
 
-def test_rcon_connection(host: str, port: int, password: str, timeout: int = 3) -> bool:
+def test_rcon_connection(host: str, port: int, password: str, timeout: int = 5) -> bool:
     """
     RCON kapcsolat tesztelése
     
     Args:
-        host: Szerver host (általában localhost)
+        host: Szerver host (IP cím vagy hostname)
         port: RCON port
         password: RCON jelszó
         timeout: Timeout másodpercben
@@ -110,15 +145,22 @@ def test_rcon_connection(host: str, port: int, password: str, timeout: int = 3) 
         True ha az RCON kapcsolat működik, False egyébként
     """
     if not password or not password.strip():
+        logger.warning(f"RCON teszt: jelszó üres")
         return False
     
     try:
+        logger.info(f"RCON teszt: {host}:{port}, jelszó hossza: {len(password)}, timeout: {timeout}")
         # Próbálunk egy egyszerű parancsot küldeni (pl. "listplayers" vagy csak egy üres parancs)
         result = send_rcon_command(host, port, password, "listplayers", timeout=timeout)
         # Ha van válasz (akár üres is), akkor működik
-        return result is not None
+        if result is not None:
+            logger.info(f"RCON teszt sikeres: {host}:{port}")
+            return True
+        else:
+            logger.warning(f"RCON teszt sikertelen: {host}:{port} - nincs válasz")
+            return False
     except Exception as e:
-        logger.debug(f"RCON kapcsolat teszt hiba: {e}")
+        logger.error(f"RCON kapcsolat teszt hiba: {e}", exc_info=True)
         return False
 
 def check_process_running_in_container(container_name: str, process_pattern: str = "ArkAscendedServer.exe") -> bool:
