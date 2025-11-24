@@ -2,12 +2,11 @@
 Mod kezelő router - Server Admin mod csomagok kezelése
 """
 
-from fastapi import APIRouter, Request, Form, HTTPException, Depends, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import APIRouter, Request, Form, HTTPException, Depends
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 from app.database import get_db, User, UserMod
-from app.services.curseforge_service import search_mods, get_mod_details
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
@@ -51,54 +50,6 @@ async def list_mods(
         "request": request,
         "current_user": current_user,
         "mods": mods
-    })
-
-@router.get("/search", response_class=HTMLResponse)
-async def show_search(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """Server Admin: Mod kereső felület"""
-    current_user = require_server_admin(request, db)
-    
-    query = request.query_params.get("q", "")
-    results = []
-    
-    if query:
-        # Mod keresés
-        results = await search_mods(query)
-        # Ha nincs találat, de a query szám, akkor lehet mod ID
-        if not results and query.strip().isdigit():
-            results = [{
-                "id": query.strip(),
-                "name": f"Mod {query.strip()}",
-                "icon_url": None,
-                "url": f"https://steamcommunity.com/sharedfiles/filedetails/?id={query.strip()}",
-                "description": "Add meg a mod nevét és ikonját manuálisan"
-            }]
-    
-    return templates.TemplateResponse("mods/search.html", {
-        "request": request,
-        "current_user": current_user,
-        "query": query,
-        "results": results
-    })
-
-@router.get("/api/search")
-async def api_search_mods(
-    request: Request,
-    q: str = Query(..., min_length=2),
-    db: Session = Depends(get_db)
-):
-    """API endpoint mod kereséshez"""
-    current_user = require_server_admin(request, db)
-    
-    # Mod keresés
-    results = await search_mods(q)
-    
-    return JSONResponse({
-        "success": True,
-        "results": results
     })
 
 @router.post("/add")
