@@ -57,24 +57,61 @@ window.updateOperationStatus = function(message) {
     }
 };
 
-// Logs és Shutdown függvények placeholder-ek (később definiáljuk)
+// Logs és Shutdown függvények - közvetlen implementáció
+// Queue a függvényhívásokhoz, ha a DOM még nem töltődött be
+window._functionQueue = [];
+
 window.showServerLogs = function(serverId) {
-    console.log('showServerLogs placeholder called, serverId:', serverId);
-    // A teljes implementáció a script blokkban lesz
-    if (window._showServerLogsImpl) {
+    console.log('showServerLogs called, serverId:', serverId);
+    // Ha a DOM már betöltődött és a teljes implementáció elérhető, hívjuk meg
+    if (document.readyState === 'complete' && window._showServerLogsImpl) {
         window._showServerLogsImpl(serverId);
+    } else if (window._showServerLogsImpl) {
+        // Ha a teljes implementáció elérhető, de a DOM még nem, várunk
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                window._showServerLogsImpl(serverId);
+            });
+        } else {
+            window._showServerLogsImpl(serverId);
+        }
     } else {
-        console.warn('showServerLogs implementation not loaded yet');
+        // Ha még nincs implementáció, tároljuk a queue-ban
+        console.log('showServerLogs: implementáció még nem elérhető, queue-ba teszem');
+        window._functionQueue.push({func: 'showServerLogs', args: [serverId]});
+        // Próbáljuk meg késleltetve is meghívni
+        setTimeout(function() {
+            if (window._showServerLogsImpl) {
+                window._showServerLogsImpl(serverId);
+            }
+        }, 100);
     }
 };
 
 window.showShutdownModal = function(serverId) {
-    console.log('showShutdownModal placeholder called, serverId:', serverId);
-    // A teljes implementáció a script blokkban lesz
-    if (window._showShutdownModalImpl) {
+    console.log('showShutdownModal called, serverId:', serverId);
+    // Ha a DOM már betöltődött és a teljes implementáció elérhető, hívjuk meg
+    if (document.readyState === 'complete' && window._showShutdownModalImpl) {
         window._showShutdownModalImpl(serverId);
+    } else if (window._showShutdownModalImpl) {
+        // Ha a teljes implementáció elérhető, de a DOM még nem, várunk
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                window._showShutdownModalImpl(serverId);
+            });
+        } else {
+            window._showShutdownModalImpl(serverId);
+        }
     } else {
-        console.warn('showShutdownModal implementation not loaded yet');
+        // Ha még nincs implementáció, tároljuk a queue-ban
+        console.log('showShutdownModal: implementáció még nem elérhető, queue-ba teszem');
+        window._functionQueue.push({func: 'showShutdownModal', args: [serverId]});
+        // Próbáljuk meg késleltetve is meghívni
+        setTimeout(function() {
+            if (window._showShutdownModalImpl) {
+                window._showShutdownModalImpl(serverId);
+            }
+        }, 100);
     }
 };
 </script>
@@ -642,8 +679,21 @@ window._showServerLogsImpl = async function(serverId, scrollToBottom = true) {
     await loadLogs(serverId, scrollToBottom);
 };
 
-// A placeholder-t felülírjuk
+// A placeholder-t felülírjuk a teljes implementációval
 window.showServerLogs = window._showServerLogsImpl;
+
+// Futtassuk le a queue-ban lévő függvényhívásokat
+if (window._functionQueue && window._functionQueue.length > 0) {
+    console.log('Futtatom a queue-ban lévő függvényhívásokat:', window._functionQueue.length);
+    window._functionQueue.forEach(function(item) {
+        if (item.func === 'showServerLogs' && window._showServerLogsImpl) {
+            window._showServerLogsImpl.apply(null, item.args);
+        } else if (item.func === 'showShutdownModal' && window._showShutdownModalImpl) {
+            window._showShutdownModalImpl.apply(null, item.args);
+        }
+    });
+    window._functionQueue = [];
+}
 
 async function loadLogs(serverId, scrollToBottom = false) {
     try {
@@ -802,6 +852,20 @@ window._showShutdownModalImpl = function(serverId) {
 
 // A placeholder-t felülírjuk a teljes implementációval
 window.showShutdownModal = window._showShutdownModalImpl;
+
+// Futtassuk le a queue-ban lévő függvényhívásokat
+if (window._functionQueue && window._functionQueue.length > 0) {
+    console.log('Futtatom a queue-ban lévő shutdown függvényhívásokat:', window._functionQueue.length);
+    window._functionQueue.forEach(function(item) {
+        if (item.func === 'showShutdownModal' && window._showShutdownModalImpl) {
+            window._showShutdownModalImpl.apply(null, item.args);
+        }
+    });
+    // Csak a shutdown hívásokat töröljük, a logs-okat már feldolgoztuk
+    window._functionQueue = window._functionQueue.filter(function(item) {
+        return item.func !== 'showShutdownModal';
+    });
+}
 
 function closeShutdownModal() {
     if (shutdownModal) {
