@@ -577,6 +577,30 @@ async def install_ark_server_files(
             # Várunk egy kicsit, hogy a fájlrendszer frissüljön
             await asyncio.sleep(3)
             
+            # FONTOS: steam_appid.txt ellenőrzése és javítása (ha szükséges)
+            # Ark Survival Evolved esetén 376030-nak kell lennie
+            if steam_app_id == "376030":
+                steam_appid_file = install_path / "ShooterGame" / "Binaries" / "Linux" / "steam_appid.txt"
+                if steam_appid_file.exists():
+                    try:
+                        current_appid = steam_appid_file.read_text().strip()
+                        if current_appid != "376030":
+                            await log(f"⚠️ steam_appid.txt rossz értéket tartalmaz: {current_appid}, javítás 376030-ra...")
+                            steam_appid_file.write_text("376030")
+                            await log(f"✓ steam_appid.txt javítva: 376030")
+                        else:
+                            await log(f"✓ steam_appid.txt helyes: 376030")
+                    except Exception as e:
+                        await log(f"⚠️ steam_appid.txt ellenőrzése/javítása sikertelen: {e}")
+                else:
+                    # Ha nincs, létrehozzuk
+                    try:
+                        steam_appid_file.parent.mkdir(parents=True, exist_ok=True)
+                        steam_appid_file.write_text("376030")
+                        await log(f"✓ steam_appid.txt létrehozva: 376030")
+                    except Exception as e:
+                        await log(f"⚠️ steam_appid.txt létrehozása sikertelen: {e}")
+            
             # Ha a SteamCMD azt mondta "already up to date", de nincs Binaries mappa,
             # akkor töröljük a ShooterGame mappát és újratelepítjük
             shooter_game = install_path / "ShooterGame"
