@@ -156,7 +156,7 @@
                                                     <i class="fas fa-stop"></i> Leállítás
                                                 </button>
                                             </form>
-                                            <button type="button" class="btn btn-sm btn-warning" onclick="showShutdownModal({{ server.id }}); return false;" title="Késleltetett leállítás">
+                                            <button type="button" class="btn btn-sm btn-warning shutdown-btn" data-server-id="{{ server.id }}" title="Késleltetett leállítás">
                                                 <i class="fas fa-clock"></i> Shutdown
                                             </button>
                                             <form method="POST" action="/ark/servers/{{ server.id }}/restart" style="display: inline;" onsubmit="showOperationStatus('Újraindítás', 'A szerver újraindítása folyamatban...', 'info'); return true;">
@@ -174,7 +174,7 @@
                                         <a href="/ark/servers/{{ server.id }}/edit" class="btn btn-sm btn-primary" title="Szerver szerkesztése">
                                             <i class="fas fa-edit"></i> Szerkesztés
                                         </a>
-                                        <button type="button" class="btn btn-sm btn-info" onclick="showServerLogs({{ server.id }}); return false;" title="Indítási logok megtekintése">
+                                        <button type="button" class="btn btn-sm btn-info logs-btn" data-server-id="{{ server.id }}" title="Indítási logok megtekintése">
                                             <i class="fas fa-file-alt"></i> Logok
                                         </button>
                                         <form method="POST" action="/ark/servers/{{ server.id }}/delete" 
@@ -858,6 +858,40 @@ function updateOperationStatus(message) {
 
 // Form submit után figyeljük a válaszokat
 document.addEventListener('DOMContentLoaded', function() {
+    // Logok gombok event listener-ei
+    const logsButtons = document.querySelectorAll('.logs-btn');
+    logsButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const serverId = parseInt(this.getAttribute('data-server-id'));
+            console.log('Logs button clicked, serverId:', serverId);
+            if (serverId && window.showServerLogs) {
+                window.showServerLogs(serverId);
+            } else {
+                console.error('Logs button: serverId vagy showServerLogs nem elérhető');
+                alert('Hiba: A logok gomb nem működik. Kérlek, frissítsd az oldalt.');
+            }
+        });
+    });
+    
+    // Shutdown gombok event listener-ei
+    const shutdownButtons = document.querySelectorAll('.shutdown-btn');
+    shutdownButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const serverId = parseInt(this.getAttribute('data-server-id'));
+            console.log('Shutdown button clicked, serverId:', serverId);
+            if (serverId && window.showShutdownModal) {
+                window.showShutdownModal(serverId);
+            } else {
+                console.error('Shutdown button: serverId vagy showShutdownModal nem elérhető');
+                alert('Hiba: A shutdown gomb nem működik. Kérlek, frissítsd az oldalt.');
+            }
+        });
+    });
+    
     // Intercept form submissions
     const forms = document.querySelectorAll('form[action*="/ark/servers/"]');
     forms.forEach(form => {
