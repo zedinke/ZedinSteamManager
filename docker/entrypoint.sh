@@ -551,10 +551,46 @@ echo "=========================================="
 if [ ! -x "${SERVER_BINARY}" ]; then
     echo "HIBA: A szerver bináris nem végrehajtható: ${SERVER_BINARY}"
     echo "Jogosultságok beállítása..."
+    
+    # Először ellenőrizzük a tulajdonjogot
+    BINARY_OWNER=$(stat -c '%U:%G' "${SERVER_BINARY}" 2>/dev/null || echo "unknown")
+    CURRENT_USER=$(id -un)
+    CURRENT_UID=$(id -u)
+    CURRENT_GID=$(id -g)
+    
+    echo "Bináris tulajdonos: ${BINARY_OWNER}"
+    echo "Jelenlegi felhasználó: ${CURRENT_USER} (${CURRENT_UID}:${CURRENT_GID})"
+    
+    # Ha root tulajdonjogú, akkor a jelenlegi felhasználóra változtatjuk
+    if [ "${BINARY_OWNER}" = "root:root" ] && [ "${CURRENT_UID}" != "0" ]; then
+        echo "Bináris root tulajdonjogú, javítás ${CURRENT_UID}:${CURRENT_GID}-re..."
+        chown "${CURRENT_UID}:${CURRENT_GID}" "${SERVER_BINARY}" 2>/dev/null || {
+            echo "⚠️  Figyelmeztetés: Nem sikerült megváltoztatni a bináris tulajdonjogát"
+        }
+    fi
+    
+    # Jogosultságok beállítása
     chmod +x "${SERVER_BINARY}" || {
         echo "HIBA: Nem lehet végrehajthatóvá tenni a binárist!"
-        exit 1
+        echo "Próbáljuk meg a szülő mappa jogosultságait is javítani..."
+        
+        # Szülő mappa jogosultságok javítása
+        BINARY_DIR=$(dirname "${SERVER_BINARY}")
+        if [ -d "${BINARY_DIR}" ]; then
+            chmod u+x "${BINARY_DIR}" 2>/dev/null || true
+            if [ "${BINARY_OWNER}" = "root:root" ] && [ "${CURRENT_UID}" != "0" ]; then
+                chown -R "${CURRENT_UID}:${CURRENT_GID}" "${BINARY_DIR}" 2>/dev/null || true
+            fi
+        fi
+        
+        # Újrapróbálkozás
+        chmod +x "${SERVER_BINARY}" || {
+            echo "HIBA: Nem lehet végrehajthatóvá tenni a binárist még a szülő mappa javítása után sem!"
+            exit 1
+        }
     }
+    
+    echo "✓ Bináris végrehajthatóvá téve"
 fi
 
 # Library függőségek ellenőrzése (csak Linux binárisoknál)
