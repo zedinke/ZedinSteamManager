@@ -1246,23 +1246,47 @@ async def delete_server(
     # Szerver törlése az adatbázisból (előbb, hogy ellenőrizhessük, van-e még más szerver)
     user_id = server.server_admin_id
     
-    # Ellenőrizzük, hogy van-e még más szerver, ami ezt a felhasználót használja (MEGELŐZŐLEG)
-    remaining_servers = db.query(ServerInstance).filter(
-        ServerInstance.server_admin_id == user_id
-    ).count()
+    # FONTOS: Ha korábbi művelet hibát okozott, rollback-et csinálunk
+    try:
+        db.rollback()
+    except Exception:
+        pass  # Ha nincs mit rollback-olni, folytatjuk
     
-    print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés előtt: {remaining_servers}")
+    # Ellenőrizzük, hogy van-e még más szerver, ami ezt a felhasználót használja (MEGELŐZŐLEG)
+    try:
+        remaining_servers = db.query(ServerInstance).filter(
+            ServerInstance.server_admin_id == user_id
+        ).count()
+        print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés előtt: {remaining_servers}")
+    except Exception as e:
+        # Ha hiba van, rollback és újra próbálkozás
+        db.rollback()
+        remaining_servers = db.query(ServerInstance).filter(
+            ServerInstance.server_admin_id == user_id
+        ).count()
+        print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés előtt (retry): {remaining_servers}")
     
     # Szerver törlése az adatbázisból
-    db.delete(server)
-    db.commit()
+    try:
+        db.delete(server)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Hiba a szerver törlésekor: {e}")
     
     # Ellenőrizzük újra, hogy van-e még más szerver
-    remaining_servers_after = db.query(ServerInstance).filter(
-        ServerInstance.server_admin_id == user_id
-    ).count()
-    
-    print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés után: {remaining_servers_after}")
+    try:
+        remaining_servers_after = db.query(ServerInstance).filter(
+            ServerInstance.server_admin_id == user_id
+        ).count()
+        print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés után: {remaining_servers_after}")
+    except Exception as e:
+        # Ha hiba van, rollback és újra próbálkozás
+        db.rollback()
+        remaining_servers_after = db.query(ServerInstance).filter(
+            ServerInstance.server_admin_id == user_id
+        ).count()
+        print(f"DEBUG: Felhasználó {user_id} szervereinek száma törlés után (retry): {remaining_servers_after}")
     
     # MINDENKÉPPEN töröljük a ServerFiles/user_{user_id} mappát (függetlenül attól, hogy van-e más szerver)
     try:
