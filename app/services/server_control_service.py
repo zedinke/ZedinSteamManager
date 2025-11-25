@@ -582,7 +582,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
                 logger.warning(f"Symlink követése sikertelen: {e}")
         
         # Docker Compose fájl útvonala
-        compose_file = get_docker_compose_file(server)
+        compose_file = get_docker_compose_file(server, db=db)
         
         # Konfiguráció beolvasása a Saved/Config/WindowsServer mappából
         config_path = saved_path / "Config" / "WindowsServer"
@@ -1073,7 +1073,7 @@ def start_server(server: ServerInstance, db: Session) -> Dict[str, any]:
         
         # Docker Compose fájl létrehozása/frissítése
         # Mindig frissítjük, hogy a konfigurációk szinkronban legyenek
-        compose_file = get_docker_compose_file(server)
+        compose_file = get_docker_compose_file(server, db=db)
         try:
             if not create_docker_compose_file(server, serverfiles_link, saved_path, db):
                 error_details = f"Docker Compose fájl létrehozása sikertelen. Ellenőrizd a logokat."
@@ -1354,7 +1354,7 @@ def stop_server(server: ServerInstance, db: Session) -> Dict[str, any]:
                 "message": "Docker Compose nem elérhető"
             }
         
-        compose_file = get_docker_compose_file(server)
+        compose_file = get_docker_compose_file(server, db=db)
         if not compose_file.exists():
             # Ha nincs compose fájl, akkor nincs mit leállítani
             try:
