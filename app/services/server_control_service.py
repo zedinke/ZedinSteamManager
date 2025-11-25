@@ -457,7 +457,7 @@ def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, s
         True ha sikeres, False egyébként
     """
     try:
-        instance_dir = get_instance_dir(server)  # Servers/server_{server_id}/
+        instance_dir = get_instance_dir(server, db=db)  # Servers/server_{server_id}/
         instance_dir.mkdir(parents=True, exist_ok=True)
         # AZONNAL beállítjuk a jogosultságokat (ne root jogosultságokkal jöjjön létre!)
         from app.services.symlink_service import ensure_permissions
