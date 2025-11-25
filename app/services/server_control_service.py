@@ -344,37 +344,47 @@ def get_docker_compose_cmd() -> Optional[str]:
     
     return None
 
-def get_instance_dir(server: ServerInstance) -> Path:
+def get_instance_dir(server: ServerInstance, db: Optional[Session] = None) -> Path:
     """
     Instance mappa útvonala (új struktúra: Servers/server_{server_id}/)
     A docker-compose.yaml közvetlenül a szerver mappájában van
     
     Args:
         server: ServerInstance objektum
+        db: Database session (opcionális, csak ha game_id lekéréséhez szükséges)
     
     Returns:
         Path objektum a szerver mappához (ahol a docker-compose.yaml van)
     """
     # Új struktúra: Servers/server_{server_id}/
     from app.services.symlink_service import get_servers_base_path
-    servers_base = get_servers_base_path()
+    servers_base = get_servers_base_path(game_id=server.game_id, db=db)
     instance_dir = servers_base / f"server_{server.id}"
-    logger.info(f"Instance mappa útvonal: {instance_dir}")
+    logger.info(f"Instance mappa útvonal: {instance_dir} (game_id: {server.game_id})")
     return instance_dir
 
-def get_instance_dir_by_id(server_id: int) -> Path:
+def get_instance_dir_by_id(server_id: int, db: Optional[Session] = None) -> Path:
     """
     Instance mappa útvonala szerver ID alapján (törléshez)
     Új struktúra: Servers/server_{server_id}/
     
     Args:
         server_id: Szerver ID
+        db: Database session (opcionális, csak ha game_id lekéréséhez szükséges)
     
     Returns:
         Path objektum a szerver mappához
     """
     from app.services.symlink_service import get_servers_base_path
-    servers_base = get_servers_base_path()
+    from app.database import ServerInstance
+    
+    game_id = None
+    if db:
+        server = db.query(ServerInstance).filter(ServerInstance.id == server_id).first()
+        if server:
+            game_id = server.game_id
+    
+    servers_base = get_servers_base_path(game_id=game_id, db=db)
     instance_dir = servers_base / f"server_{server_id}"
     return instance_dir
 
@@ -405,17 +415,18 @@ def remove_instance_dir(server_id: int) -> bool:
         traceback.print_exc()
         return False
 
-def get_docker_compose_file(server: ServerInstance) -> Path:
+def get_docker_compose_file(server: ServerInstance, db: Optional[Session] = None) -> Path:
     """
     Docker Compose fájl útvonala (új struktúra: Servers/server_{server_id}/docker-compose.yaml)
     
     Args:
         server: ServerInstance objektum
+        db: Database session (opcionális, csak ha game_id lekéréséhez szükséges)
     
     Returns:
         Path objektum a docker-compose fájlhoz
     """
-    instance_dir = get_instance_dir(server)
+    instance_dir = get_instance_dir(server, db=db)
     return instance_dir / "docker-compose.yaml"
 
 def create_docker_compose_file(server: ServerInstance, serverfiles_link: Path, saved_path: Path, db: Optional[Session] = None) -> bool:
@@ -1583,7 +1594,7 @@ def update_start_command_file(server: ServerInstance, compose_file: Path, compos
         compose_data: Docker Compose adatok
     """
     try:
-        instance_dir = get_instance_dir(server)
+        instance_dir = get_instance_dir(server, db=None)  # db nincs szükséges, mert a server objektumban már van game_id
         command_file = instance_dir / "start_command.txt"
         
         # Environment változók összegyűjtése és értelmezése
@@ -1737,7 +1748,7 @@ def get_start_command_string(server: ServerInstance, db: Session) -> Optional[st
         String formában a teljes parancs argumentumokkal vagy None
     """
     try:
-        instance_dir = get_instance_dir(server)
+        instance_dir = get_instance_dir(server, db=None)  # db nincs szükséges, mert a server objektumban már van game_id
         command_file = instance_dir / "start_command.txt"
         compose_file = get_docker_compose_file(server)
         

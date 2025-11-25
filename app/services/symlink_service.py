@@ -181,17 +181,35 @@ def get_user_serverfiles_path(user_id: int, game_id: Optional[int] = None, db: O
     user_serverfiles_path = base_path / f"user_{user_id}"
     return user_serverfiles_path
 
-def get_servers_base_path() -> Path:
+def get_servers_base_path(game_id: Optional[int] = None, db: Optional[Session] = None) -> Path:
     """
     Servers mappa alap útvonala (új struktúra)
+    
+    Args:
+        game_id: Game ID (opcionális, ha meg van adva, akkor játék-specifikus útvonalat használ)
+        db: Database session (opcionális, csak ha game_id meg van adva)
     
     Returns:
         Path objektum a Servers mappához
     """
-    if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
-        base_dir = Path(settings.ark_serverfiles_base).parent
+    # Játék-specifikus base path meghatározása
+    if db and game_id:
+        from app.database import Game
+        game = db.query(Game).filter(Game.id == game_id).first()
+        if game:
+            if game.name == "Ark Survival Evolved" or "evolved" in game.name.lower():
+                base_dir = Path(settings.ark_evolved_serverfiles_base).parent
+            else:
+                base_dir = Path(settings.ark_serverfiles_base).parent
+        else:
+            # Ha nincs játék, alapértelmezett Ark Ascended
+            base_dir = Path(settings.ark_serverfiles_base).parent
     else:
-        base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
+        # Ha nincs game_id, alapértelmezett Ark Ascended
+        if hasattr(settings, 'ark_serverfiles_base') and settings.ark_serverfiles_base:
+            base_dir = Path(settings.ark_serverfiles_base).parent
+        else:
+            base_dir = Path("/home/ai_developer/ZedinSteamManager/Server/ArkAscended")
     
     servers_base = base_dir / "Servers"
     return servers_base
