@@ -1750,7 +1750,7 @@ def get_start_command_string(server: ServerInstance, db: Session) -> Optional[st
     try:
         instance_dir = get_instance_dir(server, db=None)  # db nincs szükséges, mert a server objektumban már van game_id
         command_file = instance_dir / "start_command.txt"
-        compose_file = get_docker_compose_file(server)
+        compose_file = get_docker_compose_file(server, db=db)
         
         # Ha létezik a compose fájl, mindig frissítsük az indítási parancs fájlt
         if compose_file.exists():
